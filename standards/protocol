@@ -1,5 +1,8 @@
 OpenCoin 
 
+How the wallet creates a coin and communicates with an issuer
+=============================================================
+
 #1 issuer setup
 
 * issuer generates master key pair (pM,sM)
@@ -35,7 +38,7 @@ OpenCoin
 * fetch "currency description document" from issuer
 
 
-#3 wallet sends signing reuest to issuer
+#3 wallet creates blanks
 
 * Wallet: fetches current public minting keys for denomination
 
@@ -54,7 +57,12 @@ OpenCoin
 
     blind = blinding(r, blank)
  
-  Keep (r, blank, blind) in mind. Send 
+  Keep (r, blank, blind) in mind. 
+  
+  
+#4 wallet send minting request to issuer  
+
+* Send 
 
     request = ( (blind, key_id), [request_id] )
 
@@ -62,7 +70,7 @@ OpenCoin
 
 * Issuer: checks, if key_id is current, otherwise rejct with "current key is #ID"
 
-  Decides if request will be minted (e.g., payment not yet received), otherwise reject
+  Decides if request will be minted (e.g., payment not yet received), otherwise rejects
 
   Issuer passes (maybe asynchronous) reuest to mint.
 
@@ -71,7 +79,7 @@ OpenCoin
   Mint passes "signed blind"="blind coin" back to issuer 
 
 
-#4 Wallet gets coin back
+#5 Wallet gets coin back
 
 * Wallet asks issuer service "fetch_signed_blind request_id"
 
@@ -82,4 +90,103 @@ OpenCoin
   (optional: if yes, inform issuer that he may delete the request)
 
 * Wallet unblinds signed blind and yields coin  (or reblinds)
+
+
+#6 Wallet to Wallet
+
+Wallet S - sends a coin
+Wallet R - receives the coin
+
+* (Wallet S locates Wallet R)
+  (S knows how much to send)
+
+* S tells Wallet S what sum to send to Wallet R
+
+* Wallet S needs to compute a splitting of sum into coins (units)
+
+* Wallet S sends blanks of coins (without signature!) to Wallet R 
+  (Wallet S now needs to wait a while)
+
+* Wallet R validates the blanks
+  - do we have the "currency description document"
+  - do we trust the issuer (do we have a valid public key)
+  - checks blanks against cdd
+
+* If blanks are invalid, the transfer is declined by Wallet R
+  (later: cdd transfer between wallets)
+
+* Wallet R shows proposed transfer to user R
+
+* user R decides whether to 
+  - accept transfer
+  - accept transfer without double spending checking
+  - decline transfer
+
+
+if dsdb is reuired (normal case):
+
+    * Wallet R prepares for coin exchange with IS, by creating blanks of same sum (see #3)
+
+    * Wallet R DSDB lookup
+      - parse cdd for issuer service location
+      - parse blanks for  necessary minting key ids
+      - start session with authenticated issuer service (IS) (secured and authenticated by transport layer, e.g. SSL)
+        - get session id (from transport layer)
+        - get all missing minting key certs
+        - IS sends key certs or rejects a key id (unknown, outdated)
+        - lock list of coin serial numbers at IS (DSDB) 
+        - IS either accepts with locking time or rejects with list of rejected serials + reason (locked, spent) 
+
+      (this part pauses, session is kept)
+
+* Wallet R tells Wallet S accept or reject with reason (unknown, outdated, locked, spent) for each rejected blank
+  (if one blank is rejected the whole transfer has to be rejected)
+
+* Wallet S sends coins to Wallet R (= blanks + signature)
+  
+* Wallet R checks that the coins match the blanks and that signatures are valid
+
+* Wallet R accepts transaction or rejects with reason (unknown, invalid) for each rejected coin
+
+* Wallet R terminates session with Wallet S
+
+    (in case of rejection Wallet S needs to do emergency meassures, quickly trying to exchange coins with IS 
+     itself etc.)
+
+
+if dsdb is reuired (normal case):
+    
+    * in case of reject in the checking phase delete the blanks, otherwise
+    
+    * Wallet R sends buy request (blanks + coins) (Wallet R continues as in #4 and #8)
+
+    * IS has to check if sum of blanks and coins are equal
+
+
+#7 Redeeming Coins 
+
+* Wallet locks serials at IS (see above)
+
+* Wallet sends coins + target to IS
+  
+  - target can be an account
+
+* continue with #8
+
+
+#8 Accepting coins
+
+* IS checks:
+    - if minting keys are still valid
+    - if serial is still valid (against DSDB)
+    - if signature is valid
+
+* IS rejects with reason (key id unknown, coin outdated, coin spent, signature invalid) per coin or 
+
+* (IS tries to service target, rejects with reason if not possible)
+
+* IS enters serials into DSDB
+
+* IS sends accept to Wallet
+
 
