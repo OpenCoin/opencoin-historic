@@ -1,0 +1,74 @@
+<ui version="4.0" >
+ <author>Andrew Nicholson</author>
+ <class>openCoin_MainWindow</class>
+ <widget class="QMainWindow" name="openCoin_MainWindow" >
+  <property name="geometry" >
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>750</width>
+    <height>492</height>
+   </rect>
+  </property>
+  <property name="windowTitle" >
+   <string>Open Coin alpha 0.1</string>
+  </property>
+  <widget class="QWidget" name="centralwidget" >
+   <layout class="QHBoxLayout" >
+    <item>
+     <widget class="QListWidget" name="opencoin_listWidget" />
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menubar" >
+   <property name="geometry" >
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>750</width>
+     <height>24</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="menuWelcome" >
+    <property name="title" >
+     <string>Wallet</string>
+    </property>
+    <addaction name="action_New_Coin" />
+    <addaction name="separator" />
+    <addaction name="actionQuit" />
+   </widget>
+   <widget class="QMenu" name="menuAbout" >
+    <property name="title" >
+     <string>About</string>
+    </property>
+    <addaction name="actionAbout_Open_Coin" />
+    <addaction name="actionAbout_QT" />
+   </widget>
+   <addaction name="menuWelcome" />
+   <addaction name="menuAbout" />
+  </widget>
+  <widget class="QStatusBar" name="statusbar" />
+  <action name="action_New_Coin" >
+   <property name="text" >
+    <string> New Coin</string>
+   </property>
+  </action>
+  <action name="actionQuit" >
+   <property name="text" >
+    <string>Quit</string>
+   </property>
+  </action>
+  <action name="actionAbout_Open_Coin" >
+   <property name="text" >
+    <string>About Open Coin</string>
+   </property>
+  </action>
+  <action name="actionAbout_QT" >
+   <property name="text" >
+    <string>About QT</string>
+   </property>
+  </action>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
