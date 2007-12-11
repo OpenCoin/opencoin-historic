@@ -59,8 +59,8 @@ How the wallet creates a coin and communicates with an issuer
 
 * Wallet: fetches current public minting keys for denomination
 
-    Wallet:  FETCH_MINITNG_KEY #string(denomination)
-    IS:      keycertificate
+    Wallet:  FETCH_MINTING_KEY #string(denomination)
+    IS:      PASS_MINTING_KEY keycertificate
 
     (question: base64 response?)
 
@@ -124,21 +124,23 @@ How the wallet creates a coin and communicates with an issuer
 
     FETCH_MINTED_BLINDS #base64(request_id)
 
-* Issuer passes signed blind to wallet or rejects (temporarily or finally)
+* IS either rejects finally or temporarily
 
     FETCH_MINTED_FAILED #base64(request_id) "Reason"
-    FETCH_MINDED_WAIT   #base64(request_id) "Reason"
+    FETCH_MINTED_WAIT   #base64(request_id) "Reason"
  
-  Possible failures: "Request ID Unknown", "Request ID expired", "Request ID rejected"
-  Possible waits:    "Processing request"
+    Possible failures: "Request ID Unknown", "Request ID expired", "Request ID rejected"
+    Possible waits:    "Processing request"
 
-    (question: what about key expiration while request is in mining queue)
+  (question: what about key expiration while request is in mining queue)
+
+  or passes signed blinds to wallet Bob, must preserve order
 
     PASS_MINTED_BLINDS #base64(request_id) #hex_string(number_of_blinds)
                  #base64(signature_of_blind1)
                  #base64(signature_of_blind2)[\r]\n
 
-
+  Session terminates
 
 * wallet checks if blind fits request id and if blind was correctly signed. 
   If not, delete blind and inform user (optional: inform issuer about error)
@@ -158,27 +160,50 @@ Bob - receives the coin
   * Wallet Alice calculates a splitting of sum into coins (units) and
     creates a list of coins to send
 
-* Wallet Alice sends blanks of coins (without signature!) with the serial
-  encrypted for the IS to Wallet Bob 
-  (Wallet Alice now needs to wait a while)
+* Alice fetches DSDB key at IS
 
-     SPEND_COIN #hex_string(number_of_coins) #base64(coin1) #base64(coin2)[\r]\n
+    FETCH_DSDB_KEY
+    PASS_DSDB_KEY keycertificate
 
-* Wallet Bob validates the blanks
-  - do we have the "currency description document"
-  - do we trust the issuer (do we have a valid public key)
-  - checks blanks against cdd
+* Wallet Alice sends obfuscated blanks (coins without signature and with serial
+  encrypted for DSDB) with the serial to Wallet Bob (Wallet Alice now needs to wait a while)
 
-* If blanks are invalid, the transfer is declined by Wallet Bob
-  (later: cdd transfer between wallets)
+  {
+      standard identifier = http://opencoin.org/OpenCoinProtocol/1.0
+      currency identifier = http://opencent.net/OpenCent 
+      denomination        = denomination
+      key identifier      = key_id(signing key)
+      serial              = base64(encrypt(ALG,pub-key-of-DSDB, serial))
+  }
 
-* Wallet Bob shows proposed transfer to Bob
+     PRESENT_BLANK #hex_string(number_of_blanks)
+       blank1[\r]\n
+       blank2[\r]\n
 
-* Bob decides whether to 
-  - accept transfer
-  - accept transfer without double spending checking
-  - decline transfer
+* Wallet Bob check:
 
+  * Wallet Bob validates the blanks
+    - do we have the "currency description document"
+    - do we trust the issuer (do we have a valid public key)
+    - checks blanks against cdd
+
+  * If blanks are invalid, the transfer is declined by Wallet Bob
+    (later: cdd transfer between wallets)
+
+  * Wallet Bob shows proposed transfer to Bob
+
+  * Bob decides whether to 
+    - accept transfer
+    - accept transfer without double spending checking
+    - decline transfer
+
+      REFUSE_BLANK #hex_string(number_of_failures)
+         #base64(ecrypted serial of blank1) "Why did we fail?!?"
+         #base64(ecrypted serial of blank2) "Why did we fail?!?"[\r]\n
+
+      REFUSE_BLANK #hex_string(0) "reason"  
+
+  (Todo: Add reasons)
 
 if DSDB is required (normal case):
 
@@ -201,6 +226,8 @@ if DSDB is required (normal case):
 
 * Wallet Alice sends coins to Wallet Bob (this time including their clear serial and signature)
   
+    SPEND_COINS
+
 * Wallet Bob checks that the coins match the blanks and that signatures are valid
 
 * Wallet Bob accepts transaction or rejects with reason (unknown, invalid) for each rejected coin
