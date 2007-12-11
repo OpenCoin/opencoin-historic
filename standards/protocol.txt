@@ -5,31 +5,48 @@ How the wallet creates a coin and communicates with an issuer
 
 #1 issuer setup
 
-* issuer generates master key pair (pM,sM)
+* issuer generates master key pair (ALG,pM,sM)
 
-* issuer sets up "currency description document"
+* issuer sets up "currency description document" = CDD (like a root certificate)
 
    {
-     content part:
-       opencoin standard version      http://opencoin.org/OpenCoinProtocol/1.0    (accidentally a URL of the Standard)
-       currency identifier            http://opencent.net/OpenCent                (accidentally URL of this CDD)
-       currency identifier (short)    OC
-       issuer service location        opencoin://issuer.opencent.net:8002
-       denominations                  1, 2, 5, 10, 20, 50, 100, 200, 500, 1000
-       issuer public master key       .... 
-   +
-     signature over the content part, made with the issuers master secret key
-   + 
-     [signature over the content part, made with somebody's secret key, ...]
+     standard version             = http://opencoin.org/OpenCoinProtocol/1.0
+     currency identifier          = http://opencent.net/OpenCent
+     short currency identifier    = OC 
+     issuer service location      = opencoin://issuer.opencent.net:8002
+     denominations                = 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000
+     issuer cipher suite          = HASH-ALG, SIGN-ALG, BLINDING-ALG
+     issuer public master key     = base64(pM)
+     
+     base64(sig(sM,hash(content part)))
    }
 
+   (question: is the "short currency identifier" needed?)
+   (future: add additionial signatures, e.g. from wallet software vendors)
 
-* mint (regularily) creates keypairs (p[i],s[i]) for all denominations i, 
-  sign(sM, (i, id(p[i])), p[i], coin_expires, key_not_before, key_not_after)
+* issuer publishes CDD at "currency identifier" URL
+
+* mint (regularily) creates keypairs (p,s) for all denominations and id(p).
+  Master key holder generates keys certificate
+
+  {
+    key identifier   = base64(id(p))
+    denomination     = denomination
+    not_before       = TIME(...)
+    key_not_after    = TIME(...)
+    coin_not_after   = TIME(...)
+    public key       = base64(p)
+
+    base64(sig(sM, hash(content part)))
+  }
+
   
-  (id() = hash())      (p herausnehmen???)
+  Questions:
+  * Time format:  YYYYMMDDHHMMSS  20071211144111 or SecondsSinceEpoch?
+  * id() = sha256()?
+  * CDD?
 
-* issuer fires up issuer service at <opencoin://issuer.opencent.net:8002>
+* issuer fires up issuer service (=IS) at <opencoin://issuer.opencent.net:8002>
 
 
 
@@ -42,21 +59,28 @@ How the wallet creates a coin and communicates with an issuer
 
 * Wallet: fetches current public minting keys for denomination
 
+    Wallet:  FETCH_MINITNG_KEY #string(denomination)
+    IS:      keycertificate
+
+    (question: base64 response?)
+
 * Wallet: creates blank according to CDD:
 
-  blank = {
-      standard identifier             http://opencoin.org/OpenCoinProtocol/1.0
-      currency identifier             http://opencent.net/OpenCent 
-      denomination                    10
-      key_id                          id(signing key)
-      serial                          128bit random number (collision resistant)
+  {
+      standard identifier = http://opencoin.org/OpenCoinProtocol/1.0
+      currency identifier = http://opencent.net/OpenCent 
+      denomination        = denomination
+      key identifier      = key_id(signing key)
+      serial              = base64(128bit random number)
   }
 
 
 * Wallet: create random r, calculate 
 
-    blind = blinding(r, blank)
+    blind = blinding(r, pub_minting_key, hash(blank))
  
+  Calculate a collision-free random request ID (128 bit)
+
   Keep (r, blank, blind) in mind. 
   
   
@@ -64,26 +88,57 @@ How the wallet creates a coin and communicates with an issuer
 
 * Send 
 
-    request = ( (blind, key_id), [request_id] )
+    REQUEST_MINTING #base64(request_id) #hex_string(number_of_blinds) 
+             #key_id(blind1) #base64(blind1)
+             #key_id(blind2) #base64(blind2)[\r]\n
 
   to issuer service
 
-* Issuer: checks, if key_id is current, otherwise rejct with "current key is #ID"
+* Issuer: if key_id is not current:
 
-  Decides if request will be minted (e.g., payment not yet received), otherwise rejects
+    REFUSE_MINTING #hex_string(number_of_rejected_blinds)
+              #key_id(blind1) "Bad Key ID"
+              #key_id(blind2) "Bad Key ID"[\r]\n
 
-  Issuer passes (maybe asynchronous) reuest to mint.
+  Elif request will not be minted (e.g., payment not yet received):
 
-  Mint processes request (sings blind with key_id)
+    REFUSE_MINTING #hex_string(number_of_rejected_blinds)
+                #key_id(blind1) "Some error message"
+                #key_id(blind2) "Some error message"[\r]\n
+  
+  Else: IS passes (maybe asynchronous) request to mint and:
+    ACKNOWLEDGE_MINTING #base64(request_id)[\r]\n
 
-  Mint passes "signed blind"="blind coin" back to issuer 
+  Session is terminated.
+
+
+
+  Mint processes request (signs blind with key_id)
+
+  Mint passes "signed blind"="blind coin" back to IS 
 
 
 #5 Wallet gets coin back
 
 * Wallet asks issuer service "fetch_signed_blind request_id"
 
+    FETCH_MINTED_BLINDS #base64(request_id)
+
 * Issuer passes signed blind to wallet or rejects (temporarily or finally)
+
+    FETCH_MINTED_FAILED #base64(request_id) "Reason"
+    FETCH_MINDED_WAIT   #base64(request_id) "Reason"
+ 
+  Possible failures: "Request ID Unknown", "Request ID expired", "Request ID rejected"
+  Possible waits:    "Processing request"
+
+    (question: what about key expiration while request is in mining queue)
+
+    PASS_MINTED_BLINDS #base64(request_id) #hex_string(number_of_blinds)
+                 #base64(signature_of_blind1)
+                 #base64(signature_of_blind2)[\r]\n
+
+
 
 * wallet checks if blind fits request id and if blind was correctly signed. 
   If not, delete blind and inform user (optional: inform issuer about error)
@@ -94,71 +149,73 @@ How the wallet creates a coin and communicates with an issuer
 
 #6 Wallet to Wallet
 
-Wallet S - sends a coin
-Wallet R - receives the coin
+Alice - sends a coin
+Bob - receives the coin
 
-* (Wallet S locates Wallet R)
-  (S knows how much to send)
+* Prerequisites:
+  * Wallet Alice locates Wallet Bob and sets up (secure) connection
+  * Alice knows how much to send and tells her Wallet
+  * Wallet Alice calculates a splitting of sum into coins (units) and
+    creates a list of coins to send
 
-* S tells Wallet S what sum to send to Wallet R
+* Wallet Alice sends blanks of coins (without signature!) with the serial
+  encrypted for the IS to Wallet Bob 
+  (Wallet Alice now needs to wait a while)
 
-* Wallet S needs to compute a splitting of sum into coins (units)
+     SPEND_COIN #hex_string(number_of_coins) #base64(coin1) #base64(coin2)[\r]\n
 
-* Wallet S sends blanks of coins (without signature!) to Wallet R 
-  (Wallet S now needs to wait a while)
-
-* Wallet R validates the blanks
+* Wallet Bob validates the blanks
   - do we have the "currency description document"
   - do we trust the issuer (do we have a valid public key)
   - checks blanks against cdd
 
-* If blanks are invalid, the transfer is declined by Wallet R
+* If blanks are invalid, the transfer is declined by Wallet Bob
   (later: cdd transfer between wallets)
 
-* Wallet R shows proposed transfer to user R
+* Wallet Bob shows proposed transfer to Bob
 
-* user R decides whether to 
+* Bob decides whether to 
   - accept transfer
   - accept transfer without double spending checking
   - decline transfer
 
 
-if dsdb is reuired (normal case):
+if DSDB is required (normal case):
 
-    * Wallet R prepares for coin exchange with IS, by creating blanks of same sum (see #3)
+    * Wallet Bob prepares for coin exchange with IS, by creating blanks of same sum (see #3)
 
-    * Wallet R DSDB lookup
+    * Wallet Bob DSDB lookup
       - parse cdd for issuer service location
-      - parse blanks for  necessary minting key ids
+      - parse blanks for necessary minting key ids
       - start session with authenticated issuer service (IS) (secured and authenticated by transport layer, e.g. SSL)
         - get session id (from transport layer)
         - get all missing minting key certs
         - IS sends key certs or rejects a key id (unknown, outdated)
-        - lock list of coin serial numbers at IS (DSDB) 
+        - lock list of encrypted coin serial numbers at IS (DSDB) 
         - IS either accepts with locking time or rejects with list of rejected serials + reason (locked, spent) 
 
       (this part pauses, session is kept)
 
-* Wallet R tells Wallet S accept or reject with reason (unknown, outdated, locked, spent) for each rejected blank
-  (if one blank is rejected the whole transfer has to be rejected)
+* Wallet Bob tells Wallet Alice accept or reject with reason (unknown, outdated, locked, spent) for each rejected blank
+  (if one blank is rejected the whole transfer has to be rejected) (future: bob signs receipt)
 
-* Wallet S sends coins to Wallet R (= blanks + signature)
+* Wallet Alice sends coins to Wallet Bob (this time including their clear serial and signature)
   
-* Wallet R checks that the coins match the blanks and that signatures are valid
+* Wallet Bob checks that the coins match the blanks and that signatures are valid
 
-* Wallet R accepts transaction or rejects with reason (unknown, invalid) for each rejected coin
+* Wallet Bob accepts transaction or rejects with reason (unknown, invalid) for each rejected coin
 
-* Wallet R terminates session with Wallet S
+* Wallet Bob terminates session with Wallet Alice
 
-    (in case of rejection Wallet S needs to do emergency meassures, quickly trying to exchange coins with IS 
+    (in case of rejection Wallet Alice needs to do emergency meassures, quickly trying to exchange coins with IS 
      itself etc.)
 
 
-if dsdb is reuired (normal case):
+if DSDB is required (normal case):
     
     * in case of reject in the checking phase delete the blanks, otherwise
     
-    * Wallet R sends buy request (blanks + coins) (Wallet R continues as in #4 and #8)
+    * Wallet Bob sends buy request (blanks + coins) (Wallet Bob continues as in #4 and #8)
 
     * IS has to check if sum of blanks and coins are equal
 
