@@ -2,7 +2,7 @@ OpenCoin
 
 How the wallet creates a coin and communicates with an issuer
 =============================================================
-
+ 
 #1 issuer setup
 
 * issuer generates master key pair (ALG,pM,sM)
