@@ -53,11 +53,11 @@ COINS
 -----
 
 A:
-  COINS_SPEND	#hex_string(number_of)
+  COINS_REDEEM	#hex_string(number_of)
 				#base64(coin1)
 				#base64(coin2)
 
-
+B:
   COINS_REJECT	#hex_string(number_of)
 				#base64(coin1) "Reason"
 				#base64(coin2) "Reason"
@@ -107,10 +107,6 @@ IS:
   MINT_REJECT	#hex_string(number_of_rejected_blinds)
 				#key_id(blind1) "Bad Key ID"
 				#key_id(blind2) "Bad Key ID"
-
-  MINT_REFUSE	#hex_string(number_of_rejected_blinds)
-				#key_id(blind1) "Some error message"
-				#key_id(blind2) "Some error message"
 
   MINT_ACCEPT	#base64(request_id)
 

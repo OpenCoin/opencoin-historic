@@ -37,11 +37,11 @@ COINS
 -----
 
 A:
-  COINS_SPEND	#hex_string(number_of)
+  COINS_REDEEM	#hex_string(number_of)
 				#base64(coin1)
 				#base64(coin2)
 
-
+B:
   COINS_REJECT	#hex_string(number_of)
 				#base64(coin1) "Reason"
 				#base64(coin2) "Reason"
