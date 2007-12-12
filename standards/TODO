@@ -1,0 +1,41 @@
+protocol-details.txt
+====================
+define details of encoding each field and message
+explainations of each field
+defining #hexstring, ...
+Define time format
+
+
+protocol-containers.txt
+=======================
+Certificates (Currency, Mints, DSDB) (IS?)
+Coins
+Blanks
+Obfuscated blanks
+
+algorithms.txt
+==============
+Allowed and recommended algorithms for hashing, signing blinding and encrypting
+
+
+protocol.txt
+============
+Sort out certificate stuff
+Find consise messages
+Define encryption padding
+Refine protocol to prevent issuers from having to store payment
+Define Reasons for everything
+Question: Reason codes instead of strings?
+Ask the mailing list some of these questions
+
+
+protocol-over-https.txt
+=======================
+Figure out how to have IS not need Verisign X.509 certs
+
+
+
+walletcontainer.txt
+===================
+define the (encrypted) file format for keeping blanks, coins, blinding factors, 
+  mining_request_ids, transaction_ids

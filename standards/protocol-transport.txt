@@ -1,0 +1,6 @@
+* on TCP
+* on TLS     on :443
+* on TLS not on :443
+* on HTTPS
+
+* on bluetooth
