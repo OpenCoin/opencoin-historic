@@ -32,14 +32,15 @@ How the wallet creates a coin and communicates with an issuer
   Master key holder generates keys certificate
 
   {
-    key identifier   = base64(id(p))
-    denomination     = denomination
-    not_before       = TIME(...)
-    key_not_after    = TIME(...)
-    coin_not_after   = TIME(...)
-    public key       = base64(p)
+    key identifier      = base64(id(p))
+    currency identifier = http://opencent.net/OpenCent
+    denomination        = denomination
+    not_before          = TIME(...)
+    key_not_after       = TIME(...)
+    coin_not_after      = TIME(...)
+    public key          = base64(p)
 
-    issuer           = Hash(pM)
+    issuer              = Hash(pM)
     base64(sig(sM, hash(content part)))
   }
 
@@ -78,8 +79,9 @@ How the wallet creates a coin and communicates with an issuer
 
 * Wallet: fetches current public minting keys for denomination
 
-    Wallet:  FETCH_MINTING_KEY #string(denomination)
+Wallet:  FETCH_MINTING_KEY {DENOMINATION #string(denomination)|KEYID #hexstring(key_id)}
     IS:      PASS_MINTING_KEY keycertificate
+      or     FAIL_MINTING_KEY "Reason"
 
     (question: base64 response?)
 
@@ -178,6 +180,7 @@ Bob - receives the coin
   * Alice knows how much to send and tells her Wallet
   * Wallet Alice calculates a splitting of sum into coins (units) and
     creates a list of coins to send
+  * Wallet Alice and Wallet Bob are synchronized to UTC (within some small margin of error)
 
 * Alice fetches DSDB key at IS
 
@@ -232,24 +235,67 @@ if DSDB is required (normal case):
       - parse cdd for issuer service location
       - parse blanks for necessary minting key ids
       - start session with authenticated issuer service (IS) (secured and authenticated by transport layer, e.g. SSL)
-        - get session id (from transport layer)
-        - get all missing minting key certs
-        - IS sends key certs or rejects a key id (unknown, outdated)
+        - create transaction id (two-party secret agreement (collision free))
+          Possible example with https.
+            USE_HTTPS_SESSIONID
+            YES|NO
+        - get all missing minting key certs (FETCH_MINTING_KEY)
+        - IS sends key certs or rejects a key id (unknown, outdated) (PASS_MINTING_KEY/FAIL_MINTING_KEY)
         - lock list of encrypted coin serial numbers at IS (DSDB) 
+            LOCK_COINS #key_id_of_DSDB #hex_string(transaction_id) #hex_string(#number_of_obfuscated_blanks)
+                       #key_identifier1 #encrypted_serial1
+                       #key_identifier2 #encrypted_serial2[\r]\n
+
         - IS either accepts with locking time or rejects with list of rejected serials + reason (locked, spent) 
+            If all coins lock:
+               LOCK_COINS_GRANTED #hex_string(transaction_id) TIME(lock_expires)
+            If some coins cannot lock, no coins are locked.
+               LOCK_COINS_FAILED #hex_sting(transaction_id) #hex_string(number_of_failures)
+                                 #key_identifier1 #encrypted_serial1 "Reason 1"
+                                 #key_identifier2 #encrypted_serial2 "Reason 2"[\r]\n
+
+                     Reasons:
+                          
+                          Key ID of DSDB is unknown or expired       Permanant
+                          Key ID of blank is unknown or expired      Permanant
+                          Decryption of serial failed                Permanant
+                          Serial already spent                       Permanant
+                          Serial locked (not spent)                  Temporary
+
 
       (this part pauses, session is kept)
 
 * Wallet Bob tells Wallet Alice accept or reject with reason (unknown, outdated, locked, spent) for each rejected blank
   (if one blank is rejected the whole transfer has to be rejected) (future: bob signs receipt)
 
+      REFUSE_BLANK #hex_string(number_of_failures)
+         #base64(ecrypted serial of blank1) "Why did we fail?!?"
+         #base64(ecrypted serial of blank2) "Why did we fail?!?"[\r]\n
+
+      REFUSE_BLANK #hex_string(0) "reason"  
+
+      ACCEPT_BLANK
+
+      Note: After ACCEPT_BLANK, a REFUSE_BLANK #hex_string(0) can be given to abort the transaction
+
+
 * Wallet Alice sends coins to Wallet Bob (this time including their clear serial and signature)
   
-    SPEND_COINS
+    SPEND_COINS #hex_string(number_of_coins)
+                #base64(coin1)
+                #base64(coin2)[\r]\n
 
 * Wallet Bob checks that the coins match the blanks and that signatures are valid
 
 * Wallet Bob accepts transaction or rejects with reason (unknown, invalid) for each rejected coin
+
+     REJECT_COIN #hex_string(number_of_coins)
+                 #base64(coin1) "Reason"
+                 #base64(coin2) "Reason"[\r]\n
+
+     REJECT_COIN #hex_string(0) "Reason"
+
+     ACCEPT_COIN
 
 * Wallet Bob terminates session with Wallet Alice
 
@@ -260,21 +306,33 @@ if DSDB is required (normal case):
 if DSDB is required (normal case):
     
     * in case of reject in the checking phase delete the blanks, otherwise
-    
+        UNLOCK_COINS #hex_string(transaction_id)
+
     * Wallet Bob sends buy request (blanks + coins) (Wallet Bob continues as in #4 and #8)
+        (REDEEM_COINS+REQUEST_MINT)
 
     * IS has to check if sum of blanks and coins are equal
 
 
 #7 Redeeming Coins 
 
-* Wallet locks serials at IS (see above)
+* Wallet locks serials at IS (see above LOCK_COINS)
 
 * Wallet sends coins + target to IS
   
   - target can be an account
+    REDEEM_COINS #hex_string(transaction_id) "#string(target)" #hex_string(number_of_coins)
+                 #base64(coin1)
+                 #base64(coin2)[\r]\n
+
+    target is of the form:
+        MINT_REQUEST=#base64(request_id)
+        ONLINE_BANKING_ACCOUNT=#string(account_identifier)
+        and so on... to be defined with relationship between IS and individual
 
 * continue with #8
+
+* Send money to target
 
 
 #8 Accepting coins
@@ -283,13 +341,17 @@ if DSDB is required (normal case):
     - if minting keys are still valid
     - if serial is still valid (against DSDB)
     - if signature is valid
+    - if target is valid
 
 * IS rejects with reason (key id unknown, coin outdated, coin spent, signature invalid) per coin or 
+     REJECT_COINS #hex_string(number_of_coins)
+                  #base64(coin1) "Reason"
+                  #base64(coin2) "Reason"[\r]\n
 
 * (IS tries to service target, rejects with reason if not possible)
 
 * IS enters serials into DSDB
 
 * IS sends accept to Wallet
-
+      ACCEPT_COINS
 
