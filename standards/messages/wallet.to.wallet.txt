@@ -1,0 +1,51 @@
+********************
+* Wallet to Wallet *
+********************
+
+=============
+= BLANK		=
+= COINS		=
+=============
+
+BLANK
+-----
+
+A:
+  BLANK_PRESENT	#hex_string(number_of_blanks)
+				blank1
+				blank2
+
+B:
+  BLANK_FAILURE	#hex_string(number_of_failures)
+				#base64(encrypted serial of blank1) "Why did we fail?!?"
+				#base64(encrypted serial of blank2) "Why did we fail?!?"
+
+  BLANK_FAILURE	#hex_string(0) "reason"  
+
+  BLANK_REJECT	#hex_string(number_of_failures)
+				#base64(encrypted serial of blank1) "Why did we fail?!?"
+				#base64(encrypted serial of blank2) "Why did we fail?!?"
+
+  BLANK_REJECT	#hex_string(0) "reason"  
+
+  BLANK_ACCEPT
+	 Note: After ACCEPT, a REJECT #hex_string(0) can be given to abort the transaction
+
+
+
+COINS
+-----
+
+A:
+  COINS_SPEND	#hex_string(number_of)
+				#base64(coin1)
+				#base64(coin2)
+
+
+  COINS_REJECT	#hex_string(number_of)
+				#base64(coin1) "Reason"
+				#base64(coin2) "Reason"
+
+  COINS_REJECT	#hex_string(0) "Reason"
+
+  COINS_ACCEPT
