@@ -14,14 +14,16 @@ How the wallet creates a coin and communicates with an issuer
      currency identifier          = http://opencent.net/OpenCent
      short currency identifier    = OC 
      issuer service location      = opencoin://issuer.opencent.net:8002
-     denominations                = 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000
+     denominations                = 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000  #list of strings seperated by commas
      issuer cipher suite          = HASH-ALG, SIGN-ALG, BLINDING-ALG
      issuer public master key     = base64(pM)
      
+     issuer                       = Hash(pM)
      base64(sig(sM,hash(content part)))
    }
 
    (question: is the "short currency identifier" needed?)
+   (question: "not use after", "random collision free serial"?)
    (future: add additionial signatures, e.g. from wallet software vendors)
 
 * issuer publishes CDD at "currency identifier" URL
@@ -37,6 +39,7 @@ How the wallet creates a coin and communicates with an issuer
     coin_not_after   = TIME(...)
     public key       = base64(p)
 
+    issuer           = Hash(pM)
     base64(sig(sM, hash(content part)))
   }
 
@@ -45,6 +48,22 @@ How the wallet creates a coin and communicates with an issuer
   * Time format:  YYYYMMDDHHMMSS  20071211144111 or SecondsSinceEpoch?
   * id() = sha256()?
   * CDD?
+
+* issuer creates DSDB keypair (p,s)
+
+  {
+    key identifier   = base64(id(p))
+    not_before       = TIME(...)
+    not_after        = TIME(...)
+    public key       = base64(p)
+
+    issuer           = Hash(pM)
+    signature        = base64(sig(sM, hash(content part)))
+
+    signer           = Hash(pM)
+    signature        = base64(sig(sM, hash(content part)))
+  }   
+
 
 * issuer fires up issuer service (=IS) at <opencoin://issuer.opencent.net:8002>
 
