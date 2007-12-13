@@ -20,6 +20,9 @@ Wallet:
 IS:
   MINTING_KEY_PASS	keycertificate
   MINTING_KEY_FAILURE	"Reason"
+						Reasons:
+							Unknown denomination
+							Unknown key_id
   
 
 
@@ -33,8 +36,12 @@ Wallet:
 
 IS:
   MINT_REJECT	#hex_string(number_of_rejected_blinds)
-				#key_id(blind1) "Bad Key ID"
-				#key_id(blind2) "Bad Key ID"
+				#key_id(blind1) "Reason1"
+				#key_id(blind2) "Reason2"
+					Reasons:
+						Unknown key_id
+						Unable to blind
+							Question: if the IS doesn't have the minting key, use a similar key to test?
 
   MINT_ACCEPT	#base64(request_id)
 
@@ -49,10 +56,18 @@ Wallet:
 
 IS:
   FETCH_MINTED_FAILURE	#base64(request_id) "Reason"
-
+							Reasons:
+								Request not credited
+									Note: this message may be a temporary failure (FETCH_MINTED_WAIT)
+								Unknown request_id
+								Unable to blind (note: redundant? maybe not for all signatures)
+								
   FETCH_MINTED_WAIT	#base64(request_id) "Reason"
+							Reasons:
+								Not yet minted
+								Request not credited
+									Note: this message may be a permanant failure (FETCH_MINTED_FAILURE)
   
-
   FETCH_MINTED_ACCEPT	#base64(request_id) #hex_string(number_of_blinds)
 						#base64(signature_of_blind1)
 						#base64(signature_of_blind2)
@@ -77,10 +92,20 @@ Wallet:
   REDEEM_COINS_REQUEST	#hex_string(transaction_id) "#string(target)" #hex_string(number_of_coins)
 						#base64(coin1)
 						#base64(coin2)
-
+							Targets:
+								Strings which refer to a specific target for the redeeming of the coins.
+								i.e. an account somewhere, a request for more coins, etc.
+								The only required defined target is for another transaction to the mint.
+									MINT_REQUEST=#string(request_id)
 IS:
   REDEEM_COINS_REJECT	#hex_string(number_of_coins)
-						#base64(coin1) "Reason"
-						#base64(coin2) "Reason"
+						#base64(coin1) "Reason1"
+						#base64(coin2) "Reason2"
+							Reasons:
+								Unknown key_id
+								Coin expired
+								Coin already redeemed
+								Invalid coin
+								Unknown target
 
   REDEEM_COINS_ACCEPT

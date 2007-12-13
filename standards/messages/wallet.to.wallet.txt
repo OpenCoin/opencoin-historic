@@ -17,16 +17,31 @@ A:
 
 B:
   BLANK_FAILURE	#hex_string(number_of_failures)
-				#base64(encrypted serial of blank1) "Why did we fail?!?"
-				#base64(encrypted serial of blank2) "Why did we fail?!?"
-
-  BLANK_FAILURE	#hex_string(0) "reason"  
+				#base64(encrypted serial of blank1) "Reason1"
+				#base64(encrypted serial of blank2) "Reason2"
+					Reasons:
+						Malformed blank
+						Unknown issuer
+							Note: Also used for an untrusted issuer
+						
+  BLANK_FAILURE	#hex_string(0) "reason"
+					Reason:
+						Cancelled
+						
 
   BLANK_REJECT	#hex_string(number_of_failures)
-				#base64(encrypted serial of blank1) "Why did we fail?!?"
-				#base64(encrypted serial of blank2) "Why did we fail?!?"
+				#base64(encrypted serial of blank1) "Reason1"
+				#base64(encrypted serial of blank2) "Reason2"
+					Reasons:
+						DSDB: Key ID of DSDB is unknown or expired		Permanant
+						DSDB: Key ID of blank is unknown or expired		Permanant
+						DSDB: Decryption of serial failed				Permanant
+						DSDB: Serial already redeemed					Permanant
+						DSDB: Serial locked (not spent)					Temporary
 
-  BLANK_REJECT	#hex_string(0) "reason"  
+  BLANK_REJECT	#hex_string(0) "reason"
+					Reasons:
+						Cancelled
 
   BLANK_ACCEPT
 	 Note: After ACCEPT, a REJECT #hex_string(0) can be given to abort the transaction
@@ -43,9 +58,15 @@ A:
 
 B:
   COINS_REJECT	#hex_string(number_of)
-				#base64(coin1) "Reason"
-				#base64(coin2) "Reason"
+				#base64(coin1) "Reason1"
+				#base64(coin2) "Reason2"
+					Reasons:
+						Invalid coin
+						Unknown coin
+							Note: Used when the coin we are given is different than the blank
 
   COINS_REJECT	#hex_string(0) "Reason"
+					Reasons:
+						*I can't think of anything valid*
 
   COINS_ACCEPT

@@ -33,16 +33,31 @@ A:
 
 B:
   BLANK_FAILURE	#hex_string(number_of_failures)
-				#base64(encrypted serial of blank1) "Why did we fail?!?"
-				#base64(encrypted serial of blank2) "Why did we fail?!?"
-
-  BLANK_FAILURE	#hex_string(0) "reason"  
+				#base64(encrypted serial of blank1) "Reason1"
+				#base64(encrypted serial of blank2) "Reason2"
+					Reasons:
+						Malformed blank
+						Unknown issuer
+							Note: Also used for an untrusted issuer
+						
+  BLANK_FAILURE	#hex_string(0) "reason"
+					Reason:
+						Cancelled
+						
 
   BLANK_REJECT	#hex_string(number_of_failures)
-				#base64(encrypted serial of blank1) "Why did we fail?!?"
-				#base64(encrypted serial of blank2) "Why did we fail?!?"
+				#base64(encrypted serial of blank1) "Reason1"
+				#base64(encrypted serial of blank2) "Reason2"
+					Reasons:
+						DSDB: Key ID of DSDB is unknown or expired		Permanant
+						DSDB: Key ID of blank is unknown or expired		Permanant
+						DSDB: Decryption of serial failed				Permanant
+						DSDB: Serial already redeemed					Permanant
+						DSDB: Serial locked (not spent)					Temporary
 
-  BLANK_REJECT	#hex_string(0) "reason"  
+  BLANK_REJECT	#hex_string(0) "reason"
+					Reasons:
+						Cancelled
 
   BLANK_ACCEPT
 	 Note: After ACCEPT, a REJECT #hex_string(0) can be given to abort the transaction
@@ -59,10 +74,16 @@ A:
 
 B:
   COINS_REJECT	#hex_string(number_of)
-				#base64(coin1) "Reason"
-				#base64(coin2) "Reason"
+				#base64(coin1) "Reason1"
+				#base64(coin2) "Reason2"
+					Reasons:
+						Invalid coin
+						Unknown coin
+							Note: Used when the coin we are given is different than the blank
 
   COINS_REJECT	#hex_string(0) "Reason"
+					Reasons:
+						*I can't think of anything valid*
 
   COINS_ACCEPT
 
@@ -92,6 +113,9 @@ Wallet:
 IS:
   MINTING_KEY_PASS	keycertificate
   MINTING_KEY_FAILURE	"Reason"
+						Reasons:
+							Unknown denomination
+							Unknown key_id
   
 
 
@@ -105,8 +129,12 @@ Wallet:
 
 IS:
   MINT_REJECT	#hex_string(number_of_rejected_blinds)
-				#key_id(blind1) "Bad Key ID"
-				#key_id(blind2) "Bad Key ID"
+				#key_id(blind1) "Reason1"
+				#key_id(blind2) "Reason2"
+					Reasons:
+						Unknown key_id
+						Unable to blind
+							Question: if the IS doesn't have the minting key, use a similar key to test?
 
   MINT_ACCEPT	#base64(request_id)
 
@@ -121,10 +149,18 @@ Wallet:
 
 IS:
   FETCH_MINTED_FAILURE	#base64(request_id) "Reason"
-
+							Reasons:
+								Request not credited
+									Note: this message may be a temporary failure (FETCH_MINTED_WAIT)
+								Unknown request_id
+								Unable to blind (note: redundant? maybe not for all signatures)
+								
   FETCH_MINTED_WAIT	#base64(request_id) "Reason"
+							Reasons:
+								Not yet minted
+								Request not credited
+									Note: this message may be a permanant failure (FETCH_MINTED_FAILURE)
   
-
   FETCH_MINTED_ACCEPT	#base64(request_id) #hex_string(number_of_blinds)
 						#base64(signature_of_blind1)
 						#base64(signature_of_blind2)
@@ -149,11 +185,21 @@ Wallet:
   REDEEM_COINS_REQUEST	#hex_string(transaction_id) "#string(target)" #hex_string(number_of_coins)
 						#base64(coin1)
 						#base64(coin2)
-
+							Targets:
+								Strings which refer to a specific target for the redeeming of the coins.
+								i.e. an account somewhere, a request for more coins, etc.
+								The only required defined target is for another transaction to the mint.
+									MINT_REQUEST=#string(request_id)
 IS:
   REDEEM_COINS_REJECT	#hex_string(number_of_coins)
-						#base64(coin1) "Reason"
-						#base64(coin2) "Reason"
+						#base64(coin1) "Reason1"
+						#base64(coin2) "Reason2"
+							Reasons:
+								Unknown key_id
+								Coin expired
+								Coin already redeemed
+								Invalid coin
+								Unknown target
 
   REDEEM_COINS_ACCEPT
 
@@ -184,12 +230,12 @@ DSDB:
   LOCK_COINS_FAILURE	#hex_sting(transaction_id) #hex_string(number_of_failures)
 						#key_identifier1 #encrypted_serial1 "Reason 1"
 						#key_identifier2 #encrypted_serial2 "Reason 2"
-						Reasons:
-							Key ID of DSDB is unknown or expired       Permanant
-							Key ID of blank is unknown or expired      Permanant
-							Decryption of serial failed                Permanant
-							Serial already spent                       Permanant
-							Serial locked (not spent)                  Temporary
+							Reasons:
+								Key ID of DSDB is unknown or expired		Permanant
+								Key ID of blank is unknown or expired		Permanant
+								Decryption of serial failed					Permanant
+								Serial already redeemed						Permanant
+								Serial locked (not spent)					Temporary
 
 
 
@@ -200,7 +246,12 @@ Wallet:
   UNLOCK_COINS_REQUEST	#hex_string(transaction_id)
 
 DSDB:
-  UNLOCK_COINS_FAILURE	#hex_string(transaction_id) "Reason"
   UNLOCK_COINS_PASS
+  UNLOCK_COINS_FAILURE	#hex_string(transaction_id) "Reason"
+							Reasons:
+								Unknown transaction_id
+								Transaction already completed
+								Lock expired *Not really a failure...*
+
 
 
