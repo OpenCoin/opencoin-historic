@@ -200,6 +200,7 @@ IS:
 								Coin already redeemed
 								Invalid coin
 								Unknown target
+									Note: Can be used if Mint requires request_id to already be awaiting minting
 
   REDEEM_COINS_ACCEPT
 
