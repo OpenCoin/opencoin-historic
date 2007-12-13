@@ -284,7 +284,7 @@ if DSDB is required (normal case):
         UNLOCK_COINS_REQUEST(transaction_id)
 
     * Wallet Bob sends buy request (blanks + coins) (Wallet Bob continues as in #4 and #8)
-        (COINS_REDEEM+MINT_REQUEST)
+        (REDEEM_COINS+MINT_REQUEST)
 
     * IS has to check if sum of blanks and coins are equal
 
@@ -296,7 +296,7 @@ if DSDB is required (normal case):
 * Wallet sends coins + target to IS
   
   - target can be an account
-    COINS_REDEEM(transaction_id, target, list(coin1, ...)
+    REDEEM_COINS_REQUEST(transaction_id, target, list(coin1, ...)
 
     target is of the form:
         MINT_REQUEST=#base64(request_id)
@@ -317,12 +317,12 @@ if DSDB is required (normal case):
     - if target is valid
 
 * IS rejects with reason (key id unknown, coin outdated, coin spent, signature invalid) per coin or 
-     COINS_REJECT( list(coin1, ...) )
+     REDEEM_COINS_REJECT( list(coin1, ...) )
 
 * (IS tries to service target, rejects with reason if not possible)
 
 * IS enters serials into DSDB
 
 * IS sends accept to Wallet
-      COINS_ACCEPT
+      REDEEM_COINS_ACCEPT
 
