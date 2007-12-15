@@ -1,0 +1,89 @@
+"#string(blah)"
+blank
+"Reason"
+#key_id(blind_blah)
+#key_identifier_blah
+#key_id_of_DSDB
+#encrypted_serialBLAH
+ISCertificate
+DSDBCertificate
+MINT_CERTIFICATE
+Blind
+ObfuscatedBlind
+Coin
+
+
+Details of the protocol implementation (including messages and containers)
+
+---------------------------------------------------
+
+The following primitives are used to encode all appropriate details.
+
+#hex_string(foo) encodes the natural integer value of foo as a string.
+The integer value of foo is changed to a base-16 0-9a-f representation in lowercase.
+The value is encoded without leading zeros.
+
+#base64(foo) encodes the natural integer value of foo as a string.
+The integer value of foo is changed to a base-64 representation.
+The actual implementation of this may change, but for now I'm working with the following
+scheme:
+ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!- for the encoding
+and = for padding
+
+#string(foo) places restrictions on the string. The string cannot contain any
+unprintable characters, any control character, or the " character.
+The string cannot begin with a space character
+The string must be ASCII. The string, when encoded, will be placed in a set of ""'s
+e.g. #string(foo) is encoded as "foo"
+
+TIME(foo) encodes a literal time in a strict ISO8601 encoding. The encoding is:
+YYYYMMDDThhmmssZ.
+The character 'T' seperates the two fields between the date and the time.
+The character 'Z' encodes the time zone for the time (which must always be UTC)
+The date is encoded in YYYYMMDD where YYYY is the year, MM is the decimal month (01-12)
+and DD is the day (01-31)
+The time is encoded in hhmmss where hh is the hour (00-23), mm is the minutes (00-59)
+and ss is the seconds (00-60) (60 is only permissiable for leap seconds)
+
+---------------------------------------------------
+
+The following complex types are built using primitives.
+
+(foo, bar, baz) is a tuple containing foo, bar, and baz. The tuple can be of any length,
+but each message defines the tuple length it is looking for.
+The tuple is encoded as [foo] [bar] [baz]. That is, the value of foo, a single space,
+the value of bar, a single space, and the value of baz. No following spaces are required.
+This primitive is used to allow a concise list defination (see below)
+
+list(foo, bar) is a length-deliminated list. It can be of any length.
+The list is encoded as #hex_string(list_length) [foo] [bar]. That is, the length of the list
+encoded as a hex string and then the elements of the string are given seperated by spaces.
+All types have a length of one, including tuples.
+
+emptylist is a placeholder for a list when no list actually appears. This is only used to give
+a single reason for an action rather than for each element in a list.
+
+strlist(foo, bar, baz) is a list of strings. The strings in the list must follow the same
+restrictions as #string, and have no space characters. The list is encoded as
+#hex_string(list_length) [foo], [bar], [baz]
+
+---------------------------------------------------
+
+The following containers are built using primitives and additional encoding.
+
+Certificates, blanks, obfuscated blanks, coins are all made up of key=value pairs.
+Some keys are optional and some can be repeated. The exact semantics of which are
+described in protocol-containers.txt.
+
+When the container is encoded, it is encoded with the values in the exact order given
+from protocol-containers.txt.
+
+The encoding is as follows:
+{name=value;name=value;name=value....;name=value}
+
+The encoding of the ContentPart of the container is as follows:
+{name=value;name=value;name=value....;name=value} of only the ContentNames.
+
+[Note: this gives a human readable format while forcing all messages to be on
+ a single line]
+ 

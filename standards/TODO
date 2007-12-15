@@ -24,7 +24,7 @@ Sort out certificate stuff
 Define encryption padding
 Refine protocol to prevent issuers from having to store payment
 	Done. Need to add handshake to decide if the mint will store value 
-Add default transaction_id handling
+Add default transaction_id handling (Both parties agreeing to a transaction_id)
 Does transaction_id need to expire if it isn't seen for a few hours/days? (since it's a two-party agreement....)
 Add hello/versioning/protocol handshaking
 Add generic error message

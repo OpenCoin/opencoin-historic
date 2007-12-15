@@ -23,7 +23,7 @@ DSDB:
 	Prior:	LOCK_COINS_REQUEST
 	Follow:	Goodbye
 
-  LOCK_COINS_FAILURE	#hex_sting(transaction_id) #hex_string(number_of_failures)
+  LOCK_COINS_FAILURE	#hex_string(transaction_id) #hex_string(number_of_failures)
 						#key_identifier1 #encrypted_serial1 "Reason 1"
 						#key_identifier2 #encrypted_serial2 "Reason 2"
 							Reasons:
