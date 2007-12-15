@@ -14,9 +14,14 @@ Wallet:
   LOCK_COINS_REQUEST	#key_id_of_DSDB #hex_string(transaction_id) #hex_string(#number_of_obfuscated_blanks)
 						#key_identifier1 #encrypted_serial1
 						#key_identifier2 #encrypted_serial2
+	Prior:	Hello
+	Follow:	LOCK_COINS_ACCEPT
+			LOCK_COINS_FAILURE
 
 DSDB:
   LOCK_COINS_ACCEPT		#hex_string(transaction_id) TIME(lock_expires)
+	Prior:	LOCK_COINS_REQUEST
+	Follow:	Goodbye
 
   LOCK_COINS_FAILURE	#hex_sting(transaction_id) #hex_string(number_of_failures)
 						#key_identifier1 #encrypted_serial1 "Reason 1"
@@ -27,6 +32,8 @@ DSDB:
 								Decryption of serial failed					Permanant
 								Serial already redeemed						Permanant
 								Serial locked (not spent)					Temporary
+	Prior:	LOCK_COINS_REQUEST
+	Follow:	Goodbye
 
 
 
@@ -35,11 +42,19 @@ UNLOCK_COINS
 
 Wallet:
   UNLOCK_COINS_REQUEST	#hex_string(transaction_id)
+	Prior:	Hello
+	Follow:	UNLOCK_COINS_PASS
+			UNLOCK_COINS_FAILURE
 
 DSDB:
   UNLOCK_COINS_PASS
+	Prior:	UNLOCK_COINS_REQUEST
+	Follow:	Goodbye
+	
   UNLOCK_COINS_FAILURE	#hex_string(transaction_id) "Reason"
 							Reasons:
 								Unknown transaction_id
 								Transaction already completed
 								Lock expired *Not really a failure...*
+	Prior:	UNLOCK_COINS_REQUEST
+	Follow:	Goodbye

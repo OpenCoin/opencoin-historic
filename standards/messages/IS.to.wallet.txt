@@ -15,14 +15,28 @@ MINTING_KEY
 
 Wallet:
   MINTING_KEY_FETCH_DENOMINATION	#string(denomination)
+	Prior:	Hello
+	Follow:	MINTING_KEY_PASS
+			MINTING_KEY_FAILURE
+			
   MINTING_KEY_FETCH_KEYID	#hexstring(key_id)}
+	Prior:	Hello
+	Follow:	MINTING_KEY_PASS
+			MINTING_KEY_FAILURE
 
 IS:
   MINTING_KEY_PASS	keycertificate
+	Prior:	MINTING_KEY_FETCH_DENOMINATION
+			MINTING_KEY_FETCH_KEYID
+	Follow:	Goodbye
+			
   MINTING_KEY_FAILURE	"Reason"
 						Reasons:
 							Unknown denomination
 							Unknown key_id
+	Prior:	MINTING_KEY_FETCH_DENOMINATION
+			MINTING_KEY_FETCH_KEYID
+	Follow:	Goodbye
   
 
 
@@ -33,6 +47,9 @@ Wallet:
   MINT_REQUEST	#base64(request_id) #hex_string(number_of_blinds) 
 				#key_id(blind1) #base64(blind1)
 				#key_id(blind2) #base64(blind2)
+	Prior:	Hello
+	Follow:	MINT_REJECT
+			MINT_ACCEPT
 
 IS:
   MINT_REJECT	#hex_string(number_of_rejected_blinds)
@@ -42,8 +59,12 @@ IS:
 						Unknown key_id
 						Unable to blind
 							Question: if the IS doesn't have the minting key, use a similar key to test?
+	Prior:	MINT_REQUEST
+	Follow:	Goodbye
 
   MINT_ACCEPT	#base64(request_id)
+	Prior:	MINT_REQUEST
+	Follow: Goodbye
 
 
 
@@ -52,6 +73,10 @@ FETCH_MINTED
 
 Wallet:
   FETCH_MINTED_REQUEST	#base64(request_id)
+	Prior:	Hello
+	Follow:	FETCH_MINTED_FAILURE
+			FETCH_MINTED_WAIT
+			FETCH_MINTED_ACCEPT
 
 
 IS:
@@ -61,16 +86,22 @@ IS:
 									Note: this message may be a temporary failure (FETCH_MINTED_WAIT)
 								Unknown request_id
 								Unable to blind (note: redundant? maybe not for all signatures)
+	Prior:	FETCH_MINTED_REQUEST
+	Follow:	Goodbye
 								
   FETCH_MINTED_WAIT	#base64(request_id) "Reason"
 							Reasons:
 								Not yet minted
 								Request not credited
 									Note: this message may be a permanant failure (FETCH_MINTED_FAILURE)
+	Prior:	FETCH_MINTED_REQUEST
+	Follow:	Goodbye
   
   FETCH_MINTED_ACCEPT	#base64(request_id) #hex_string(number_of_blinds)
 						#base64(signature_of_blind1)
 						#base64(signature_of_blind2)
+	Prior:	FETCH_MINTED_REQUEST
+	Follow:	Goodbye
 
 
 
@@ -79,9 +110,13 @@ DSDB_KEY
 
 Wallet:
   DSDB_KEY_REQUEST
+	Prior:	Hello
+	Follow: DSDB_KEY_PASS
 
 IS:
   DSDB_KEY_PASS	keycertificate
+	Prior:	DSDB_KEY_REQUEST
+	Follow: Goodbye
 
 
 
@@ -97,6 +132,9 @@ Wallet:
 								i.e. an account somewhere, a request for more coins, etc.
 								The only required defined target is for another transaction to the mint.
 									MINT_REQUEST=#string(request_id)
+	Prior:	Hello
+	Follow:	REDEEM_COINS_REJECT
+			REDEEM_COINS_ACCEPT
 IS:
   REDEEM_COINS_REJECT	#hex_string(number_of_coins)
 						#base64(coin1) "Reason1"
@@ -108,5 +146,9 @@ IS:
 								Invalid coin
 								Unknown target
 									Note: Can be used if Mint requires request_id to already be awaiting minting
+	Prior:	REDEEM_COINS_REQUEST
+	Follow:	Goodbye
 
   REDEEM_COINS_ACCEPT
+	Prior:	REDEEM_COINS_REQUEST
+	Follow: Goodbye

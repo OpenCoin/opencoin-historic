@@ -14,6 +14,10 @@ A:
   BLANK_PRESENT	#hex_string(number_of_blanks)
 				blank1
 				blank2
+		Prior:	Hello
+		Follow:	BLANK_FAILURE
+				BLANK_REJECT
+				BLANK_ACCEPT
 
 B:
   BLANK_FAILURE	#hex_string(number_of_failures)
@@ -23,10 +27,14 @@ B:
 						Malformed blank
 						Unknown issuer
 							Note: Also used for an untrusted issuer
+		Prior:	BLANK_PRESENT
+		Follow:	Goodbye
 						
   BLANK_FAILURE	#hex_string(0) "reason"
 					Reason:
 						Cancelled
+		Prior:	BLANK_PRESENT
+		Follow:	Goodbye
 						
 
   BLANK_REJECT	#hex_string(number_of_failures)
@@ -38,13 +46,21 @@ B:
 						DSDB: Decryption of serial failed				Permanant
 						DSDB: Serial already redeemed					Permanant
 						DSDB: Serial locked (not spent)					Temporary
+		Prior:	BLANK_PRESENT
+		Follow:	Goodbye
 
   BLANK_REJECT	#hex_string(0) "reason"
 					Reasons:
 						Cancelled
+		Prior:	BLANK_PRESENT
+				BLANK_ACCEPT (Message from self)
+		Follow:	Goodbye
 
   BLANK_ACCEPT
-	 Note: After ACCEPT, a REJECT #hex_string(0) can be given to abort the transaction
+		Note:	After ACCEPT, a REJECT #hex_string(0) can be given to abort the transaction
+		Prior:	BLANK_PRESENT
+		Follow:	COINS_REDEEM
+				BLANK_REJECT (Message from self)
 
 
 
@@ -55,6 +71,9 @@ A:
   COINS_REDEEM	#hex_string(number_of)
 				#base64(coin1)
 				#base64(coin2)
+		Prior:	BLANK_ACCEPT
+		Follow:	COINS_REJECT
+				COINS_ACCEPT
 
 B:
   COINS_REJECT	#hex_string(number_of)
@@ -64,9 +83,17 @@ B:
 						Invalid coin
 						Unknown coin
 							Note: Used when the coin we are given is different than the blank
+		Prior:	COINS_REDEEM
+		Follow: COINS_REDEEM
+				Goodbye
 
   COINS_REJECT	#hex_string(0) "Reason"
 					Reasons:
 						*I can't think of anything valid*
+		Prior:	COINS_REDEEM
+		Follow:	COINS_REDEEM
+				Goodbye
 
   COINS_ACCEPT
+		Prior:	COINS_REDEEM
+		Follow:	Goodbye
