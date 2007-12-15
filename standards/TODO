@@ -2,16 +2,11 @@ protocol-details.txt
 ====================
 define details of encoding each field and message
 explainations of each field
-defining #hexstring, ...
-Define time format
 
 
 protocol-containers.txt
 =======================
 Certificates (Currency, Mints, DSDB) (IS?)
-Coins
-Blanks
-Obfuscated blanks
 
 algorithms.txt
 ==============
