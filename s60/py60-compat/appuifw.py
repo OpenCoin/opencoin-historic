@@ -278,6 +278,9 @@ class Listbox(wx.ListCtrl):
 
         self.set_list(data)
 
+
+        self.focus = True  # This attribute is part of the public API.
+
     def OnResize(self, event):
         w = self.GetClientSize().width
         n = self.GetColumnCount()

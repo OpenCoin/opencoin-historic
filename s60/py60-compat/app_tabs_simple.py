@@ -6,7 +6,8 @@ import appuifw
 import e32
 from graphics import *
 
-
+def callback():
+    print 'foo callback'
 # define application 1: text app
 app1 = appuifw.Text(u'Appliation o-n-e is on')
 
@@ -14,7 +15,8 @@ app1 = appuifw.Text(u'Appliation o-n-e is on')
 app2 = appuifw.Text(u'Appliation t-w-o is on')
 
 # define application 3: text app
-app3 = appuifw.Text(u'Appliation t-h-r-e-e is on')
+app3 = appuifw.Listbox([(u'Sum',u'22'),(u'ones',u'12'),(u'twos',u'2')],callback)
+
 
 
 def exit_key_handler():
@@ -29,6 +31,7 @@ def handle_tab(index):
         appuifw.app.body = app2 # switch to application 2
     if index == 2:
         appuifw.app.body = app3 # switch to application 3
+        appuifw.app.menu = [(u'Send',callback)]
 
     
 # create an Active Object
