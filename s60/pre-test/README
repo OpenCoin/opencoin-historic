@@ -1,3 +1,17 @@
+This directory contains a couple of testfiles that I (jhb) use to check
+out the s60 functionality. 
+
+- run wallet.py on your pc with wx windows installed.
+- transfer it to our mobile phone.
+
+The rest is from py60-compat, a library that allows to run s60 apps 
+on your pc
+
+Cheers,
+
+  Joerg
+
+----------------------------------------------------------------------
 
 		       Series 60 Compatibility
 
