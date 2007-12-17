@@ -1,0 +1,39 @@
+Requirements in the OpenCoin standards
+
+1) The system shall be resistant to compromising, i.e.
+   * Tokens cannot be falsified without having the minting keys
+   * 'Anonymity': issuer should not be able to correlate a minted 
+     blind to a redeemed token.
+   * Everybody should be able to verify if a token is valid (signed
+     by the issuer's mint, fulfills the token format specs of the 
+     issuer, not expired, not spent yet, ...)
+   * no double spending possible. There shall be not racecondition 
+     or other trick to circumvent the double spending check.
+
+2) Strength against denial of service
+   * How to distribute the DSDB (double spending database)
+   * How to prevent a malicious receiver from locking a token forever 
+     making it unredeemable for its owner?
+   * How to minimize impact of temporarily unavailable issuer services
+     (coin expiration!)
+
+3) Future directions
+
+  * Are there protocols/algorithms besides Chaum which are more suited?
+
+  * Receipts: How could mutual reciepts ("i hereby certify that i sent/re-
+    ceived 10 opencents from Alice/to Bob") come into play? Can the protocol
+    be designed in a way such receipts are mandatory? I.e. the issuer can
+    detect if receipts where exchanged and refuses redemption otherwise.
+
+  * Offline tokens: There are way to debunk double spenders. How do they 
+    work? Is it feasable to implement them?
+
+  * Transferable tokens (what's the correct term?): with Chaum's protocol,
+    every receiver should redeem (or exchange) tokens immediatly. How to make
+    tokens 'multi-hop' capable?
+
+  * Condionional anonymity: The issuer can detect if blinded tokens are
+    blinded such that a trusted third party (e.g. law enforcement agencies)
+    could unblind them and refuses minting otherwise.
+
