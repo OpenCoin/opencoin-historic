@@ -42,25 +42,25 @@ A:
                 BLANK_ACCEPT
 
 B:
-  BLANK_REJECT #hex_string(number_of_failures)
+  BLANK_REJECT  #hex_string(number_of_failures)
                 #base64(encrypted serial of blank1) "Reason1"
                 #base64(encrypted serial of blank2) "Reason2"
                     Reasons:
                         Malformed blank
                         Unknown issuer
                             Note: Also used for an untrusted issuer
+        Prior:  BLANK_PRESENT
+        Follow: Goodbye
+                        
+  BLANK_REJECT  #hex_string(0) "reason"
+                    Reason:
+                        Cancelled
                         Insufficient currency
         Prior:  BLANK_PRESENT
         Follow: Goodbye
                         
-  BLANK_REJECT #hex_string(0) "reason"
-                    Reason:
-                        Cancelled
-        Prior:  BLANK_PRESENT
-        Follow: Goodbye
-                        
 
-  BLANK_FAILURE  #hex_string(number_of_failures)
+  BLANK_FAILURE #hex_string(number_of_failures)
                 #base64(encrypted serial of blank1) "Reason1"
                 #base64(encrypted serial of blank2) "Reason2"
                     Reasons:
@@ -72,7 +72,7 @@ B:
         Prior:  BLANK_PRESENT
         Follow: Goodbye
 
-  BLANK_FAILURE  #hex_string(0) "reason"
+  BLANK_FAILURE #hex_string(0) "reason"
                     Reasons:
                         Cancelled
         Prior:  BLANK_PRESENT
@@ -120,6 +120,7 @@ B:
   COINS_ACCEPT
         Prior:  COINS_REDEEM
         Follow: Goodbye
+
 
 
 
