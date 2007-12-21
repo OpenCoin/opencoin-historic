@@ -204,7 +204,7 @@ Bob - receives the coin
   * Wallet Bob shows proposed transfer to Bob
 
   * Bob decides whether to 
-    - accept transfer
+    - accept transfer (trust issuer, enough currency)
     - accept transfer without double spending checking
     - decline transfer
 
