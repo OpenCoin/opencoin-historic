@@ -619,7 +619,7 @@ def selection_list(data):
     return popup_menu(data)
 
 def query(label, type, initial_value=""):
-    if type in ["text","code"]:
+    if type in ["text","code","number"]:
         return _text_query(label, initial_value)
     elif type == "query":
         return _confirm(label)

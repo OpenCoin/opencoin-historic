@@ -2,7 +2,7 @@
 # This script creates tabs that let you switch between different applications
 
 
-import appuifw,e32,socket
+import appuifw,e32,socket,httplib
 from graphics import *
 from key_codes import EKeyLeftArrow, EKeyRightArrow
 
@@ -12,21 +12,11 @@ def callback():
 def exit_key_handler():
     app_lock.signal()
 
-def setCurrency():
-    
-    cur = content[wallet.current()]
-    l = [(u'%s %s:' % (sum(cur['coins']),cur['name'])),]
 
-    for coin in cur['coins']:
-        l.append(u"a '%s' coin" % coin)
-    
-    cl = appuifw.Listbox(l,callback)
-    cl.bind(EKeyLeftArrow,setWallet)                  
-    appuifw.app.body = cl
+
+
 
     
-def setWallet():
-    appuifw.app.body =  wallet
 
 def sum(seq, start=0):
         s = 0
@@ -36,13 +26,93 @@ def sum(seq, start=0):
 
 class Wallet:
 
+   
+    
+
+    def __init__(self):
+        self.content = [{'name':u'opencents','description':u'opencents.org','coins':[1,7,3,4,7,2,3]},
+                        {'name':u'hubtokens','description':u'the-hub.net','coins': [11,13,4,11,22]},]
+
+
+        
+        self.wallet_list = []
+        for cur in self.content:
+            self.wallet_list.append((u'%s %s' % (sum(cur['coins']),cur['name']),unicode(cur['description'])))
+        self.wallet_menu = appuifw.Listbox(self.wallet_list,self.displayActions)
+        self.wallet_menu.bind(EKeyRightArrow,self.displayActions)
+
+        
+        appuifw.query(u'Wallet Password',u'code')
+        self.displayWallet()
+
+
+    def createOptionMenu(self):
+        appuifw.app.menu=[(u'Send coins',((u'via Internet',w.sendCoins),
+                          (u'via Bluetooth',w.sendCoinsBT))),
+                  (u'Receive coins',((u'via Internet',w.receiveCoins),
+                                     (u'via Bluetooth',w.receiveCoinsBT))),
+                  (u'Buy coins',w.buyCoins),
+                  (u'Redeem coins',w.redeemCoins)]
+    
+    
+    def getActiveCurrency(self):
+        return self.content[self.wallet_menu.current()]
+    
+    def displayWallet(self):
+        appuifw.app.body =  self.wallet_menu
+        appuifw.app.title = u'Opencoin Wallet'
+
+    def displayDetails(self):
+    
+        cur = self.getActiveCurrency()
+        l = [(u'%s %s:' % (sum(cur['coins']),cur['name'])),]
+
+        for coin in cur['coins']:
+            l.append(u"a '%s' coin" % coin)
+    
+        cl = appuifw.Listbox(l,callback)
+        cl.bind(EKeyLeftArrow,self.displayActions)                  
+        appuifw.app.body = cl
+        appuifw.app.title = u'Opencoin \n%s - details' % cur['name']
+
+    def displayActions(self):
+        name = self.getActiveCurrency()['name']
+        action_list = [u'Show details' ,
+                       u'Send %s' % name,
+                       u'Receive %s' % name,
+                       u'Buy %s' % name,
+                       u'Redeem %s' % name]
+
+        self.action_menu = appuifw.Listbox(action_list,self.selectAction)
+        self.action_menu.bind(EKeyRightArrow,self.selectAction)
+        self.action_menu.bind(EKeyLeftArrow,self.displayWallet)
+
+        appuifw.app.body = self.action_menu
+        appuifw.app.title = u'Opencoin \n%s - actions' % name
+
+    def selectAction(self):
+        current = self.action_menu.current()
+
+        actions = [self.displayDetails,self.sendCoins,self.receiveCoins,self.buyCoins,self.redeemCoins]
+        actions[current]()
 
 
     def sendCoins(self):
-        appuifw.query(u'Enter Recepients Address',u'text')
+        name = self.getActiveCurrency()['name']
+        number = appuifw.query(u'number of %s' % name,u'number')
+        selection = appuifw.popup_menu([u'internet',u'bluetooth'],u'Send %s %s via' % (number,name))
+        if selection == 1:
+            self.sendCoinsBT()
+        elif selection == 0:
+            address = appuifw.query(u'Recipients address',u'text')
+            conn = httplib.HTTPConnection(address)
+            appuifw.note(u'Making connection. May take a while...')
+            conn.request('POST','/wallet')
+
 
     def receiveCoins(self):
-        pass
+        name = self.getActiveCurrency()['name']
+        appuifw.popup_menu([u'internet',u'bluetooth'],u'Receive %s via' % name)
 
     def sendCoinsBT(self):
         self.sock=socket.socket(socket.AF_BT,socket.SOCK_STREAM)
@@ -76,33 +146,17 @@ class Wallet:
     def redeemCoins(self):
         pass
 
-w = Wallet()
 
-content = [{'name':'opencents','description':'opencents.org','coins':[1,7,3,4,7,2,3]},
-           {'name':'hubtokens','description':'the-hub.net','coins': [11,13,4,11,22]},]
 
-wl = []
-for cur in content:
-    wl.append((u'%s %s' % (sum(cur['coins']),cur['name']),unicode(cur['description'])))
-wallet = appuifw.Listbox(wl,setCurrency)
-wallet.bind(EKeyRightArrow,setCurrency)
+
 
 # create an Active Object
 app_lock = e32.Ao_lock()
 
 # set the title of the script
-appuifw.app.title = u'Opencoin Wallet'
-appuifw.app.menu=[(u'Send coins',((u'via Internet',w.sendCoins),
-                                  (u'via Bluetooth',w.sendCoinsBT))),
-                  (u'Receive coins',((u'via Internet',w.receiveCoins),
-                                     (u'via Bluetooth',w.receiveCoinsBT))),
-                  (u'Buy coins',w.buyCoins),
-                  (u'Redeem coins',w.redeemCoins)]
-
-appuifw.query(u'Wallet Password',u'code')
+w = Wallet()
 
 # set app.body to app1 (for start of script)
-setWallet()
 
 appuifw.app.exit_key_handler = exit_key_handler
 app_lock.wait()
