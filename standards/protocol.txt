@@ -189,7 +189,7 @@ Bob - receives the coin
       serial              = base64(encrypt(ALG,pub-key-of-DSDB, serial))
   }
 
-     BLANK_PRESENT( list(blank1, blank2, ...) )
+     BLANK_PRESENT( dsdb_keycertificate list(blank1, blank2, ...) )
 
 * Wallet Bob check:
 
@@ -268,7 +268,7 @@ if DSDB is required (normal case):
      COINS_REJECT( list( (coin1, "Reason1") ) )
      COINS_REJECT( emptylist, "Reason")
 
-     ACCEPT_COIN
+     COINS_ACCEPT
 
 * Wallet Bob terminates session with Wallet Alice
 

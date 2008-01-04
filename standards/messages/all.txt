@@ -33,7 +33,7 @@ BLANK
 -----
 
 A:
-  BLANK_PRESENT #hex_string(number_of_blanks)
+  BLANK_PRESENT dsdb_keycertificate #hex_string(number_of_blanks)
                 blank1
                 blank2
         Prior:  Hello
