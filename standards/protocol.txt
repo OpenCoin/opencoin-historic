@@ -28,17 +28,17 @@ How the wallet creates a coin and communicates with an issuer
 
 * issuer publishes CDD at "currency identifier" URL
 
-* mint (regularily) creates keypairs (p,s) for all denominations and id(p).
+* mint (regularily) creates keypairs (pP,sP) for all denominations and id(p).
   Master key holder generates keys certificate
 
   {
-    key identifier      = base64(id(p))
+    key identifier      = base64(id(pP))
     currency identifier = http://opencent.net/OpenCent
     denomination        = denomination
     not_before          = TIME(...)
     key_not_after       = TIME(...)
     coin_not_after      = TIME(...)
-    public key          = base64(p)
+    public key          = base64(pP)
 
     issuer              = Hash(pM)
     base64(sig(sM, hash(content part)))
@@ -50,13 +50,14 @@ How the wallet creates a coin and communicates with an issuer
   * id() = sha256()?
   * CDD?
 
-* issuer creates DSDB keypair (p,s)
+* issuer creates DSDB keypair (pD,sD)
 
   {
-    key identifier   = base64(id(p))
+    key identifier   = base64(id(pD))
     not_before       = TIME(...)
     not_after        = TIME(...)
-    public key       = base64(p)
+    cipher           = ENCRYPTION-ALG
+    public key       = base64(pD)
 
     issuer           = Hash(pM)
     signature        = base64(sig(sM, hash(content part)))

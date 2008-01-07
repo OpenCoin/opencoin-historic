@@ -63,13 +63,13 @@ Currency Description Document (CCD) =
 
 Mint Key =
 {
-    key identifier      = base64(hash(p))
+    key identifier      = base64(hash(pP))
     currency identifier = http://opencent.net/OpenCent
     denomination        = denomination
     not_before          = TIME(...)
     key_not_after       = TIME(...)
     coin_not_after      = TIME(...)
-    public key          = base64(p)
+    public key          = base64(pP)
 
     issuer              = hash(pM)
     signature           = base64(sig(sM, hash(content part)))
@@ -78,10 +78,11 @@ Mint Key =
 
 DSDB Key = 
 {
-    key identifier      = base64(hash(p))
+    key identifier      = base64(hash(pD))
     not_before          = TIME(...)
     not_after           = TIME(...)
-    public key          = base64(p)
+    cipher              = ENCRYPT-ALG
+    public key          = base64(pD)
 
     issuer              = Hash(pM)
     signature           = base64(sig(sM, hash(content part)))
@@ -114,7 +115,7 @@ Coin =
     key identifier          = key_id(signing key)
     serial                  = base64(128bit random number)
     
-    signature               = base64(encrypt(ALG,priv-key-of-signing-key, content part))
+    signature               = base64(sig(pP, content part))
 }
 
 
@@ -124,5 +125,5 @@ Obfuscated Blank =
     currency identifier     = http://opencent.net/OpenCent 
     denomination            = denomination
     key identifier          = key_id(signing key)
-    serial                  = base64(encrypt(ALG,pub-key-of-DSDB, serial))
+    serial                  = base64(encrypt(pD, serial))
 }
