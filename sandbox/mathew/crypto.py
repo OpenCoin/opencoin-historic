@@ -1,5 +1,3 @@
-import time
-
 class CryptoContainer:
     def __init__(self, signing=None, encryption=None, blinding=None, hashing=None):
         self.signing = signing
@@ -125,7 +123,7 @@ class HashingAlgorithm:
 
 
 class KeyPair:
-    def __init__(self, public, private=None):
+    def __init__(self, public, private):
         self.public = public
         self.private = private
 
@@ -135,9 +133,47 @@ class KeyPair:
    
 class RSAKeyPair(KeyPair):
     from Crypto.PublicKey import RSA
-    def __init__(self, modulus, public, private=None):
-        KeyPair.__init__(self, public, private)
-        self.modulus = modulus
+    def __init__(self, key=None, p=None, q=None, e=None, d=None, n=None, u=None):
+        self.key = key
+
+        if not key: # we weren't passed in a key. Have to figure it out ourselves. yay!
+            #this function builds just the parts of the tuple contstruct uses
+            li = [n, e]
+            if d:
+                li.append(d)
+            if p and q:
+                li.append(p, q)
+            if u:
+                li.append(u)
+                
+            self.key = RSA.construct(tuple(li))
+
+
+    def hasPrivate(self):
+        return self.key.has_private()
+
+    def public(self):
+        return self.key.publickey()
+
+    def private(self):
+        if not self.hasPrivate():
+            raise CryptoError('Do not have private key')
+
+        return self.key
+
+    def __str__(self):
+        """The string representation of the key. Always the public key."""
+        values = [str(self.key.n), str(self.key.e)]
+        return ','.join(values)
+
+def createRSAKeyPair(N):
+    """Creates an RSA keypair of size N."""
+    from Crypto.PublicKey import RSA
+
+    _r.verifyEntropy(N)
+    rsaKey = RSA.generate(N, _r.get_bytes)
+    return RSAKeyPair(key=rsaKey)
+
 
 class RSAEncryptionAlgorithm(EncryptionAlgorithm):
     from Crypto.PublicKey import RSA
@@ -151,22 +187,24 @@ class RSAEncryptionAlgorithm(EncryptionAlgorithm):
 
         self.ALGNAME = 'RSAEncryptionAlgorithm'
         
-    def update(input):
-        self.input.append(input)
+    def update(self, input):
+        self.input = self.input + input
 
     def reset(self):
         self.input = ''
 
     def encrypt(self):
+        from Crypto.Util import number
         try:
-            return self.key.encrypt(input)
-        except error:
+            return self.key.public().encrypt(self.input, '')
+        except PyCryptoError:
             raise CryptoError
     
     def decrypt(self):
+        from Crypto.Util import number
         try:
-            return self.key.decrypt(input)
-        except error:
+            return self.key.private().decrypt(self.input)
+        except PyCryptoError:
             raise CryptoError
         
 
@@ -178,7 +216,7 @@ class RSABlindingAlgorithm(BlindingAlgorithm):
 
     def update(self, input):
         """updates the algorithm with more hashing information."""
-        self.input.append(input)
+        self.input = self.input + input
 
     def blind(self, blinding_factor=None):
         """returns the blinding of the input with the key and the blinding factor."""
@@ -186,15 +224,15 @@ class RSABlindingAlgorithm(BlindingAlgorithm):
             blinding_factor = some_crypto_to_get_random_less_than_N()
 
         try:
-            return self.key.blind(self.input, blinding_factor), blinding_factor
-        except error:
+            return self.key.public().blind(self.input, blinding_factor), blinding_factor
+        except PyCryptoError:
             raise CryptoError
 
     def unblind(self):
         """returns the unblinded value of the input."""
         try:
-            return self.key.unblind(self.input, self.blinding_factor)
-        except error:
+            return self.key.public().unblind(self.input, self.blinding_factor)
+        except PyCryptoError:
             raise CryptoError
         
     def reset(self):
@@ -210,20 +248,20 @@ class RSASigningAlgorithm(SigningAlgorithm):
 
     def update(self, input):
         """updates the algorithm with more hashing information."""
-        self.input.append(input)
+        self.input = self.input + input
 
     def sign(self):
         """returns the signature of the input with the key."""
         try:
-            return self.key.sign(self.input)
-        except error:
+            return self.key.private().sign(self.input)
+        except PyCryptoError:
             raise CryptoError
 
     def verify(self):
         """returns if the signature in input is valid."""
         try:
-            return self.key.verify(self.input)
-        except error:
+            return self.key.public().verify(self.input)
+        except PyCryptoError:
             raise CryptoError
 
     def reset(self):
@@ -293,4 +331,25 @@ class Random:
         self.RandomPool.add_event(text)
         self.RandomPool.stir()
 
+    def verifyEntropy(self, N):
+        """Verifies enough entropy is in the RandomPool. If we are close to no entropy, attempt to add some."""
+        if self.RandomPool.entropy < 2 * N:
+            self.RandomPool.randomize(4 * N)
+
+        self.RandomPool.add_event('')
+        self.RandomPool.stir()
+
+        if self.RandomPool.entropy < N: # if the stirring got rid of entropy, seed with more entropy
+            self.verifyEntropy(2 * N)
+
+    def get_bytes(self, num):
+        """Get num bytes of randomness from the RandomPool."""
+        return self.RandomPool.get_bytes(num)
+            
 _r = Random()    
+
+import Crypto.PublicKey.RSA as quickRSA
+PyCryptoRSAError = quickRSA.error
+del quickRSA
+
+
