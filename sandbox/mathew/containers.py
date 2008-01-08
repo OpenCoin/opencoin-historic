@@ -188,8 +188,10 @@ class CurrencyBase:
         return True # Everything checks out
 
 class CurrencyBlank(CurrencyBase):
-    def __init__(self, standard_identifier, currency_identifier, denomination, key_identifier, serial=None):
+    def __init__(self, standard_identifier, currency_identifier, denomination, key_identifier, serial=None, blind_factor=None):
         CurrencyBase.__init__(self, standard_identifier, currency_identifier, denomination, key_identifier, serial)
+
+        self.blind_factor = blind_factor
 
     def generateSerial(self):
         self.serial = do_crypto()
@@ -197,7 +199,7 @@ class CurrencyBlank(CurrencyBase):
     def content_part(self):
         if not self.serial:
             raise SomeError('Serial is not set')
-        do_some_encode_thing
+        do_some_encode_thing()
 
     def obfuscate(self, dsdb_certificate):
         """Returns an CurrencyObfuscatedBlank for a certian DSDB."""
@@ -205,6 +207,33 @@ class CurrencyBlank(CurrencyBase):
         return CurrencyObfuscatedBlank(self.standard_identifier, self.currency_identifier, self.denomination,
                                        self.key_identifier, obfuscatedserial)
 
+    def blind_blank(self):
+        """Returns the blinded value of the hash of the coin for signing."""
+        if self.blind_factor:
+            raise MessageError('CurrenyBlank already has a blind factor')
+
+        self.blind_value, self.blind_factor = someBlindingFunctionCall()
+
+        return self.blind_value
+
+    def unblind_signature(self, signature):
+        """Returns the unblinded value of the blinded signature."""
+        return someUnblindedFunctionCall()
+
+    def newCoin(self, signature, currency_description_document=None, minting_key=None):
+        """Returns a coin using the unblinded signature.
+        Performs tests if currency_description_document and minting_key are provided.
+        """
+        coin = CurrencyCoin(self.standard_identifier, self.currency_identifier, self.denomination, self.key_identifier,
+                            self.serial, signature)
+        
+        
+        # if only one is provided, we have an error. Purposefully use an 'or' for the test to get an exception later
+        if currency_description_document or minting_key:
+            coin.validate_with_CDD_and_MintingKey(currency_description_document, minting_key)
+        
+        return coin
+        
 class CurrencyCoin(CurrencyBase):
     def __init__(self, standard_identifier, currency_identifier, denomination, key_identifier, serial, signature):
         CurrencyBase.__init__(self, standard_identifier, currency_identifier, denomination, key_identifier, serial)

@@ -658,4 +658,25 @@ class FetchMinted(Handler):
 
         self._setLastState(message.identifier)
 
+    def verifySignatures(self, signatures, minting_keys, minting_blanks, cdd):
+        """verifies the signatures received and makes coins out of blanks."""
+        successes = []
+        failures = []
 
+        if len(minting_blanks) != len(signatures):
+            #FIXME: logging
+            #pass # nothing we can do here. Try to salvage what we can. We are going to assume they still line up
+            raise MessageError('minting_blanks and signatures are different lengths') # screw it
+
+        for i in range(len(signatures)):
+            sig = signatures[i]
+            bnk = minting_blanks[i]
+            unblinded = bnk.unblind_signature(sig)
+            try:
+                coin = bnk.newCoin(unblinded, cdd, minting_keys.search(bnk.denomination))
+                # the call to newCoin verifies the signature
+                successes.append(coin)
+            except CryptoError:
+                failures.append(bnk, sig)
+
+        return successes, failures
