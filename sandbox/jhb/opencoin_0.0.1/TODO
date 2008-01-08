@@ -1,0 +1,19 @@
+TODO:
+
+* fake account bank
+* automatic coin selection for summarized amounts
+* permanent storage (file) of wallet, DSDB, mint-keys (Done for issuer)
+* coin exchange
+* regular mint key rotation
+* currency description certificate (textfile or X.509v3 cert?) and parsing:
+  * issuer name
+  * issuer root pub key or cert
+  * currency name
+  * currency denominations
+  * currency policies (e.g. mint key rotation times)
+  * currency services (opencoin://hostname:port)
+  * issuer's signature
+
+* exchange XML-RPC if that is not possible via bluetooth/IrDA
+
+foobar2
