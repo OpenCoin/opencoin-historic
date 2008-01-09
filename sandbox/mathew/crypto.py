@@ -1,3 +1,5 @@
+import types
+
 class CryptoContainer:
     def __init__(self, signing=None, encryption=None, blinding=None, hashing=None):
         self.signing = signing
@@ -8,13 +10,13 @@ class CryptoContainer:
     def __str__(self):
         include = []
         if self.signing:
-            include.append(self.signing)
+            include.append(str(self.signing))
         if self.encryption:
-            include.append(self.encryption)
+            include.append(str(self.encryption))
         if self.blinding:
-            include.append(self.blinding)
+            include.append(str(self.blinding))
         if self.hashing:
-            include.append(self.hashing)
+            include.append(str(self.hashing))
 
         # the order is always SIGN-ALG, ENCRYPTION-ALG, BLINDING-ALG, HASH-ALG
 
@@ -22,19 +24,15 @@ class CryptoContainer:
 
     
 class SigningAlgorithm:
-    def __init__(self, hashing, input=None):
-        self.hashing = hashing
-        if input:
-            self.hashing.update(input)
+    def __init__(self, key, input=None):
+        self.key = key
 
     def update(self, input):
         """updates the object with more information to sign."""
-        self.hashing.update(input)
+        raise NotImplementedError
 
     def sign(self):
         """returns the signature of the hash of the data."""
-        hash = self.hashing.digest()
-        self.hashing.reset()
         raise NotImplementedError
 
     def verify(self):
@@ -43,7 +41,7 @@ class SigningAlgorithm:
 
     def reset(self):
         """resets the data for signing to it's default value."""
-        self.hashing.reset()
+        raise NotImplementedError
 
     def __str__(self):
         """returns only the name of the signing algorithm in accordance with the SIGN-ALG name."""
@@ -161,6 +159,9 @@ class RSAKeyPair(KeyPair):
 
         return self.key
 
+    def size(self):
+        return self.key.size()
+
     def __str__(self):
         """The string representation of the key. Always the public key."""
         values = [str(self.key.n), str(self.key.e)]
@@ -209,9 +210,10 @@ class RSAEncryptionAlgorithm(EncryptionAlgorithm):
         
 
 class RSABlindingAlgorithm(BlindingAlgorithm):
-    def __init__(self, key, input=None):
+    def __init__(self, key, input=None, blinding_factor=None):
         self.input = ''
         BlindingAlgorithm.__init__(self, key, input)
+        self.blinding_factor = blinding_factor
         self.ALGNAME = 'RSABlindingAlgorithm'
 
     def update(self, input):
@@ -220,19 +222,25 @@ class RSABlindingAlgorithm(BlindingAlgorithm):
 
     def blind(self, blinding_factor=None):
         """returns the blinding of the input with the key and the blinding factor."""
-        if not blinding_factor:
-            blinding_factor = some_crypto_to_get_random_less_than_N()
+        if not blinding_factor and not self.blinding_factor:
+            # self.key.size returns the size of the key - 1, which is acceptable
+            blinding_factor = _r.getRandomNumber(self.key.size())
+
+        self.blinding_factor = blinding_factor
 
         try:
             return self.key.public().blind(self.input, blinding_factor), blinding_factor
         except PyCryptoError:
             raise CryptoError
 
-    def unblind(self):
+    def unblind(self, blinding_factor = None):
         """returns the unblinded value of the input."""
+        if blinding_factor:
+            self.blinding_factor = blinding_factor
+
         try:
             return self.key.public().unblind(self.input, self.blinding_factor)
-        except PyCryptoError:
+        except PyCryptoRSAError:
             raise CryptoError
         
     def reset(self):
@@ -250,18 +258,23 @@ class RSASigningAlgorithm(SigningAlgorithm):
         """updates the algorithm with more hashing information."""
         self.input = self.input + input
 
-    def sign(self):
-        """returns the signature of the input with the key."""
+    def sign(self, message):
+        """returns the signature of the message with the key."""
         try:
-            return self.key.private().sign(self.input)
-        except PyCryptoError:
+            result = self.key.private().sign(message, '')[0]
+            if isinstance(message, types.StringType):
+                from Crypto.Util import number
+                return number.long_to_bytes(result)
+            return result
+        except PyCryptoRSAError:
             raise CryptoError
 
-    def verify(self):
-        """returns if the signature in input is valid."""
+    def verify(self, signature):
+        """returns if the signature of the input is valid."""
+        from Crypto.Util import number
         try:
-            return self.key.public().verify(self.input)
-        except PyCryptoError:
+            return self.key.public().verify(self.input, (number.bytes_to_long(signature),))
+        except PyCryptoRSAError:
             raise CryptoError
 
     def reset(self):
@@ -272,7 +285,7 @@ class SHA256HashingAlgorithm(HashingAlgorithm):
         self.reset() # setup self.hash
 
         HashingAlgorithm.__init__(self, input)
-        self.ALGNAME=SHA256HashingAlgorithm
+        self.ALGNAME='SHA256HashingAlgorithm'
 
     def update(self, input):
         self.hash.update(input) 
@@ -282,7 +295,7 @@ class SHA256HashingAlgorithm(HashingAlgorithm):
 
     def reset(self):
         from Crypto.Hash import SHA256
-        self.hash = SHA256()
+        self.hash = SHA256.new()
         
 class CryptoError(Exception): pass
 
