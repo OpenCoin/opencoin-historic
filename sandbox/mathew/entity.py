@@ -11,7 +11,8 @@ class IssuerDSDBEntity(Entity):
         self.cdd = cdd # the cdd
         #self.mk = mk # a list of all active minting keys
         self.dsdb_key = dsdb_key # the dsdb_certificate
-        self.dsdb_database = dsdb_database # the doublespending database
+        self.dsdb_database = dsdb_database # the doublespending database, a dictionary by mint_key of
+                                           #            (dictionaries by serial of (tuple of ('Spent',),  ('Locked', time_expire, _id))))
         self.minted = minted # dictionary the coins we have minted which haven't been sent by id
         self.mint_waiting = mint_waiting # a dictionary of a reason why it isn't fetchable and either the minted or unminted blanks
         self.mint_failures = mint_failures # a dictionary of a reason why the request failed
@@ -23,6 +24,9 @@ class IssuerDSDBEntity(Entity):
         self.minting_keys_denomination = {} # dictionary by by denomination of (list of valid minting keys)
 
         self.addMintingKeys(mk)
+
+        if not dsdb_database: # setup a empty database
+            self.dsdb_database = {}
 
     def addMintingKeys(self, keys):
         """Adds minting keys from the list of keys to minting_key_key_id and minting_keys_denomination."""

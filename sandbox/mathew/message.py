@@ -44,7 +44,7 @@ class MessageType(object):
                     if self.callback:
                         for f in self.callback:
                             f(result)
-                except MessageError:
+                except None: #MessageError:
                     #Do error handling
                     raise #or rethrow exception for now
 
@@ -55,7 +55,7 @@ class MessageType(object):
                 raise MessageError('messageHandler for message %s is None!' % message.identifier)
         except AttributeError:
             message.setMessageLayer(self)
-            print 'setting message handler for message %s to %s' % (message.identifier,self)
+            #print 'setting message handler for message %s to %s' % (message.identifier,self)
 
         result = message.encode()
         self._outputFunction(result)
@@ -124,19 +124,19 @@ class MessageType(object):
 
        
     def __clearPersistant(self, keep=[]):
-        print 'clearing persistant information'
+        #print 'clearing persistant information'
         if keep:
             raise NotImplementedError
         class persistant: pass
         self.persistant = persistant
 
     def addCallback(self, callback):
-        print 'adding a callback'
+        #print 'adding a callback'
         if callback not in self.callback:
             self.callback.append(callback)
 
     def removeCallback(self, callback):
-        print 'removing a callback'
+        #print 'removing a callback'
         if callback not in self.callback:
             raise MessageError('Callback function not in list of callbacks.')
 

@@ -208,7 +208,7 @@ class RSAEncryptionAlgorithm(EncryptionAlgorithm):
     def encrypt(self):
         from Crypto.Util import number
         try:
-            return self.key.public().encrypt(self.input, '')
+            return self.key.public().encrypt(self.input, '')[0]
         except PyCryptoError:
             raise CryptoError
     

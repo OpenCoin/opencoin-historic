@@ -143,11 +143,14 @@ class MintingKey(Handler):
                 self.manager.messageType.persistant.reason = result
                 self.__createAndOutput(MintingKeyFailure)
                 self.reason = 'Unknown key_id'
+
+                self.manager.messageType.persistant.reason = self.reason
+                self.__createAndOutput(MintingKeyFailure)
             else:
                 self.reason = 'Unknown denomination'
                     
-            self.manager.messageType.persistant.reason = self.reason
-            self.__createAndOutput(MintingKeyFailure)
+                self.manager.messageType.persistant.reason = self.reason
+                self.__createAndOutput(MintingKeyFailure)
 
         elif isinstance(message, MintingKeyPass) or isinstance(message, MintingKeyFailure):
             # we output this. Next step can only be Goodbye

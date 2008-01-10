@@ -233,26 +233,24 @@ class Coins(Handler):
     def handle(self, message):
         if not isinstance(message, CoinsRedeem) and not isinstance(message, CoinsReject) and not isinstance(message, CoinsAccept):
             if self.manager.walletMessageType.globals.lastState == MessageHello: # we are now on a different message. Oops.
-                raise MessageError('Redeem should have already been removed. It was not. Very odd. Message: %s LastMessage: %s' % (message.identifier,
+                raise MessageError('Coins should have already been removed. It was not. Very odd. Message: %s LastMessage: %s' % (message.identifier,
                                                                                                                 self.manager.walletMessageType.globals.lastState))
             else:
-                raise MessageError('We somehow called RedeemCoins.handle() but cannot be there. Message: %s' % message.identifier)
+                raise MessageError('We somehow called Coins.handle() but cannot be there. Message: %s' % message.identifier)
 
         if isinstance(message, CoinsRedeem):
             # we output this. Previous step was Hello. Do nothing.
             print 'Got a CoinsRedeem. I did not know we got these.'
 
         elif isinstance(message, CoinsAccept):
-            
+            self.manager.walletMessageType.removeCallback(self.handle)
             self.manager.success(message, self)
 
-        elif isinstance(message, BlankFailure):
+        elif isinstance(message, CoinsReject):
             self.reason = self.manager.walletMessageType.persistant.reason
+            
+            self.manager.walletMessageType.removeCallback(self.handle)
             # undo the damage and tell someone
-            self.manager.failure(message, self)
-
-        elif isinstance(message, BlankReject):
-            self.reason = self.manager.walletMessageType.persistant.reason
             self.manager.failure(message, self)
 
         self._setLastState(message.identifier)

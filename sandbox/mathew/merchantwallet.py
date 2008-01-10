@@ -154,6 +154,8 @@ class MerchantWalletManager(object):
             self.setHandler(RedeemCoins(self, message)) # Now we redeem them (note: the next step may be to try to mint them...)
         elif isinstance(message, FetchMintedRequest):
             self.setHandler(FetchMinted(self, message)) # And finally, get the coins.
+        elif isinstance(message, UnlockCoinsPass) or isinstance(message, UnlockCoinsFailure):
+            self.setHandler(UnlockCoins(self, message)) # If we erred, we unlock to be nice
             
         else:
             raise MessageError('Message %s does not continue a conversation' % message.identifier)
@@ -234,6 +236,7 @@ class Handler(object):
         For any message which can start at Hello, perform a check to make sure that we have the required lastState in the manager.
         A lastState of None is the beginning.
         """
+        return #FIXME: lastState isn't being set due to function calls. Figure this out later. (Note: not having this breaks verification)
         if not self.manager.lastMessageIdentifier in state:
             raise MessageError('Did not find expected last state. Found: %s, Wanted: %s' % (self.manager.lastMessageIdentifier, state))
 
@@ -362,14 +365,25 @@ class BlankAndMintingKey(Handler):
             #Verify blanks
             type, result = self.checkValidObfuscatedBlanksAndKnownIssuers(self.blanks, self.manager.entity.cdds, self.manager.entity.minting_keys_key_id)
             if type == 'PASS': 
-                self.manager.isMessageType.persistant.key_id = self.dsdb_certificate
-                self.manager.isMessageType.persistant.transaction_id = self.makeTransactionID()
+                # setup the requirements for the LockCoinsRequest
+                self.manager.dsdbMessageType.persistant.key_id = self.dsdb_certificate.key_identifier
+                self.manager.dsdbMessageType.persistant.transaction_id = self.makeTransactionID()
+
+                # the message to the dsdb, LOCK_COINS_REQUEST only gets sent the obfuscated serial and the minting_key. Get that information
+                self.lockRequestBlanks = []
+                for b in self.blanks:
+                    self.lockRequestBlanks.append((b.key_identifier, b.serial))
+                self.manager.dsdbMessageType.persistant.blanks = self.lockRequestBlanks
+
+                # setup future minting
+                self.manager.isMessageType.persistant.transaction_id = self.manager.dsdbMessageType.persistant.transaction_id # it's the same id for a different thing
                 self.manager.isMessageType.persistant.blanks = self.manager.persistant.mintBlanks
         
                 # The result will be handled by a different Handler. Remove ourselves as a callback
                 self.manager.walletMessageType.removeCallback(self.handle)
                 self.manager.isMessageType.removeCallback(self.handle)
 
+                # And finally output
                 self._createAndOutputDSDB(LockCoinsRequest)
             elif type == 'FAILED': # Send a BlankReject
                 self.manager.walletMessageType.persistant.reason = result
@@ -486,30 +500,33 @@ class LockCoins(Handler):
             print 'Got a LockCoinsRequest. I did not know we got these.'
 
         elif isinstance(message, LockCoinsAccept):
-            self.dsdb_lock = self.manager.isMessageType.persistant.dsdb_lock
+            self.dsdb_lock = self.manager.dsdbMessageType.persistant.dsdb_lock
             self.manager.persistant.dsdb_lock = self.dsdb_lock
 
-            if not validDSDBLock(self, self.dsdb_lock, time):
+            if not self.validDSDBLock(self.dsdb_lock, self.timeNow()):
                 raise MessageError('Invalid DSDB Lock')
             
-            self.manager.isMessageType.removeCallback(self.handle) #remove the callback. Not coming here again
+            self.manager.dsdbMessageType.removeCallback(self.handle) #remove the callback to the DSDB. Not coming here again
 
             self._createAndOutputWallet(BlankAccept)
 
         elif isinstance(message, LockCoinsFailure):
-            self.reason = self.manager.isMessageType.persistant.reason
+            self.reason = self.manager.dsdbMessageType.persistant.reason
             # undo the damage and tell someone
             self.manager.failure(message, self)
 
         self._setLastState(message.identifier)
 
-    def validDSDBLock(self, dsdb_lock, time):
+    def validDSDBLock(self, dsdb_lock, now):
         """validDSDBLock returns whether dsdb_lock is still valid or not.
         dsdb_lock is really just a time, so we test if we are before the time or not.
         """
 
-        return time < dsdb_lock
+        return now < dsdb_lock
     
+    def timeNow(self):
+        import time
+        return time.time()
 
 class Coins(Handler):
     def __init__(self, manager, firstMessage):
@@ -529,7 +546,8 @@ class Coins(Handler):
             self.coins = self.manager.walletMessageType.persistant.coins
             self.manager.persistant.coins = self.coins
 
-            type, result = self.verifyCoins(self.coins, self.manager.persistant.mintingKeyKeyID, self.manager.persistant.blanks, self.manager.persistany.dsdb_certificate)
+            type, result = self.verifyCoins(self.coins, self.manager.entity.minting_keys_key_id, self.manager.persistant.blanks,
+                                            self.manager.persistant.dsdb_certificate, self.manager.entity.cdds)
 
             if type == 'ACCEPT':
                 if not self.validDSDBLock(self.dsdb_lock):
@@ -538,7 +556,7 @@ class Coins(Handler):
                 self._createAndOutputWallet(CoinsAccept)
 
             elif type == 'REJECT':
-                self.manager.walletMessageType.persistant.result = result
+                self.manager.walletMessageType.persistant.reason = result
 
                 self._createAndOutputWallet(CoinsReject)
 
@@ -547,13 +565,15 @@ class Coins(Handler):
 
         elif isinstance(message, CoinsReject):
             # We are done. We should be nice though and Unlock the coins
-            if self.validDSDBLock(self.dsdb_lock):
-                self.manager.dsdbMessageType.persistant.transaction_id = self.dsdb_lock
+            if self.validDSDBLock(self.manager.dsdbMessageType.persistant.dsdb_lock, self.timeNow()):
+                # XXX What is the line below even trying to do? - oierw
+                # self.manager.dsdbMessageType.persistant.transaction_id = self.dsdb_lock
 
-                self.manager.walletMessageType.removeCallback(self.result)
+                self.manager.walletMessageType.removeCallback(self.handle)
                 self._createAndOutputDSDB(UnlockCoinsRequest)
             else: # the DSDB lock has already expired.
-                self.manager.walletMessageType.removeCallback(self.result)
+                self.manager.walletMessageType.removeCallback(self.handle)
+                self.manager.isMessageType.removeCallback(self.handle)
                 self.manager.failure(self, message)
         
         elif isinstance(message, CoinsAccept):
@@ -579,12 +599,12 @@ class Coins(Handler):
                 
         self._setLastState(message.identifier)
 
-    def validDSDBLock(self, dsdb_lock, time):
+    def validDSDBLock(self, dsdb_lock, now):
         """validDSDBLock returns whether dsdb_lock is still valid or not.
         dsdb_lock is really just a time, so we test if we are before the time or not.
         """
 
-        return time < dsdb_lock
+        return now< dsdb_lock
 
     def newRequestId(self):
         raise NotImplementedError
@@ -592,7 +612,7 @@ class Coins(Handler):
     def newTarget(self):
         raise NotImplementedError
     
-    def verifyCoins(self, coins, mintingKeys, blanks, dsdb_keycertificate):
+    def verifyCoins(self, coins, mintingKeys, blanks, dsdb_keycertificate, cdds):
         failure = False
         failures = []
 
@@ -604,12 +624,12 @@ class Coins(Handler):
             # this *should* be impossible due to the previus error.
 
         for i in range(len(coins)):
-            type, result = self.verifySingleCoin(coins[i], mintingKeys, blanks[i], dsdb_keycertificate)
+            type, result = self.verifySingleCoin(coins[i], mintingKeys, blanks[i], dsdb_keycertificate, cdds)
             if type == 'VALID':
                 pass
             elif type == 'FAILURE':
                 failure = True
-                failures.append( (coins[i], reason) )
+                failures.append( (coins[i], result) )
             else:
                 raise MessageError('Got an imposisble type: %s' % type)
 
@@ -618,7 +638,7 @@ class Coins(Handler):
         else:
             return 'ACCEPT', None
 
-    def verifySingleCoin(self, coin, mintingKeys, blank, dsdb_keycertificate):
+    def verifySingleCoin(self, coin, mintingKeys, blank, dsdb_keycertificate, cdds):
         """verifySingleCoin takes a coin and ensures the coin is valid and the coin and the obfuscated blank are the same."""
         # First check the coin values against the blank values.
         # Then check the obfuscated serial against the serial
@@ -631,11 +651,14 @@ class Coins(Handler):
         if not coin.check_obfuscated_blank_serial(blank, dsdb_keycertificate):
             return 'FAILURE', 'Unknown coin'
 
-        if not coin.validate_with_CDD_and_MintingKey(cdds.search(coin.currency_identifier), mintingKeys.search(coin.currency_identifier)):
+        if not coin.validate_with_CDD_and_MintingKey(cdds[coin.currency_identifier], mintingKeys[coin.key_identifier]):
             return 'FAILURE', 'Invalid coin'
 
         return 'VALID', None
         
+    def timeNow(self):
+        import time
+        return time.time()
 
 class Mint(Handler):
     def __init__(self, manager, firstMessage):
@@ -784,3 +807,39 @@ class FetchMinted(Handler):
                 failures.append(bnk, sig)
 
         return successes, failures
+        
+class UnlockCoins(Handler):
+    def __init__(self, manager, firstMessage):
+        self.manager = manager
+        self.manager.dsdbMessageType.addCallback(self.handle)
+
+    def handle(self, message):
+        if not isinstance(message, UnlockCoinsRequest) and not isinstance(message, UnlockCoinsPass) and not isinstance(message, UnlockCoinsFailure):
+            if message.messageLayer.globals.lastState == MessageHello: # we are now on a different message. Oops.
+                raise MessageError('UnlockCoins should have already been removed. It was not. Very odd. Message: %s LastMessage: %s' % (message.identifier,
+                                                                                                                message.messageLayer.globals.lastState))
+            else:
+                raise MessageError('We somehow called UnlockCoins.handle() but cannot be there. Message: %s' % message.identifier)
+
+
+        self._verifyLastState([]) # FIXME: Figure it out later
+
+        if isinstance(message, UnlockCoinsRequest):
+            # we output this. Previous step was in ?????
+            print 'Got a UnlockCoinsRequest. I did not know we got these.'
+
+        elif isinstance(message, UnlockCoinsPass):
+            #FIXME: do something USEFUL here
+            self.manager.dsdbMessageType.removeCallback(self.handle)
+        
+        elif isinstance(message, UnlockCoinsFailure):
+            #FIXME: do something USEFUL here
+            self.manager.dsdbMessageType.removeCallback(self.handle)
+            #self.manager.failure(message, self)
+
+        self._setLastState(message.identifier)
+
+    def timeNow(self):
+        import time
+        return time.time()
+

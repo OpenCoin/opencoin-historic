@@ -12,7 +12,7 @@ from message import statusHandleServer
 from message import MessageError
 from message import Hello as MessageHello
 
-#import crypto stuff
+from crypto import CryptoError
 
 class Handler(object):
     pass
@@ -25,31 +25,33 @@ class LockCoins(Handler):
     def handle(self, message):
         if not isinstance(message, LockCoinsRequest) and not isinstance(message, LockCoinsAccept) and not isinstance(message, LockCoinsFailure):
             if self.manager.messageType.globals.lastState == MessageHello: # we are now on a different message. Oops.
-                raise MessageError('Mint should have already been removed. It was not. Very odd. Message: %s LastMessage: %s' % (message.identifier,
+                raise MessageError('LockCoins should have already been removed. It was not. Very odd. Message: %s LastMessage: %s' % (message.identifier,
                                                                                                                         self.manager.messageType.globals.lastState))
             else:
                 print 'message class: %s' % message.__class__
-                raise MessageError('We somehow called Mint.handle() but cannot be there. Message: %s' % message.identifier)
+                raise MessageError('We somehow called LockCoins.handle() but cannot be there. Message: %s' % message.identifier)
 
         if isinstance(message, LockCoinsRequest):
                 self.key_id = self.manager.messageType.persistant.key_id
                 self.transaction_id = self.manager.messageType.persistant.transaction_id
-                self.blanks = self.manager.messageType.persistant.blanks
+                self.blanks = self.manager.messageType.persistant.blanks # blanks is a tuple of mint_key_id and obfuscated serial
 
-                self.type, self.result = self.lock(self.key_id, self.transaction_id, self.blanks)
-                
+                self.type, self.result = self.lock(self.key_id, self.transaction_id, self.blanks, self.manager.dsdb_key,
+                                                   self.manager.entity.dsdb_database, self.manager.entity.minting_keys_key_id, self.timeNow())
+               
                 if self.type == 'ACCEPT':
                     transaction_id, self.dsdb_lock = self.result
                     if self.transaction_id != transaction_id:
                         raise MessageError('transaction_id changed. Was: %s, Received: %s' % (self.transaction_id, transaction_id))
                     self.manager.messageType.persistant.dsdb_lock = self.dsdb_lock
+                    
+                    self.manager.messageType.removeCallback(self.handle) # we are done here
                     self.__createAndOutput(LockCoinsAccept)
                     
                 elif self.type == 'REJECT':
-                    transaction_id, self.reason = self.result
-                    if self.transaction_id != transaction_id:
-                        raise MessageError('transaction_id changed. Was: %s, Received: %s' % (self.transaction_id, transaction_id))
-                    self.manager.messageType.persistant.reason = self.reason
+                    self.manager.messageType.persistant.reason = self.result
+
+                    self.manager.messageType.removeCallback(self.handle) # we are done here
                     self.__createAndOutput(LockCoinsFailure)
 
                 else:
@@ -59,52 +61,105 @@ class LockCoins(Handler):
             # we output this. Next step can only be Goodbye
             self.manager.messageType.removeCallback(self.handle)
 
-    def lock(self, dsdb_key_id, transaction_id, blanks):
+    def lock(self, dsdb_key_id, transaction_id, blanks, dsdb_key, dsdb_database, minting_keys_key_id, now):
         failure = False
         failures = []
+
+        blanksAndSerials = []
 
         if len(blanks) == 0:
             raise MessageError('request %s has no blinds' % request_id)
 
-        if not self.validDSDBKeyID(dsdb_key_id):
+        if not self.validDSDBKeyID(dsdb_key_id, dsdb_key, now):
             return 'REJECT', 'Key ID of DSDB is unknown or expired'
         
         for b in blanks:
-            result = self.testBlank(b, dsdb_key_id)
-            if result == 'ACCEPT':
-                pass
-            else:
+            type, result = self.testBlank(b, dsdb_key_id, dsdb_key, dsdb_database, minting_keys_key_id, now)
+            if type == 'ACCEPT':
+                blanksAndSerials.append((b, result)) # Add the tuple of the blank and the serial
+            elif type == 'REJECT':
                 failure = True
                 failures.append( (b, result) )
+            else:
+                raise MessageError('Received impossible type: %s' % type)
 
         if failure:
             return 'REJECT', failures
 
-        self.lockBlanks(dsdb_key_id, request_id, blanks)
+        dsdb_lock_time = self.lockBlanks(transaction_id, blanksAndSerials, dsdb_key, dsdb_database, now)
 
-        return 'ACCEPT', request_id
+        return 'ACCEPT', (transaction_id, dsdb_lock_time)
 
-    def testBlank(self, blank, dsdb_key_id):
-        key_id, blind = blind
-        raise NotImpolementedError
-        #for testing, require key_id to be between 10 and 999999 and blind to be less than a million
-        if key_id < 10 or key_id > 999999:
-            return 'Unknown key_id'
+    def testBlank(self, blank, dsdb_key_id, dsdb_key, dsdb_database, minting_keys_key_id, now):
+        mint_key_id, obfuscated = blank
 
-        if blank < 10000000:
-            return 'Unable to blind'
+        serial = self.unobfuscate(obfuscated, dsdb_key)
+        if serial == 'Decryption of serial failed':
+            return 'REJECT', 'Decryption of serial failed'
 
-        return 'ACCEPT'
+        if not minting_keys_key_id.has_key(mint_key_id) or not minting_keys_key_id[mint_key_id].verify_time(now):
+            return 'REJECT', 'Key ID of blank is unknown or expired'
+        
+        if dsdb_database.has_key(mint_key_id):
+            if dsdb_database[mint_key_id].has_key(serial):
+                result = dsdb_database[mint_key_id][serial]
+                if result[0] == 'Spent':
+                    return 'REJECT', 'Serial already redeemed'
+                elif result[0] == 'Locked':
+                    string, time_lock_expires, transaction_id = result
+                    if self.timeNow() <= time_lock_expires:
+                        return 'REJECT', 'Serial locked (not spent)'
+                    else:
+                        # the serial is no longer locked. unlock it
+                        del dsdb_database[mint_key_id][serial]
+                        return 'ACCEPT', serial
+                else:
+                    raise MessageError('Got an impossible state: %s' % result[0])
+            else: # we have never seen this serial
+                return 'ACCEPT', serial
+        else: # we have never seen this valid mint_key_id
+            return 'ACCEPT', serial
 
-    def validDSDBKeyID(self, dsdb_key_id):
-        if dsdb_key_id < 10000:
-            return False
-        return True
+        
+    def validDSDBKeyID(self, dsdb_key_id, dsdb_key, now):
+        return dsdb_key_id == dsdb_key.key_identifier and dsdb_key.verify_time(now)
 
     def __createAndOutput(self, message):
         m = message()
         self.manager.messageType.addOutput(m)
 
+    def timeNow(self):
+        import time
+        return time.time()
+
+    def unobfuscate(self, obfuscated, dsdb_key):
+        enc = dsdb_key.cipher.__class__(dsdb_key.public_key)
+        enc.update(obfuscated)
+        
+        try:
+            serial = enc.decrypt()
+        except CryptoError:
+            return 'Decryption of serial failed'
+
+        return serial
+
+    def lockBlanks(self, transaction_id, blanksAndSerials, dsdb_key, dsdb_database, now):
+        """locks the serials in the dsdb_database and returns the dsdb_lock_time."""
+        dsdb_lock_time = now + 5 * 60 # 5 minute lock #FIXME: should be setable somewhere.
+
+        #FIXME this is ugly. It doesn't delete transactions as they expire
+
+        for bas in blanksAndSerials:
+            blank, serial = bas
+            mint_key, obfuscated_serial = blank
+            if not dsdb_database.has_key(mint_key):
+                dsdb_database[mint_key] = {} # Make it
+
+            # FIXME: This assumes only one transaction at a time is going on twith the dsdb. If two concurrent transactions happen, this will not catch them
+            dsdb_database[mint_key][serial] = ('Locked', dsdb_lock_time, transaction_id)
+
+        return dsdb_lock_time
+        
 
 class UnlockCoins(Handler):
     def __init__(self, manager, firstMessage):
@@ -143,6 +198,7 @@ class UnlockCoins(Handler):
             self.manager.messageType.removeCallback(self.handle)
 
     def unlock(self, transaction_id):
+        # raise NotImplementedError
         if transaction_id < 100:
             return 'REJECT', 'Unknown transaction_id'
         if transaction_id < 10000:
@@ -162,6 +218,7 @@ class HandlerManager(object):
     def __init__(self, messageType, entity):
         self.messageType = messageType
         self.entity = entity # the entity that spawned us
+        self.dsdb_key = self.entity.dsdb_key
         
         if not self.messageType.globals.status.can(MessageStatuses.PrivilegeServer):
             raise MessageError('given messageType does not have PrivilegeServer')

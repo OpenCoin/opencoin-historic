@@ -303,7 +303,7 @@ class CurrencyCoin(CurrencyBase):
         content.append('"%s"="%s"' % ('serial', base64.b64encode(self.serial)))
         return 'Currency={' + ';'.join(content) + '}'
 
-    def check_similar_to_obfuscated_blank(blank):
+    def check_similar_to_obfuscated_blank(self, blank):
         """check_similar_to_obfuscated_blank verifies that the coin and the blank both refer to a specific minting of a coin without verifying the serials."""
         if self.standard_identifier != blank.standard_identifier:
             return False
@@ -319,9 +319,10 @@ class CurrencyCoin(CurrencyBase):
 
         return True # We have performed allt he cbecks we can
 
-    def check_obfuscated_blank_serial(blank, dsdb_certificate):
+    def check_obfuscated_blank_serial(self, blank, dsdb_certificate):
         """Attempts to ensure the the blank and the dsdb_key have the same serial. This may require additional information if we use something like ElGamal."""
-        obfuscated_serial = obfuscated_crypto(self.serial, dsdb_certificate.public_key)
+        enc = dsdb_certificate.cipher.__class__(dsdb_certificate.public_key, self.serial)
+        obfuscated_serial = enc.encrypt()
         return obfuscated_serial == blank.serial
 
     def newObfuscatedBlank(self, dsdb_certificate):
