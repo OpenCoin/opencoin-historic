@@ -9,7 +9,7 @@ class IssuerDSDBEntity(Entity):
                  mk_before_length=None, mk_coin_not_after_length=None, mk_mint_not_after_length=None, mint_waiting=None,
                  mint_failures=None):
         self.cdd = cdd # the cdd
-        self.mk = mk # a list of all active minting keys
+        #self.mk = mk # a list of all active minting keys
         self.dsdb_key = dsdb_key # the dsdb_certificate
         self.dsdb_database = dsdb_database # the doublespending database
         self.minted = minted # dictionary the coins we have minted which haven't been sent by id
@@ -19,7 +19,25 @@ class IssuerDSDBEntity(Entity):
         self.mk_before_length = mk_before_length #XXX the time to do the not_before for
         self.mk_coin_not_after_length = mk_coin_not_after_length # XXX the time to do the coin_not_after for
         self.mk_mint_not_after_length = mk_mint_not_after_length # XXX the time to do the mint_not_after for
+        self.minting_keys_key_id = {} # dictionary of minting keys by key_identifier
+        self.minting_keys_denomination = {} # dictionary by by denomination of (list of valid minting keys)
 
+        self.addMintingKeys(mk)
+
+    def addMintingKeys(self, keys):
+        """Adds minting keys from the list of keys to minting_key_key_id and minting_keys_denomination."""
+        import time; now=time.time() #hack for now
+        # minting keys is a list of all keys which we sort into minting_keys_key_id and minting_keys_denomination if valid
+        for key in keys:
+            if now <= key.coin_not_after and self.cdd.currency_identifier == key.currency_identifier: 
+                # we don't need keys which have expired or we don't have cdd
+                self.minting_keys_key_id[key.key_identifier] = key
+                if not self.minting_keys_denomination.has_key(key.denomination):
+                    self.minting_keys_denomination[key.denomination] = []
+                self.minting_keys_denomination[key.denomination].append(key)
+            else:
+                print('Invalid minting key: %s', key)
+    
     def newDSDBMessageType(self):
         import dsdb
         
@@ -41,26 +59,12 @@ class IssuerDSDBEntity(Entity):
 
 class WalletEntity(Entity):
     def __init__(self, cdds=None, minting_keys=None, coins=None, requests=None, universe=None):
-        import time #FIXME: hack for time
-        now = time.time()
-
         self.cdds = cdds # dictionary of cdds by currency identifier
         
         self.minting_keys_key_id = {} # dictionary of minting keys by key_identifier
         self.minting_keys_denomination = {} # dictionary by currency identifier of (dictionary by denomination of (list of valid minting keys))
-        # minting keys is a list of all keys which we sort into minting_keys_key_id and minting_keys_denomination if valid
-        for key in minting_keys:
-            if now <= key.coin_not_after and cdds.has_key(key.currency_identifier): 
-                # we don't need keys which have expired or we don't have cdd
-                self.minting_keys_key_id[key.key_identifier] = key
-                if not self.minting_keys_denomination.has_key(key.key_identifier):
-                    self.minting_keys_denomination[key.key_identifier] = {}
-                table = self.minting_keys_denomination[key.key_identifier]
-                if not table.has_key(key.denomination):
-                    table[key.denomination] = []
-                table[key.denomination].append(key)
-            else:
-                print('Invalid minting key: %s', key)
+        self.addMintingKeys(minting_keys)
+
 
         self.coins = [] # list of coins
         for coin in coins: # only add keys we have the (cdd and) minting key for
@@ -73,6 +77,24 @@ class WalletEntity(Entity):
         
         self.universe = universe # holder of all the entities to allow connections to work
         
+    def addMintingKeys(self, minting_keys):
+        """Adds minting keys to self.minting_keys_key_id and self.minging_keys_denomination."""
+        # minting keys is a list of all keys which we sort into minting_keys_key_id and minting_keys_denomination if valid
+        import time; now = time.time() #FIXME hack for time
+        
+        for key in minting_keys:
+            if now <= key.coin_not_after and self.cdds.has_key(key.currency_identifier): 
+                # we don't need keys which have expired or we don't have cdd
+                self.minting_keys_key_id[key.key_identifier] = key
+                if not self.minting_keys_denomination.has_key(key.key_identifier):
+                    self.minting_keys_denomination[key.key_identifier] = {}
+                table = self.minting_keys_denomination[key.key_identifier]
+                if not table.has_key(key.denomination):
+                    table[key.denomination] = []
+                table[key.denomination].append(key)
+            else:
+                print('Invalid minting key: %s', key)
+
     def newMerchantWalletMessageType(self):
         import merchantwallet
         

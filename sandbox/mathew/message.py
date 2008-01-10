@@ -28,6 +28,7 @@ class MessageType(object):
         self.globals.handlers[handler.identifier] = handler
 
     def addInput(self, input):
+        print 'MESSAGE: %s %s' % (input.identifier, input.sentence)
         self.input.append(input)
         while self.input:
             #print 'addInput() looping'

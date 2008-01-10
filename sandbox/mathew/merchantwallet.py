@@ -31,7 +31,7 @@ from message import MessageStatuses
 from message import MessageError
 from message import Hello as MessageHello
 
-#import crypto stuff
+import containers
 
 class MerchantWalletManager(object):
     def __init__(self, walletMessageType, entity):
@@ -286,6 +286,7 @@ class BlankAndMintingKey(Handler):
         
         elif isinstance(message, MintingKeyPass): # we've received a key
             minting_certificate = self.manager.isMessageType.persistant.minting_certificate
+            print 'received minting_certificate: %s' % str(minting_certificate)
             self.mkfType[self.mkfSearch] = minting_certificate
 
             self.mkfReturn()
@@ -350,13 +351,18 @@ class BlankAndMintingKey(Handler):
             self._createAndOutputIS(MintingKeyFetchDenomination)
         
         else: # We have all the keys we need. Make new blanks. Verify blanks against DSDB (For now, we don't support trying to do a MintRequest right now
-            self.manager.persistant.mintBlanks = self.makeBlanks(self.blanks, self.mintingKeysDenomination, self.coins)
+            # Add all the keys to the entity
+            self.manager.entity.addMintingKeys(self.collapseMintingKeys(self.mintingKeysKeyID, self.mintingKeysDenomination))
+                    
+            # Make blanks
+            self.manager.persistant.mintBlanks = self.makeBlanks(self.blanks, self.manager.entity.cdds, self.mintingKeysDenomination)
             self.manager.persistant.mintingKeysDenomination = self.mintingKeysDenomination
             self.manager.persistant.mintingKeysKeyID = self.mintingKeysKeyID
 
-            type, result = checkValidObfuscatedBlanksAndKnownIssuers(self.blanks, self.mintingKeysKeyID, self.coins)
+            #Verify blanks
+            type, result = self.checkValidObfuscatedBlanksAndKnownIssuers(self.blanks, self.manager.entity.cdds, self.manager.entity.minting_keys_key_id)
             if type == 'PASS': 
-                self.manager.isMessageType.persistant.key_id = self.dsdb_keycertificate
+                self.manager.isMessageType.persistant.key_id = self.dsdb_certificate
                 self.manager.isMessageType.persistant.transaction_id = self.makeTransactionID()
                 self.manager.isMessageType.persistant.blanks = self.manager.persistant.mintBlanks
         
@@ -364,26 +370,30 @@ class BlankAndMintingKey(Handler):
                 self.manager.walletMessageType.removeCallback(self.handle)
                 self.manager.isMessageType.removeCallback(self.handle)
 
-                self._createAndOutputIS(LockCoinsRequest)
+                self._createAndOutputDSDB(LockCoinsRequest)
             elif type == 'FAILED': # Send a BlankReject
                 self.manager.walletMessageType.persistant.reason = result
                 self._createAndOutputWallet(BlankReject)
             else:
                 raise MessageError('Received an impossible type: %s' % type)
 
-    def makeBlanks(self, blanks, cdds, mintingKeys, coins):
+    def makeBlanks(self, blanks, cdds, mintingKeys):
         """I have no idea why we take the inputs we do. It looks like it makes new CurrencyBlanks. Why do we input the blanks? it makes no sense. We do need the cdd though, I think."""
         # Okay. This is how this function is going to work. It goes through and sees if the values of coins is the same as the blanks. If it is... Fuck. That doesn't work. Okay... just making copies of coins for now.
 
-        newblanks = []
+        newBlanks = []
 
         for b in blanks:
-            newBlank = CurrencyBlank(b.standard_identifier, b.currency_identifier, b.denomination, mintingKeys[b.denomination])
+            # FIXME: This will break if the old key cannot be used to mint.
+            newBlank = containers.CurrencyBlank(b.standard_identifier, b.currency_identifier, b.denomination, mintingKeys[b.denomination])
             newBlank.generateSerial()
             newBlanks.append(newBlank)
 
         return newBlanks
             
+    def makeTransactionID(self):
+        import crypto
+        return crypto._r.getRandomNumber(128)
         
     def checkValidObfuscatedBlanksAndKnownIssuers(self, blanks, cdds, mintingKeysKeyID):
         failure = False
@@ -393,10 +403,10 @@ class BlankAndMintingKey(Handler):
             raise MessageError('Need atleast one blank!')
 
         for b in blanks:
-            if not self.checkValidBlank(b, mintingKeysKeyID):
+            if not self.checkValidObfuscatedBlank(b, cdds, mintingKeysKeyID):
                 failure = True
                 failures.append( (b, 'Malformed blank') )
-            elif not self.checkKnownIssuer(b):
+            elif not self.checkKnownIssuer(b, self.manager.entity.cdds):
                 failure = True
                 failures.append( (b, 'Unknown issuer') )
 
@@ -406,8 +416,8 @@ class BlankAndMintingKey(Handler):
             return 'PASS', None
 
     def checkValidObfuscatedBlank(self, blank, cdds, mintingKeysKeyID):
-        return blank.validate_with_CDD_and_MintingKey(cdds.search(blank.currency_identifier),
-                                                      mintingKeysKeyID.search(blank.key_identifier))
+        return blank.validate_with_CDD_and_MintingKey(cdds[blank.currency_identifier],
+                                                      mintingKeysKeyID[blank.key_identifier])
 
     def checkKnownIssuer(self, blank, cdds):
         found = blank.currency_identifier in cdds
@@ -415,7 +425,7 @@ class BlankAndMintingKey(Handler):
         if not found:
             return false
 
-        return checkWantIssuer(self, cdds.search(blank.currency_identifier))
+        return self.checkWantIssuer(cdds[blank.currency_identifier])
 
     def checkWantIssuer(self, cdd):
         """checkWantIssuer checks a known issuer to see if we want to agree to use them. It may ask the user themselves
@@ -423,7 +433,7 @@ class BlankAndMintingKey(Handler):
         """
 
         # FIXME: this should be somehow superceded by the client
-        return true
+        return True
         
     
     def getCDD(self, cdds, blanks):
@@ -442,6 +452,18 @@ class BlankAndMintingKey(Handler):
             return 'Unknown issuer'
         else:
             return cdds[currency_identifier]
+    
+    def collapseMintingKeys(self, mk_keyid, mk_denomination):
+        """This takes mk_keyid and mk_denomination and makes a list of each of them once."""
+        result = []
+        for key in mk_keyid.values():
+            if key not in result:
+                result.append(key)
+        for key in mk_denomination.values():
+            if key not in result:
+                result.append(key)
+
+        return result
         
 class LockCoins(Handler):
     def __init__(self, manager, firstMessage):

@@ -133,19 +133,21 @@ class MintingKey(Handler):
                 self.denomination = self.manager.messageType.persistant.denomination
                 self.key_id = None
 
-            try:
-                self.minting_certificate = self.findKey(self.key_id, self.denomination)
+            type, result = self.findKey(self.key_id, self.denomination)
 
+            if type == 'PASS':
+                self.minting_certificate = result
                 self.manager.messageType.persistant.minting_certificate = self.minting_certificate
                 self.__createAndOutput(MintingKeyPass)
-            except _MintingKeyError:
-                if self.key_id:
-                    self.reason = 'Unknown key_id'
-                else:
-                    self.reason = 'Unknown denomination'
-                    
-                self.manager.messageType.persistant.reason = self.reason
+            elif type == 'FAILURE':
+                self.manager.messageType.persistant.reason = result
                 self.__createAndOutput(MintingKeyFailure)
+                self.reason = 'Unknown key_id'
+            else:
+                self.reason = 'Unknown denomination'
+                    
+            self.manager.messageType.persistant.reason = self.reason
+            self.__createAndOutput(MintingKeyFailure)
 
         elif isinstance(message, MintingKeyPass) or isinstance(message, MintingKeyFailure):
             # we output this. Next step can only be Goodbye
@@ -153,25 +155,29 @@ class MintingKey(Handler):
 
     def findKey(self, key_id, denomination):
         if key_id:
-            if key_id == 481928:
-                return 'Denomination 1'
-            elif key_id == 38401:
-                return 'Denomination 2'
+            if self.manager.entity.minting_keys_key_id.has_key(key_id):
+                return 'PASS', self.manager.entity.minting_keys_key_id[key_id]
             else:
-                raise _MintingKeyError('Unknown key_id %s' % key_id)
+                return 'FAILURE', 'Unknown key_id'
         else:
-            if denomination == '1':
-                return 'Denomination 1'
-            elif denomination == '2':
-                return 'Denomination 2'
+            if self.manager.entity.minting_keys_denomination.has_key(denomination):
+                return 'PASS', self.mostCurrentValid(self.manager.entity.minting_keys_denomination[denomination], self.timeNow())
             else:
-                raise _MintingKeyError('Unknown denomination: %s' % denomination)
+                return 'FAILURE', 'Unknown denomination'
 
     def __createAndOutput(self, message):
         m = message()
         self.manager.messageType.addOutput(m)
 
-class _MintingKeyError(MessageError): pass
+    def timeNow(self):
+        import time
+        return time.time()
+
+    def mostCurrentValid(self, keys, now):
+        if len(keys) > 1:
+            raise NotImplementedError
+
+        return keys[0]
 
 class DSDBKey(Handler):
     def __init__(self, manager, firstMessage):
