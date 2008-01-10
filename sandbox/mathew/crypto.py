@@ -26,6 +26,8 @@ class CryptoContainer:
 class SigningAlgorithm:
     def __init__(self, key, input=None):
         self.key = key
+        if input:
+            self.update(input)
 
     def update(self, input):
         """updates the object with more information to sign."""
@@ -164,8 +166,13 @@ class RSAKeyPair(KeyPair):
 
     def __str__(self):
         """The string representation of the key. Always the public key."""
-        values = [str(self.key.n), str(self.key.e)]
+        import base64
+        from Crypto.Util import number
+        values = [base64.b64encode(number.long_to_bytes(self.key.n)), base64.b64encode(number.long_to_bytes(self.key.e))]
         return ','.join(values)
+
+    def newPublicKeyPair(self):
+        return RSAKeyPair(self.key.publickey())
 
 def createRSAKeyPair(N):
     """Creates an RSA keypair of size N."""
@@ -190,9 +197,13 @@ class RSAEncryptionAlgorithm(EncryptionAlgorithm):
         
     def update(self, input):
         self.input = self.input + input
+        return self
 
-    def reset(self):
+    def reset(self, input=''):
         self.input = ''
+        if input:
+            self.update(input)
+        return self
 
     def encrypt(self):
         from Crypto.Util import number
@@ -219,6 +230,7 @@ class RSABlindingAlgorithm(BlindingAlgorithm):
     def update(self, input):
         """updates the algorithm with more hashing information."""
         self.input = self.input + input
+        return self
 
     def blind(self, blinding_factor=None):
         """returns the blinding of the input with the key and the blinding factor."""
@@ -243,9 +255,12 @@ class RSABlindingAlgorithm(BlindingAlgorithm):
         except PyCryptoRSAError:
             raise CryptoError
         
-    def reset(self):
+    def reset(self, input=''):
         """resets the algorithm to it's default value."""
         self.input = ''
+        if input:
+            self.update(input)
+        return self
 
     
 class RSASigningAlgorithm(SigningAlgorithm):
@@ -257,6 +272,7 @@ class RSASigningAlgorithm(SigningAlgorithm):
     def update(self, input):
         """updates the algorithm with more hashing information."""
         self.input = self.input + input
+        return self
 
     def sign(self, message):
         """returns the signature of the message with the key."""
@@ -277,25 +293,30 @@ class RSASigningAlgorithm(SigningAlgorithm):
         except PyCryptoRSAError:
             raise CryptoError
 
-    def reset(self):
+    def reset(self, input=''):
         self.input = ''
+        if input:
+            self.update(input)
+        return self
 
 class SHA256HashingAlgorithm(HashingAlgorithm):
     def __init__(self, input=None):
-        self.reset() # setup self.hash
+        self.reset() # setup self.hash. We reset empty since HashingAlgorithm.__init__ will update!
 
         HashingAlgorithm.__init__(self, input)
         self.ALGNAME='SHA256HashingAlgorithm'
 
     def update(self, input):
         self.hash.update(input) 
+        return self
 
     def digest(self):
         return self.hash.digest()
 
-    def reset(self):
+    def reset(self, input=''):
         from Crypto.Hash import SHA256
-        self.hash = SHA256.new()
+        self.hash = SHA256.new(input)
+        return self
         
 class CryptoError(Exception): pass
 

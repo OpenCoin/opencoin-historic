@@ -81,6 +81,8 @@ class ConsumerWalletManager(object):
 
     def startConversation(self):
         #this is kind of a hack. Okay. A lot of a hack
+        self.connectToIS(self.entity.cdds[self.coins[0].currency_identifier])
+
         dkr = DSDBKeyRequest()
         self.isMessageType.addOutput(dkr) # and so it starts. Flow follows to DSDBKey
 
@@ -101,6 +103,9 @@ class ConsumerWalletManager(object):
         self.isMessageType.addMessageHandler(self.isMessages.DKP)
 
         self.entity.connectToIS(self.isMessageType, currency_description_document)
+
+        #FIXME: This is one of many places we enforce the one currency at a time
+        self.cdd = currency_description_document
 
 class Handler(object):
     def _createAndOutput(self, message, messageType):
@@ -146,7 +151,8 @@ class DSDBKey(Handler):
 
         elif isinstance(message, DSDBKeyPass):
             self.dsdb_certificate = self.manager.isMessageType.persistant.dsdb_certificate 
-            self.manager.persistant.dsdb_certificate = self.dsdb_certificate 
+            self.manager.persistant.dsdb_certificate = self.dsdb_certificate # keep a copy for me
+            self.manager.walletMessageType.persistant.dsdb_certificate = self.dsdb_certificate # and we need to encode it
             
             if not self.validCertificate(self.dsdb_certificate, self.manager.cdd, self.getTime()):
                 raise MessageError('Invalid DSDB Certificate')

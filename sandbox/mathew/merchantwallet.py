@@ -141,7 +141,7 @@ class MerchantWalletManager(object):
 
     def resumeConversation(self, message, result):
         if isinstance(message, BlankPresent):
-            self.setHandlerAndMintingKey(Blank(self, message)) # First we receive the blanks
+            self.setHandler(BlankAndMintingKey(self, message)) # First we receive the blanks
         #elif isinstance(message, MintingKeyPass) or isinstance(message, MintingKeyFailure):
         #    self.setHandler(MintingKey(self, message)) # Then we get the MintingKeys
         elif isinstance(message, MintAccept) or isinstance(message, MintReject):
@@ -190,7 +190,7 @@ class MerchantWalletManager(object):
         self.isMessageType.addMessageHandler(MintingKeyFailure()) # These normally would continue, but are folded into BlankAndMintingKey
         self.isMessageType.addMessageHandler(MintRequest())
         self.isMessageType.addMessageHandler(self.isMessages.MA)
-        elf.isMessageType.addMessageHandler(self.isMessages.MR)
+        self.isMessageType.addMessageHandler(self.isMessages.MR)
         self.isMessageType.addMessageHandler(FetchMintedRequest())
         self.isMessageType.addMessageHandler(self.isMessages.FMF)
         self.isMessageType.addMessageHandler(self.isMessages.FMW)
@@ -242,7 +242,7 @@ class BlankAndMintingKey(Handler):
     def __init__(self, manager, firstMessage):
         self.manager = manager
         self.manager.walletMessageType.addCallback(self.handle)
-        self.manager.isMessageType.addCallback(self.handle)
+        # do this later self.manager.isMessageType.addCallback(self.handle)
         self.mintingKeysDenomination = {}
         self.mintingKeysKeyID = {}
         self.mkfReturn = None
@@ -271,6 +271,9 @@ class BlankAndMintingKey(Handler):
             if result != 'Unknown issuer':
                 self.manager.connectToIS(result)
 
+                # add the required callback
+                self.manager.isMessageType.addCallback(self.handle)
+
                 # connect to dsdb
                 self.manager.connectToDSDB(self.manager.persistant.dsdb_certificate)
 
@@ -287,9 +290,9 @@ class BlankAndMintingKey(Handler):
 
             self.mkfReturn()
 
-        elif isinstance(message, FetchMintingFailure):        
+        elif isinstance(message, MintingKeyFailure):        
             self.reason = message.messageLayer.persistant.reason
-            self.manager.failure(self, message)
+            self.manager.failure(message, self)
 
         elif isinstance(message, MintingKeyFetchKeyID) or isinstance(message, MintingKeyFetchDenomination):
             self._verifyLastState(['BlankAndMintingKey']) # make sure we started in here
@@ -311,7 +314,7 @@ class BlankAndMintingKey(Handler):
 
         return dontHave
         
-    def listUnknownKeysDenominatioN(self, blanks, entity):
+    def listUnknownKeysDenomination(self, blanks, entity):
         """Returns a list of all the Denominations we need to request."""
         denominations = []
         for b in blanks:
@@ -324,8 +327,8 @@ class BlankAndMintingKey(Handler):
         raise NotImplementedError
     
     def performMagic(self, blanks, dsdb_certificate):
-        self.neededKeyIDs = listUnknownKeysKeyID(blanks)
-        self.neededDenominations = listUnknownKeysDenomination(blank)
+        self.neededKeyIDs = self.listUnknownKeysKeyID(blanks, self.manager.entity)
+        self.neededDenominations = self.listUnknownKeysDenomination(blanks, self.manager.entity)
 
         self.getMintingKeyAndContinue()
 

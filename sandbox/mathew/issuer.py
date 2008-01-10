@@ -198,7 +198,7 @@ class DSDBKey(Handler):
             self.manager.messageType.removeCallback(self.handle)
 
     def dsdbKey(self):
-        return 'DSDB Certificate'
+        return self.manager.entity.dsdb_key
 
     def __createAndOutput(self, message):
         m = message()

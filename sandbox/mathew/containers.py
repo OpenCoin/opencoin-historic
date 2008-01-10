@@ -1,3 +1,5 @@
+import base64
+
 class Container:
     def __init__(self):
         pass
@@ -11,37 +13,50 @@ class ContainerWithBase(Container):
     def __init__(self):
         Container.__init__(self)
 
-    def _verifyASignature(self, signature, key, content_part):
-        return do_crypto(content_part, signature, key)
+    def _verifyASignature(self, signature_algorithm, hashing_algorithm, signature, key, content_part):
+        hasher = hashing_algorithm.__class__(content_part)
+        signer = signature_algorithm.__class__(key, hasher.digest())
+        return signer.verify(signature.signature)
+    
+    def _performSigning(self, key, signing_algorithm, hashing_algorithm):
+        """sign the container using the key, signing algorithm and hashing algorithm."""
+        contentpart = self.content_part()
+        signer = signing_algorithm.__class__(key)
+        hasher = hashing_algorithm.__class__()
+        hasher.update(contentpart)
+        signature = signer.sign(hasher.digest())
+        hasher.reset()
+        hasher.update(str(key))
+        keyprint = hasher.digest()
+        return Signature(keyprint, signature)
     
 class ContainerWithSignature(ContainerWithBase):
     def __init__(self, signature):
         ContainerWithBase.__init__(self)
         self.signature = signature
 
-    def verifySignature(self, signature, key):
-        return self._verifyASignature(signature, key, self.content_part())
+    def verifySignature(self, signature_algorithm, hashing_algorithm, key):
+        return self._verifyASignature(signature_algorithm, hashing_algorithm, self.signature, key, self.content_part())
 
-    def performSigning(self, key):
-        contentpart = self.content_part()
-        signature = do_crypto(contentpart, key)
-        keyprint = fingerprint(key)
-        return Signature(keyprint, signature)
-
-    def setSignature(self, key):
+    def setSignature(self, key, signing_algorithm, hashing_algorithm):
         """This sets the signature part of the container."""
-        self.signature = self.performSigning(key)
+        self.signature = self._performSigning(key, signing_algorithm, hashing_algorithm)
     
 class ContainerWithAdSignatures(ContainerWithBase):
     def __init__(self, signatures):
         ContainerWithBase.__init__(self)
         self.signatures = signatures
+        if not signatures:
+            self.signatures = []
 
-    def verifyAdSignatures(self, key, keyprint):
+    def verifyAdSignatures(self, signature_algorithm, hashing_algorithm, key, keyprint):
         for s in self.signatures:
-            if s.keyprint == keyprint:
-                return self._verifyASignature(s, key, self.content_part())
+            if s == keyprint:
+                return self._verifyASignature(signature_algorithm, hashing_algorithm, s, key, self.content_part())
         return False # If we didn't match keyprints, we fail verification
+
+    def addAdSignature(self, key, signing_algorithm, hashing_algorithm):
+        self.signatures.append(self._performSigning(key, signing_algorithm, hashing_algorithm))
 
 class CurrencyDescriptionDocument(ContainerWithSignature):
     def __init__(self, standard_version, currency_identifier, short_currency_identifier, issuer_service_location, 
@@ -70,11 +85,11 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
 
     def verify_self(self):
         """Verifies the self-signed certificate."""
-        return self.verifySignature(signature.signature, self.issuer_public_master_key)
+        return self.verifySignature(self.issuer_cipher_suite.signing, self.issuer_cipher_suite.hashing, self.issuer_public_master_key)
 
-    def sign_self(self):
+    def sign_self(self, signing, hashing):
         """Signs the self-signed certificate."""
-        return self.setSignature(self.issuer_public_master_key)
+        return self.setSignature(self.issuer_public_master_key, signing, hashing)
 
 class MintKey(ContainerWithSignature):
     def __init__(self, key_identifier, currency_identifier, denomination, not_before, key_not_after, coin_not_after,
@@ -92,7 +107,7 @@ class MintKey(ContainerWithSignature):
     def content_part(self):
         #return encode(MintKey (all the parts of content_part) )
         content = []
-        content.append('"%s"="%s"' % ('key identifier', self.key_identifier))
+        content.append('"%s"="%s"' % ('key identifier', base64.b64encode(self.key_identifier)))
         content.append('"%s"="%s"' % ('currency identifier', self.currency_identifier))
         content.append('"%s"="%s"' % ('denomination', self.denomination))
         content.append('"%s"="%s"' % ('not_before', self.not_before))
@@ -104,7 +119,8 @@ class MintKey(ContainerWithSignature):
     def verify_with_CDD(self, currency_description_document):
         """verify_with_CDD verifies the mint key against the CDD ensuring valid values matching the CDD and the signature validity."""
         cdd = currency_description_document
-        if self.public_key != cdd.signature.keyprint:
+
+        if self.signature.keyprint != cdd.signature.keyprint:
             return False # if they aren't the same master key, it isn't valid
 
         if self.denomination not in cdd.denominations:
@@ -113,11 +129,12 @@ class MintKey(ContainerWithSignature):
         if self.currency_identifier != cdd.currency_identifier:
             return False # we have to be using the same currency identifier
 
-        if self.key_identifier != hashFunction(self.public_key):
+        if self.key_identifier != cdd.issuer_cipher_suite.hashing.__class__(str(self.public_key)).digest():
             return False # the key identifier is not valid
 
         if self.signature:
-            return self.verifySignature(self.signature, cdd.public_master_key)
+            signing, hashing = cdd.issuer_cipher_suite.signing, cdd.issuer_cipher_suite.hashing
+            return self.verifySignature(signing, hashing, cdd.issuer_public_master_key)
         else:
             return False # if we have no signature, we are not valid (or verifiable)
         
@@ -129,17 +146,18 @@ class MintKey(ContainerWithSignature):
         return can_mint and can_redeem
 
 class DSDBKey(ContainerWithAdSignatures):
-    def __init__(self, key_identifier, not_before, not_after, public_key, signatures = None):
-        ContainerWithAdSignature.__init__(self, signatures)
+    def __init__(self, key_identifier, not_before, not_after, cipher, public_key, signatures = None):
+        ContainerWithAdSignatures.__init__(self, signatures)
         self.key_identifier = key_identifier
         self.not_before = not_before
         self.not_after = not_after
+        self.cipher = cipher
         self.public_key = public_key
 
     def content_part(self):
         #return encode(MintKey (all the parts of content_part) )
         content = []
-        content.append('"%s"="%s"' % ('key identifier', self.key_identifier))
+        content.append('"%s"="%s"' % ('key identifier', base64.b64encode(self.key_identifier)))
         content.append('"%s"="%s"' % ('not_before', self.not_before))
         content.append('"%s"="%s"' % ('not_after', self.not_after))
         content.append('"%s"="%s"' % ('public key', self.public_key))
@@ -149,9 +167,9 @@ class DSDBKey(ContainerWithAdSignatures):
         """verify_with_CDD verifies the signatures of the dsdb key against the CDD."""
         cdd = currency_description_document
 
-        for s in signatures:
+        for s in self.signatures:
             if s.keyprint == cdd.signature.keyprint: # we have the same signer
-                return self.verifySignature(s, cdd.master_public_key)
+                return self.verifyAdSignatures(cdd.issuer_cipher_suite.signing, cdd.issuer_cipher_suite.hashing, cdd.issuer_public_master_key, s)
         return False #if we get here, no valid signatures were found
         
     def verify_time(self, time):
@@ -195,6 +213,8 @@ class CurrencyBlank(CurrencyBase):
         self.blind_factor = blind_factor
 
     def generateSerial(self):
+        import crypto
+
         if self.serial:
             raise MessageError('gah! trying to make another serial.')
         
@@ -203,7 +223,14 @@ class CurrencyBlank(CurrencyBase):
     def content_part(self):
         if not self.serial:
             raise SomeError('Serial is not set')
-        do_some_encode_thing()
+        #return encode(Currency (all the parts of content_part) )
+        content = []
+        content.append('"%s"="%s"' % ('standard identifier', self.standard_identifier))
+        content.append('"%s"="%s"' % ('currency identifier', self.currency_identifier))
+        content.append('"%s"="%s"' % ('denomination', self.denomination))
+        content.append('"%s"="%s"' % ('key identifier', base64.b64encode(self.key_identifier)))
+        content.append('"%s"="%s"' % ('serial', base64.b64encode(self.serial)))
+        return 'Currency={' + ';'.join(content) + '}'
 
     def blind_blank(self):
         """Returns the blinded value of the hash of the coin for signing."""
@@ -265,7 +292,16 @@ class CurrencyCoin(CurrencyBase):
         return True
 
     def content_part(self):
-        do_some_encode_thing()
+        if not self.serial:
+            raise SomeError('Serial is not set')
+        #return encode(Currency (all the parts of content_part) )
+        content = []
+        content.append('"%s"="%s"' % ('standard identifier', self.standard_identifier))
+        content.append('"%s"="%s"' % ('currency identifier', self.currency_identifier))
+        content.append('"%s"="%s"' % ('denomination', self.denomination))
+        content.append('"%s"="%s"' % ('key identifier', base64.b64encode(self.key_identifier)))
+        content.append('"%s"="%s"' % ('serial', base64.b64encode(self.serial)))
+        return 'Currency={' + ';'.join(content) + '}'
 
     def check_similar_to_obfuscated_blank(blank):
         """check_similar_to_obfuscated_blank verifies that the coin and the blank both refer to a specific minting of a coin without verifying the serials."""
@@ -290,7 +326,9 @@ class CurrencyCoin(CurrencyBase):
 
     def newObfuscatedBlank(self, dsdb_certificate):
         """Returns an CurrencyObfuscatedBlank for a certian DSDB."""
-        obfuscatedserial = obfuscated_crypto(self.serial, dsdb_certificate.public_key)
+        enc = dsdb_certificate.cipher.__class__(dsdb_certificate.public_key)
+        enc.update(self.serial)
+        obfuscatedserial = enc.encrypt()
         return CurrencyObfuscatedBlank(self.standard_identifier, self.currency_identifier, self.denomination,
                                        self.key_identifier, obfuscatedserial)
 
@@ -299,4 +337,12 @@ class CurrencyObfuscatedBlank(CurrencyBase):
         CurrencyBase.__init__(self, standard_identifier, currency_identifier, denomination, key_identifier, serial)
 
     def content_part(self):
-        do_some_encode_thing()
+        #return encode(Currency (all the parts of content_part) )
+        content = []
+        content.append('"%s"="%s"' % ('standard identifier', self.standard_identifier))
+        content.append('"%s"="%s"' % ('currency identifier', self.currency_identifier))
+        content.append('"%s"="%s"' % ('denomination', self.denomination))
+        content.append('"%s"="%s"' % ('key identifier', base64.b64encode(self.key_identifier)))
+        content.append('"%s"="%s"' % ('serial', base64.b64encode(self.serial)))
+        return 'Currency={' + ';'.join(content) + '}'
+
