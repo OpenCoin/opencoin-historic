@@ -57,10 +57,13 @@ class MessageType(object):
             print 'setting message handler for message %s to %s' % (message.identifier,self)
 
         result = message.encode()
-        self.output.append(result)
+        self._outputFunction(result)
         if self.callback:
             for f in self.callback:
                 f(result)
+
+    def _outputFunction(self, result):
+        self.output.append(result)
 
     def getHandler(self, identifier, message):
         """Gets the handler for the identifier.

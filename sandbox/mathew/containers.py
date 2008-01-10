@@ -87,6 +87,7 @@ class MintKey(ContainerWithSignature):
         self.key_not_after = key_not_after
         self.coin_not_after = coin_not_after
         self.public_key = public_key
+        self.signature = signature
 
     def content_part(self):
         #return encode(MintKey (all the parts of content_part) )
@@ -115,7 +116,7 @@ class MintKey(ContainerWithSignature):
         if self.key_identifier != hashFunction(self.public_key):
             return False # the key identifier is not valid
 
-        if signature:
+        if self.signature:
             return self.verifySignature(self.signature, cdd.public_master_key)
         else:
             return False # if we have no signature, we are not valid (or verifiable)
@@ -194,31 +195,38 @@ class CurrencyBlank(CurrencyBase):
         self.blind_factor = blind_factor
 
     def generateSerial(self):
-        self.serial = do_crypto()
+        if self.serial:
+            raise MessageError('gah! trying to make another serial.')
+        
+        self.serial = crypto._r.getRandomString(128)
 
     def content_part(self):
         if not self.serial:
             raise SomeError('Serial is not set')
         do_some_encode_thing()
 
-    def obfuscate(self, dsdb_certificate):
-        """Returns an CurrencyObfuscatedBlank for a certian DSDB."""
-        obfuscatedserial = obfuscated_crypto(self.serial, dsdb_certificate.public_key)
-        return CurrencyObfuscatedBlank(self.standard_identifier, self.currency_identifier, self.denomination,
-                                       self.key_identifier, obfuscatedserial)
-
     def blind_blank(self):
         """Returns the blinded value of the hash of the coin for signing."""
         if self.blind_factor:
             raise MessageError('CurrenyBlank already has a blind factor')
 
-        self.blind_value, self.blind_factor = someBlindingFunctionCall()
+        blinding = self.currency_identifier.issuer_cipher_suite.blinding
+        hashing = self.currency_identifier.issuer_cipher_suite.hashing
+        blinding.reset()
+        hashing.reset()
+
+        hashing.update(self.content_part())
+        blinding.update(hashing.digest())
+        
+        self.blind_value, self.blind_factor = blinding.blind()
 
         return self.blind_value
 
     def unblind_signature(self, signature):
         """Returns the unblinded value of the blinded signature."""
-        return someUnblindedFunctionCall()
+        blinding = self.currency_identifier.issuer_cipher_suite.blinding
+
+        return blinding.unblind(signature, self.blind_factor)
 
     def newCoin(self, signature, currency_description_document=None, minting_key=None):
         """Returns a coin using the unblinded signature.
@@ -243,7 +251,15 @@ class CurrencyCoin(CurrencyBase):
         if not CurrencyBase.validate_with_CDD_and_MintingKey(self, currency_description_document, minting_key):
             return False
 
-        if not verify_signature_crypto_stuff(self.content_part(), minting_key):
+        key = minting_key.public_key
+        signer = currency_description_document.issuer_cipher_suite.signing.__class__(key)
+        hasher = currency_description_document.issuer_cipher_suite.hashing
+
+        hasher.reset()
+        hasher.update(self.content_part())
+        signer.update(hasher.digest())
+        
+        if not signer.verify(self.signature):
             return False
 
         return True
@@ -271,6 +287,12 @@ class CurrencyCoin(CurrencyBase):
         """Attempts to ensure the the blank and the dsdb_key have the same serial. This may require additional information if we use something like ElGamal."""
         obfuscated_serial = obfuscated_crypto(self.serial, dsdb_certificate.public_key)
         return obfuscated_serial == blank.serial
+
+    def newObfuscatedBlank(self, dsdb_certificate):
+        """Returns an CurrencyObfuscatedBlank for a certian DSDB."""
+        obfuscatedserial = obfuscated_crypto(self.serial, dsdb_certificate.public_key)
+        return CurrencyObfuscatedBlank(self.standard_identifier, self.currency_identifier, self.denomination,
+                                       self.key_identifier, obfuscatedserial)
 
 class CurrencyObfuscatedBlank(CurrencyBase):
     def __init__(self, standard_identifier, currency_identifier, denomination, key_identifier, serial):

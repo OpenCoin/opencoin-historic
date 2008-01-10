@@ -83,18 +83,25 @@ class FetchMinted(Handler):
             self.manager.messageType.removeCallback(self.handle)
 
     def findRequest(self, request_id):
-        if request_id == 31337:
-            return 'ACCEPT', (75746, 192237, 192783)
-        if request_id == 47281:
-            return 'WAIT', 'Not yet minted'
-        if request_id == 88394:
-            return 'WAIT', 'Request not credited'
-        if request_id == 82057:
-            return 'FAILURE', 'Request not credited'
-        if request_id == 17393:
-            return 'FAILURE', 'Unable to blind'
-        else:
-            return 'FAILURE', 'Unknown request_id'
+        if self.manager.entity.minted.has_key(request_id):
+            result = 'ACCEPT', self.manager.entity.minted[request_id]
+            del self.manager.entity.minted[request_id]
+            return result
+
+        if self.manager.entity.minted_wait.has_key(request_id):
+            reason = self.manager.entity.minted_wait[request_id].reason
+            if self.manager.entity.creditRequestsBeforeMint:
+                if reason != 'Request not credited':
+                    return 'WAIT', reason
+                else:
+                    #FIXME: This mode should be impossible. It wouldn't be stored becuase we would have rejected it.
+                    return 'FAILURE', reason
+            else:
+                return 'WAIT', reason
+
+        if self.manager.entity.minted_failures.has_key(request_id):
+            return 'FAILURE', self.manager.entity.minted_failures[request_id]
+
 
     def __createAndOutput(self, message):
         m = message()
@@ -379,8 +386,10 @@ class RedeemCoins(Handler):
 
 
 class HandlerManager(object):
-    def __init__(self, messageType):
+    def __init__(self, messageType, entity):
         self.messageType = messageType
+        self.entity = entity
+
         if not self.messageType.globals.status.can(MessageStatuses.PrivilegeServer):
             raise MessageError('given messageType does not have PrivilegeServer')
         

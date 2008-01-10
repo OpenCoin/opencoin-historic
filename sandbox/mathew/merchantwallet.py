@@ -34,16 +34,20 @@ from message import Hello as MessageHello
 #import crypto stuff
 
 class MerchantWalletManager(object):
-    def __init__(self, walletMessageType, isMessageType, dsdbMessageType, amount):
+    def __init__(self, walletMessageType, entity):
+        
+        # isMessageType, dsdbMessageType, amount):
         self.walletMessageType = walletMessageType
-        self.isMessageType = isMessageType
-        self.dsdbMessageType = dsdbMessageType
+        self.entity = entity
+
+        #self.isMessageType = isMessageType
+        #self.dsdbMessageType = dsdbMessageType
         if not self.walletMessageType.globals.status.can(MessageStatuses.PrivilegeServer):
             raise MessageError('given messageType does not have PrivilegeServer')
-        if not self.isMessageType.globals.status.can(MessageStatuses.PrivilegeClient):
-            raise MessageError('given messageType does not have PrivilegeClient')
-        if not self.dsdbMessageType.globals.status.can(MessageStatuses.PrivilegeClient):
-            raise MessageError('given message Type does not have PrivilegeClient')
+        #if not self.isMessageType.globals.status.can(MessageStatuses.PrivilegeClient):
+        #    raise MessageError('given messageType does not have PrivilegeClient')
+        #if not self.dsdbMessageType.globals.status.can(MessageStatuses.PrivilegeClient):
+        #    raise MessageError('given message Type does not have PrivilegeClient')
         
 
         class messages: pass
@@ -73,23 +77,23 @@ class MerchantWalletManager(object):
         self.dsdbMessages.UCP = UnlockCoinsPass(self.resumeConversation)
         self.dsdbMessages.UCF = UnlockCoinsFailure(self.resumeConversation)
 
-        # Add handlers for all the messages, using isMessages if continues conversation
-        self.isMessageType.addMessageHandler(MintingKeyFetchKeyID())
-        self.isMessageType.addMessageHandler(MintingKeyFetchDenomination())
-        #self.isMessageType.addMessageHandler(self.isMessages.MKP)
-        #self.isMessageType.addMessageHandler(self.isMessages.MKF)
-        self.isMessageType.addMessageHandler(MintingKeyPass()) # These normally would continue, but are folded into BlankAndMintingKey
-        self.isMessageType.addMessageHandler(MintingKeyFailure()) # These normally would continue, but are folded into BlankAndMintingKey
-        self.isMessageType.addMessageHandler(MintRequest())
-        self.isMessageType.addMessageHandler(self.isMessages.MA)
-        self.isMessageType.addMessageHandler(self.isMessages.MR)
-        self.isMessageType.addMessageHandler(FetchMintedRequest())
-        self.isMessageType.addMessageHandler(self.isMessages.FMF)
-        self.isMessageType.addMessageHandler(self.isMessages.FMW)
-        self.isMessageType.addMessageHandler(self.isMessages.FMA)
-        self.isMessageType.addMessageHandler(RedeemCoinsRequest())
-        self.isMessageType.addMessageHandler(self.isMessages.RCR)
-        self.isMessageType.addMessageHandler(self.isMessages.RCA)
+        ## Add handlers for all the messages, using isMessages if continues conversation
+        #self.isMessageType.addMessageHandler(MintingKeyFetchKeyID())
+        #self.isMessageType.addMessageHandler(MintingKeyFetchDenomination())
+        ##self.isMessageType.addMessageHandler(self.isMessages.MKP)
+        ##self.isMessageType.addMessageHandler(self.isMessages.MKF)
+        #self.isMessageType.addMessageHandler(MintingKeyPass()) # These normally would continue, but are folded into BlankAndMintingKey
+        #self.isMessageType.addMessageHandler(MintingKeyFailure()) # These normally would continue, but are folded into BlankAndMintingKey
+        #self.isMessageType.addMessageHandler(MintRequest())
+        #self.isMessageType.addMessageHandler(self.isMessages.MA)
+        #self.isMessageType.addMessageHandler(self.isMessages.MR)
+        #self.isMessageType.addMessageHandler(FetchMintedRequest())
+        #self.isMessageType.addMessageHandler(self.isMessages.FMF)
+        #self.isMessageType.addMessageHandler(self.isMessages.FMW)
+        #self.isMessageType.addMessageHandler(self.isMessages.FMA)
+        #self.isMessageType.addMessageHandler(RedeemCoinsRequest())
+        #self.isMessageType.addMessageHandler(self.isMessages.RCR)
+        #self.isMessageType.addMessageHandler(self.isMessages.RCA)
 
         # Add handlers for all the messages using walletMessages if starts conversation
         self.walletMessageType.addMessageHandler(self.walletMessages.BP)
@@ -100,15 +104,15 @@ class MerchantWalletManager(object):
         self.walletMessageType.addMessageHandler(CoinsReject())
         self.walletMessageType.addMessageHandler(CoinsAccept())
 
-        # Add handlers for all the emssages using dsdbMessages if it contiues conversation
-        self.dsdbMessageType.addMessageHandler(LockCoinsRequest())
-        self.dsdbMessageType.addMessageHandler(self.dsdbMessages.LCF)
-        self.dsdbMessageType.addMessageHandler(self.dsdbMessages.LCA)
-        self.dsdbMessageType.addMessageHandler(UnlockCoinsRequest())
-        self.dsdbMessageType.addMessageHandler(self.dsdbMessages.UCF)
-        self.dsdbMessageType.addMessageHandler(self.dsdbMessages.UCP)
+        ## Add handlers for all the emssages using dsdbMessages if it contiues conversation
+        #self.dsdbMessageType.addMessageHandler(LockCoinsRequest())
+        #self.dsdbMessageType.addMessageHandler(self.dsdbMessages.LCF)
+        #self.dsdbMessageType.addMessageHandler(self.dsdbMessages.LCA)
+        #self.dsdbMessageType.addMessageHandler(UnlockCoinsRequest())
+        #self.dsdbMessageType.addMessageHandler(self.dsdbMessages.UCF)
+        #self.dsdbMessageType.addMessageHandler(self.dsdbMessages.UCP)
         
-        self.amount = amount
+        #self.amount = amount
 
         class state:
             __slots__ = ('blanks', # the blanks given in BlankPresent
@@ -129,8 +133,6 @@ class MerchantWalletManager(object):
 
         self.lastMessageIdentifier = None
 
-        # if true, we o the MintRequest after the BlankPresent, rather than at RedeemCoinsRequest
-        self.isSupportsMRbeforeRCR = None
 
     # an explaination of how this class treats the exchange. We first wait for a BlankPresent from the wallet. We look at the issuer and let the client decide if he wants to accept.
     # if he does, we make matching blanks and depending on the issuer, MintRequest now (may do after RedeemCoins.
@@ -158,6 +160,45 @@ class MerchantWalletManager(object):
 
     def setHandler(self, handler):
         self.handler = handler
+
+    def connectToDSDB(self, dsdb_certificate):
+        """sets up the dsdbMessageType and links the callbacks."""
+        client = MessageStatuses.getBaseClient()
+        self.dsdbMessageType = MessageType(client)
+
+        # Add handlers for all the messages using dsdbMessages if it continues conversation
+        self.dsdbMessageType.addMessageHandler(LockCoinsRequest())
+        self.dsdbMessageType.addMessageHandler(self.dsdbMessages.LCF)
+        self.dsdbMessageType.addMessageHandler(self.dsdbMessages.LCA)
+        self.dsdbMessageType.addMessageHandler(UnlockCoinsRequest())
+        self.dsdbMessageType.addMessageHandler(self.dsdbMessages.UCF)
+        self.dsdbMessageType.addMessageHandler(self.dsdbMessages.UCP)        
+
+        self.entity.connectToDSDB(self.dsdbMessageType, dsdb_certificate)
+
+    def connectToIS(self, currency_description_document):
+        """sets up the isMessageType and links the callbacks."""
+        client = MessageStatuses.getBaseClient()
+        self.isMessageType = MessageType(client)
+
+        # Add handlers for all the messages using isMessages if it continues the conversation
+        self.isMessageType.addMessageHandler(MintingKeyFetchKeyID())
+        self.isMessageType.addMessageHandler(MintingKeyFetchDenomination())
+        #self.isMessageType.addMessageHandler(self.isMessages.MKP)
+        #self.isMessageType.addMessageHandler(self.isMessages.MKF)
+        self.isMessageType.addMessageHandler(MintingKeyPass()) # These normally would continue, but are folded into BlankAndMintingKey
+        self.isMessageType.addMessageHandler(MintingKeyFailure()) # These normally would continue, but are folded into BlankAndMintingKey
+        self.isMessageType.addMessageHandler(MintRequest())
+        self.isMessageType.addMessageHandler(self.isMessages.MA)
+        elf.isMessageType.addMessageHandler(self.isMessages.MR)
+        self.isMessageType.addMessageHandler(FetchMintedRequest())
+        self.isMessageType.addMessageHandler(self.isMessages.FMF)
+        self.isMessageType.addMessageHandler(self.isMessages.FMW)
+        self.isMessageType.addMessageHandler(self.isMessages.FMA)
+        self.isMessageType.addMessageHandler(RedeemCoinsRequest())
+        self.isMessageType.addMessageHandler(self.isMessages.RCR)
+    
+        self.entity.connectToIS(self.isMessageType, currency_description_document)
 
     def success(self, message, handler):
         print 'Received a success! Message class: %s. Handler class: %s' % (message.__class__, handler.__class__)
@@ -224,8 +265,21 @@ class BlankAndMintingKey(Handler):
             self.manager.persistant.blanks = self.blanks
             self.manager.persistant.dsdb_certificate = self.dsdb_certificate
 
-            # self.performMagic is a special function doing anything we want.
-            self.performMagic(self.blanks, self.dsdb_certificate)
+            # connect to IS
+            # FIXME: Gah. What a hack. Only supports one IS
+            result = self.getCDD(self.manager.entity.cdds, self.blanks)
+            if result != 'Unknown issuer':
+                self.manager.connectToIS(result)
+
+                # connect to dsdb
+                self.manager.connectToDSDB(self.manager.persistant.dsdb_certificate)
+
+                # self.performMagic is a special function doing anything we want.
+                self.performMagic(self.blanks, self.dsdb_certificate)
+            else:
+                self.manager.walletMessageType.persistant.reason = result
+                self._createAndOutputWallet(BlankReject)
+                
         
         elif isinstance(message, MintingKeyPass): # we've received a key
             minting_certificate = self.manager.isMessageType.persistant.minting_certificate
@@ -243,16 +297,21 @@ class BlankAndMintingKey(Handler):
             
         self._setLastState('BlankAndMintingKey') # There are many different ways to exit this. Just cover them all.
 
-    def listUnknownKeysKeyID(self, blanks):
+    def listUnknownKeysKeyID(self, blanks, entity):
         """Returns a list of all the KeyIDs we need to request."""
         needed = []
         for b in blanks:
             if b.key_identifier not in needed:
                 needed.append(b.key_identifier)
 
-        return needed
+        dontHave = []
+        for key_id in needed:
+            if key_id not in entity.minting_keys_key_id:
+                dontHave.append(b)
+
+        return dontHave
         
-    def listUnknownKeysDenominatioN(self, blanks):
+    def listUnknownKeysDenominatioN(self, blanks, entity):
         """Returns a list of all the Denominations we need to request."""
         denominations = []
         for b in blanks:
@@ -261,6 +320,9 @@ class BlankAndMintingKey(Handler):
 
         return denominations
         
+    def removeKnownKeysDenomination(self, blanks, entity):
+        raise NotImplementedError
+    
     def performMagic(self, blanks, dsdb_certificate):
         self.neededKeyIDs = listUnknownKeysKeyID(blanks)
         self.neededDenominations = listUnknownKeysDenomination(blank)
@@ -361,6 +423,23 @@ class BlankAndMintingKey(Handler):
         return true
         
     
+    def getCDD(self, cdds, blanks):
+        """Returns the CDD for the blanks. Assumes only one CDD (Raise MessageError if multiple)."""
+        try:
+            currency_identifier = blanks[0].currency_identifier
+        except IndexError:
+            raise MessageError('No blanks')
+
+        #FIXME: somehow allow multiple cdds?
+        for b in blanks:
+            if currency_identifier != b.currency_identifier:
+                raise MessageError('This client is too stupid to deal with more than one currency.')
+
+        if not cdds.has_key(currency_identifier):
+            return 'Unknown issuer'
+        else:
+            return cdds[currency_identifier]
+        
 class LockCoins(Handler):
     def __init__(self, manager, firstMessage):
         self.manager = manager

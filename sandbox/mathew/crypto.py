@@ -233,7 +233,7 @@ class RSABlindingAlgorithm(BlindingAlgorithm):
         except PyCryptoError:
             raise CryptoError
 
-    def unblind(self, blinding_factor = None):
+    def unblind(self, blinding_factor=None):
         """returns the unblinded value of the input."""
         if blinding_factor:
             self.blinding_factor = blinding_factor
@@ -304,6 +304,14 @@ class Random:
         from Crypto.Util.randpool import RandomPool
         self.RandomPool = RandomPool()
 
+    def getRandomString(self, N):
+        """Returns a N-bit length random string."""
+        r = self.getRandomNumber(N)
+
+        from Crypto.Util import number
+
+        return number.long_to_bytes(r)
+    
     def getRandomNumber(self, N):
         """Returns an N-bit length random number."""
         if self.RandomPool.entropy < 2 * N:

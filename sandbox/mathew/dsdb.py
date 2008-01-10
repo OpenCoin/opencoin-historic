@@ -159,8 +159,10 @@ class UnlockCoins(Handler):
 
 
 class HandlerManager(object):
-    def __init__(self, messageType):
+    def __init__(self, messageType, entity):
         self.messageType = messageType
+        self.entity = entity # the entity that spawned us
+        
         if not self.messageType.globals.status.can(MessageStatuses.PrivilegeServer):
             raise MessageError('given messageType does not have PrivilegeServer')
         

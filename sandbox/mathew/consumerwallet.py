@@ -18,13 +18,15 @@ from message import Hello as MessageHello
 #import crypto stuff
 
 class ConsumerWalletManager(object):
-    def __init__(self, walletMessageType, isMessageType, coins):
+    def __init__(self, walletMessageType, entity, coins):
         self.walletMessageType = walletMessageType
-        self.isMessageType = isMessageType
+        self.entity = entity
+
+        #self.isMessageType = isMessageType
         if not self.walletMessageType.globals.status.can(MessageStatuses.PrivilegeClient):
             raise MessageError('given messageType does not have PrivilegeClient')
-        if not self.isMessageType.globals.status.can(MessageStatuses.PrivilegeClient):
-            raise MessageError('given messageType does not have PrivilegeClient')
+        #if not self.isMessageType.globals.status.can(MessageStatuses.PrivilegeClient):
+        #    raise MessageError('given messageType does not have PrivilegeClient')
         
 
         class messages: pass
@@ -42,9 +44,9 @@ class ConsumerWalletManager(object):
         self.walletMessages.CR = CoinsReject(self.resumeConversation)
         self.walletMessages.CA = CoinsAccept(self.resumeConversation)
 
-        # Add handlers for all the messages, using isMessages if continues conversation
-        self.isMessageType.addMessageHandler(DSDBKeyRequest())
-        self.isMessageType.addMessageHandler(self.isMessages.DKP)
+        ## Add handlers for all the messages, using isMessages if continues conversation
+        #self.isMessageType.addMessageHandler(DSDBKeyRequest())
+        #self.isMessageType.addMessageHandler(self.isMessages.DKP)
 
         # Add handlers for all the messages using walletMessages if continues conversation
         self.walletMessageType.addMessageHandler(BlankPresent())
@@ -88,6 +90,17 @@ class ConsumerWalletManager(object):
     def failure(self, message, handler):
         print 'Received a failure. Message %s Sentence: %s' % (message.identifier, message.sentence)
         print 'We should do something like un-hook ourselves or something.'
+
+    def connectToIS(self, currency_description_document):
+        """sets up the isMessageType and links the callbacks."""
+        client = MessageStatuses.getBaseClient()
+        self.isMessageType = MessageType(client)
+        
+        # Add handlers for all the messages, using isMessages if continues conversation
+        self.isMessageType.addMessageHandler(DSDBKeyRequest())
+        self.isMessageType.addMessageHandler(self.isMessages.DKP)
+
+        self.entity.connectToIS(self.isMessageType, currency_description_document)
 
 class Handler(object):
     def _createAndOutput(self, message, messageType):
@@ -135,7 +148,7 @@ class DSDBKey(Handler):
             self.dsdb_certificate = self.manager.isMessageType.persistant.dsdb_certificate 
             self.manager.persistant.dsdb_certificate = self.dsdb_certificate 
             
-            if not self.validCertificate(self.dsdb_certificate):
+            if not self.validCertificate(self.dsdb_certificate, self.manager.cdd, self.getTime()):
                 raise MessageError('Invalid DSDB Certificate')
             
             self.createBlinds(self.dsdb_certificate, self.manager.coins)
@@ -144,8 +157,19 @@ class DSDBKey(Handler):
 
         self._setLastState(message.identifier)
 
-    def validCertificate(self, dsdb_certificate):
-        return True
+    def validCertificate(self, dsdb_certificate, currency_description_document, time):
+        """returns if the dsdb_certificate is valid right now."""
+        valid = dsdb_certificate.verify_with_CDD(currency_description_document)
+
+        if not valid:
+            return False
+
+        return dsdb_certificate.verify_time(time)
+
+    def getTime(self):
+        import time
+
+        return time.time()
 
     def createBlinds(self, dsdb_certificate, coins):
         if len(coins) == 0:
@@ -158,7 +182,7 @@ class DSDBKey(Handler):
         self.manager.walletMessageType.persistant.blanks = blinds
 
     def createBlind(self, dsdb_certificate, coin):
-        return 'A blind!'
+        return coin.newObfuscatedBlank(dsdb_certificate)
 
 
 class Blank(Handler):
