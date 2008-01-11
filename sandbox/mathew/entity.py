@@ -290,10 +290,12 @@ def makeCoin(cdd, mintingKey):
     blank.generateSerial()
 
     hashing = cdd.issuer_cipher_suite.hashing.__class__()
-    signing = cdd.issuer_cipher_suite.signing.__class__(cdd.issuer_public_master_key)
+    signing = cdd.issuer_cipher_suite.signing.__class__(mintingKey.public_key)
 
     hashing.update(blank.content_part())
     signature = signing.sign(hashing.digest())
 
-    return blank.newCoin(signature, cdd, mintingKey)
+    coin = blank.newCoin(signature, cdd, mintingKey)
+
+    return coin
     

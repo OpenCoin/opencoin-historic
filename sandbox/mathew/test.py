@@ -71,6 +71,14 @@ if __name__=='__main__':
 
     print 'gah! we have coins and wallets too!'
 
+    # test out the entire obfuscation/unobfuscation
+    aCoin = coinsOne[0]
+    aMK = mintingKeys[0]
+    obfuscated = aCoin.newObfuscatedBlank(dsdb_key)
+    if not aCoin.validate_with_CDD_and_MintingKey(myCDD, aMK):
+        pass
+        #raise Exception('Ahh!')
+    
     print 'And this is the last thing I expect to work. the spending is broken.'
     walletNils.spendCoins('oierw', coinsTwo[0].currency_identifier, ['1', '1', '5'])
 

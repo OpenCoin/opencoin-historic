@@ -265,7 +265,8 @@ class CurrencyBlank(CurrencyBase):
         
         # if only one is provided, we have an error. Purposefully use an 'or' for the test to get an exception later
         if currency_description_document or minting_key:
-            coin.validate_with_CDD_and_MintingKey(currency_description_document, minting_key)
+            if not coin.validate_with_CDD_and_MintingKey(currency_description_document, minting_key):
+                raise Exception('New coin does not validate!')
         
         return coin
         
