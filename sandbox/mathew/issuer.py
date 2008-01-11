@@ -31,7 +31,9 @@ class FetchMinted(Handler):
     def __init__(self, manager, firstMessage):
         self.manager = manager
         self.manager.messageType.addCallback(self.handle)
-        self.started = False # if set to true, we have contaminated variables
+
+        #FIXME: This is a hack. It should be setup somewhere else
+        self.isRequiresMRbeforeRCR = True
 
     def handle(self, message):
         if not isinstance(message, FetchMintedRequest) and not isinstance(message, FetchMintedFailure) and not \
@@ -44,12 +46,11 @@ class FetchMinted(Handler):
                 raise MessageError('We somehow called FetchMinted.handle() but cannot be there. Message: %s' % message.identifier)
 
         if isinstance(message, FetchMintedRequest):
-            if self.started:
-                raise MessageError('This FetchMinted has already been started. Require a clean one.')
-            self.started = True
-
             self.request_id = self.manager.messageType.persistant.request_id
 
+            # FIXME: Hack to ensure we try to mint things. Run the minting right now, if we have it
+            self.manager.entity.attemptToMint() # this tries to mint everything waiting
+            
             type, result = self.findRequest(self.request_id)
 
             if type == 'ACCEPT':
@@ -88,9 +89,9 @@ class FetchMinted(Handler):
             del self.manager.entity.minted[request_id]
             return result
 
-        if self.manager.entity.minted_wait.has_key(request_id):
-            reason = self.manager.entity.minted_wait[request_id].reason
-            if self.manager.entity.creditRequestsBeforeMint:
+        if self.manager.entity.mint_waiting.has_key(request_id):
+            reason, currency = self.manager.entity.mint_waiting[request_id]
+            if not self.isRequiresMRbeforeRCR:
                 if reason != 'Request not credited':
                     return 'WAIT', reason
                 else:
@@ -99,8 +100,8 @@ class FetchMinted(Handler):
             else:
                 return 'WAIT', reason
 
-        if self.manager.entity.minted_failures.has_key(request_id):
-            return 'FAILURE', self.manager.entity.minted_failures[request_id]
+        if self.manager.entity.mint_failures.has_key(request_id):
+            return 'FAILURE', self.manager.entity.mint_failures[request_id]
 
 
     def __createAndOutput(self, message):
@@ -238,15 +239,19 @@ class Mint(Handler):
                 self.request_id = self.manager.messageType.persistant.request_id
                 self.blinds = self.manager.messageType.persistant.blinds
 
-                self.type, self.result = self.request(self.request_id, self.blinds)
+                type, result = self.request(self.request_id, self.blinds, self.manager.entity.minting_keys_key_id, self.timeNow())
                 
-                if self.type == 'ACCEPT':
-                    if self.request_id != self.result:
-                        raise MessageError('request_id changed. Was: %s, Received: %s' % (self.request_id, self.result))
+                if type == 'ACCEPT':
+                    if self.request_id != result:
+                        raise MessageError('request_id changed. Was: %s, Received: %s' % (self.request_id, result))
+
+                    self.manager.messageType.removeCallback(self.handle)
                     self.__createAndOutput(MintAccept)
                     
-                elif self.type == 'REJECT':
-                    self.manager.messageType.persistant.reason = self.result
+                elif type == 'REJECT':
+                    self.manager.messageType.persistant.reason = result
+
+                    self.manager.messageType.removeCallback(self.handle)
                     self.__createAndOutput(MintReject)
 
                 else:
@@ -256,7 +261,7 @@ class Mint(Handler):
             # we output this. Next step can only be Goodbye
             self.manager.messageType.removeCallback(self.handle)
 
-    def request(self, request_id, blinds):
+    def request(self, request_id, blinds, minting_keys_key_id, now):
         failure = False
         failures = []
 
@@ -264,10 +269,10 @@ class Mint(Handler):
             raise MessageError('request %s has no blinds' % request_id)
 
         for b in blinds:
-            result = self.testBlind(b)
-            if result == 'ACCEPT':
+            type, result = self.testBlind(b, minting_keys_key_id, now)
+            if type == 'ACCEPT':
                 pass
-            else:
+            elif type == 'REJECT':
                 failure = True
                 key_id, blind = b
                 failures.append( (blind, result) )
@@ -279,21 +284,24 @@ class Mint(Handler):
 
         return 'ACCEPT', request_id
 
-    def testBlind(self, blind):
+    def testBlind(self, blind, minting_keys_key_id, now):
         key_id, blind = blind
 
-        #for testing, require key_id to be between 10 and 999999 and blind to be less than a million
-        if key_id < 10 or key_id > 999999:
-            return 'Unknown key_id'
+        if not minting_keys_key_id.has_key(key_id) or not minting_keys_key_id[key_id].verify_time(now):
+            return 'REJECT', 'Unknown key_id'
 
-        if blind < 10000000:
-            return 'Unable to blind'
+        if len(blind) > minting_keys_key_id[key_id].public_key.key.size(): # FIXME: this will probably break if we change from RSA
+            return 'REJECT', 'Unable to blind'
 
-        return 'ACCEPT'
+        return 'ACCEPT', None
 
 
     def acceptBlinds(self, request_id, blinds):
-        pass
+        self.manager.entity.mint_waiting[request_id] = ('No attempt to mint', blinds)
+
+    def timeNow(self):
+        import time
+        return time.time()
 
     def __createAndOutput(self, message):
         m = message()
@@ -319,13 +327,15 @@ class RedeemCoins(Handler):
                 self.target = self.manager.messageType.persistant.target
                 self.coins = self.manager.messageType.persistant.coins
 
-                self.type, self.result = redeem(self.transaction_id, self.target, self.coins)
+                type, result = self.redeem(self.transaction_id, self.target, self.coins)
 
-                if self.type == 'ACCEPT':
+                if type == 'ACCEPT':
+                    self.manager.messageType.removeCallback(self.handle)
                     self.__createAndOutput(RedeemCoinsAccept)
 
-                elif self.type == 'REJECT':
-                    self.manager.messageType.persistant.reason = self.result
+                elif type == 'REJECT':
+                    self.manager.messageType.persistant.reason = result
+                    self.manager.messageType.removeCallback(self.handle)
                     self.__createAndOutput(RedeemCoinsReject)
 
                 else:
@@ -347,17 +357,19 @@ class RedeemCoins(Handler):
             raise MessageError('transaction %s has no coins' % transaction_id)
 
         for c in coins:
-            result = self.testCoin(c, transaction_id)
-            if result == 'ACCEPT':
+            type, result = self.testCoin(c, transaction_id)
+            if type == 'ACCEPT':
                 pass
-            else:
+            elif type == 'REJECT':
                 failure = True
                 failures.append( (coin, result) )
+            else:
+                raise MessageError('Received impossible type: %s' % type)
 
         if failure:
             return 'REJECT', failures
 
-        if not checkValidTarget(target):
+        if not self.checkValidTarget(target):
             return 'REJECT', 'Unknown target'
         
         self.redeemCoins(transaction_id, target, coins)
@@ -365,19 +377,18 @@ class RedeemCoins(Handler):
         return 'ACCEPT', None
 
     def testCoin(self, coin, transaction_id):
-        pass # for now, all coins pass. We need to do math stuff here.
-        if not validKeyID(coin):
-            return 'Unknown key_id'
-        if not validCoin(coin):
-            return 'Invalid coin'
+        if not self.validKeyID(coin):
+            return 'REJECT', 'Unknown key_id'
+        if not self.validCoin(coin):
+            return 'REJECT', 'Invalid coin'
         
-        dsdb = checkDSDB(coin, transcation_id)
+        dsdb = self.checkDSDB(coin, transaction_id)
         if dsdb == 'EXPIRED':
-            return 'Coin expired'
+            return 'REJECT', 'Coin expired'
         if dsdb == 'REDEEMED':
-            return 'Coin already redeemed'
+            return 'REJECT', 'Coin already redeemed'
         
-        return 'ACCEPT'
+        return 'ACCEPT', None
 
     def validKeyID(self, coin):
         return True

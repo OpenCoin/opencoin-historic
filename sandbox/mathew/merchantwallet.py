@@ -32,6 +32,7 @@ from message import MessageError
 from message import Hello as MessageHello
 
 import containers
+from crypto import CryptoError
 
 class MerchantWalletManager(object):
     def __init__(self, walletMessageType, entity):
@@ -77,24 +78,6 @@ class MerchantWalletManager(object):
         self.dsdbMessages.UCP = UnlockCoinsPass(self.resumeConversation)
         self.dsdbMessages.UCF = UnlockCoinsFailure(self.resumeConversation)
 
-        ## Add handlers for all the messages, using isMessages if continues conversation
-        #self.isMessageType.addMessageHandler(MintingKeyFetchKeyID())
-        #self.isMessageType.addMessageHandler(MintingKeyFetchDenomination())
-        ##self.isMessageType.addMessageHandler(self.isMessages.MKP)
-        ##self.isMessageType.addMessageHandler(self.isMessages.MKF)
-        #self.isMessageType.addMessageHandler(MintingKeyPass()) # These normally would continue, but are folded into BlankAndMintingKey
-        #self.isMessageType.addMessageHandler(MintingKeyFailure()) # These normally would continue, but are folded into BlankAndMintingKey
-        #self.isMessageType.addMessageHandler(MintRequest())
-        #self.isMessageType.addMessageHandler(self.isMessages.MA)
-        #self.isMessageType.addMessageHandler(self.isMessages.MR)
-        #self.isMessageType.addMessageHandler(FetchMintedRequest())
-        #self.isMessageType.addMessageHandler(self.isMessages.FMF)
-        #self.isMessageType.addMessageHandler(self.isMessages.FMW)
-        #self.isMessageType.addMessageHandler(self.isMessages.FMA)
-        #self.isMessageType.addMessageHandler(RedeemCoinsRequest())
-        #self.isMessageType.addMessageHandler(self.isMessages.RCR)
-        #self.isMessageType.addMessageHandler(self.isMessages.RCA)
-
         # Add handlers for all the messages using walletMessages if starts conversation
         self.walletMessageType.addMessageHandler(self.walletMessages.BP)
         self.walletMessageType.addMessageHandler(BlankReject())
@@ -103,16 +86,6 @@ class MerchantWalletManager(object):
         self.walletMessageType.addMessageHandler(self.walletMessages.CR)
         self.walletMessageType.addMessageHandler(CoinsReject())
         self.walletMessageType.addMessageHandler(CoinsAccept())
-
-        ## Add handlers for all the emssages using dsdbMessages if it contiues conversation
-        #self.dsdbMessageType.addMessageHandler(LockCoinsRequest())
-        #self.dsdbMessageType.addMessageHandler(self.dsdbMessages.LCF)
-        #self.dsdbMessageType.addMessageHandler(self.dsdbMessages.LCA)
-        #self.dsdbMessageType.addMessageHandler(UnlockCoinsRequest())
-        #self.dsdbMessageType.addMessageHandler(self.dsdbMessages.UCF)
-        #self.dsdbMessageType.addMessageHandler(self.dsdbMessages.UCP)
-        
-        #self.amount = amount
 
         class state:
             __slots__ = ('blanks', # the blanks given in BlankPresent
@@ -139,11 +112,15 @@ class MerchantWalletManager(object):
     # we verify the blanks against the DSDB and then BlankAccept. We get the CoinsRedeem, test them, then CoinsAccept.
     # now we RedeemCoinsRequest, and potentially MintRequest at this point. Finally, we FetchMintedRequest to get the new coins. Done. Whew!
 
+    # More information. If isRequiresMRbeforeRCR is true, the chain when the wallet accepts the coins goes:
+    #   MINT_REQUEST -> (MINT_ACCEPT) -> REDEEM_COINS_REQUEST -> (REDEEM_COINS_ACCEPT) -> FETCH_MINTED_REQUEST -> (FETCH_MINTED_ACCEPT)
+    # If isRequiresMRbeforeRCR is false, the chain when the wallet sends the COINS_REQUEST goes:
+    #   REDEEM_COINS_REQUEST -> (REDEEM_COINS_ACCEPT) -> MINT_REQUEST -> (MINT_ACCEPT) -> FETCH_MINTED_REQUEST -> (FETCH_MINTED_ACCEPT
+
+    
     def resumeConversation(self, message, result):
         if isinstance(message, BlankPresent):
             self.setHandler(BlankAndMintingKey(self, message)) # First we receive the blanks
-        #elif isinstance(message, MintingKeyPass) or isinstance(message, MintingKeyFailure):
-        #    self.setHandler(MintingKey(self, message)) # Then we get the MintingKeys
         elif isinstance(message, MintAccept) or isinstance(message, MintReject):
             self.setHandler(Mint(self, message)) # Then we (may) try to mint our own blanks
         elif isinstance(message, LockCoinsFailure) or isinstance(message, LockCoinsAccept):
@@ -152,11 +129,10 @@ class MerchantWalletManager(object):
             self.setHandler(Coins(self, message)) # We locked the coins, and they are valid. We sent a BlankAccept. Next we get told to redeem them
         elif isinstance(message, RedeemCoinsReject) or isinstance(message, RedeemCoinsAccept):
             self.setHandler(RedeemCoins(self, message)) # Now we redeem them (note: the next step may be to try to mint them...)
-        elif isinstance(message, FetchMintedRequest):
+        elif isinstance(message, FetchMintedWait) or isinstance(message, FetchMintedFailure) or isinstance(message, FetchMintedAccept):
             self.setHandler(FetchMinted(self, message)) # And finally, get the coins.
         elif isinstance(message, UnlockCoinsPass) or isinstance(message, UnlockCoinsFailure):
             self.setHandler(UnlockCoins(self, message)) # If we erred, we unlock to be nice
-            
         else:
             raise MessageError('Message %s does not continue a conversation' % message.identifier)
 
@@ -199,6 +175,7 @@ class MerchantWalletManager(object):
         self.isMessageType.addMessageHandler(self.isMessages.FMA)
         self.isMessageType.addMessageHandler(RedeemCoinsRequest())
         self.isMessageType.addMessageHandler(self.isMessages.RCR)
+        self.isMessageType.addMessageHandler(self.isMessages.RCA)
     
         self.entity.connectToIS(self.isMessageType, currency_description_document)
 
@@ -534,7 +511,7 @@ class Coins(Handler):
         self.manager.walletMessageType.addCallback(self.handle)
 
         #FIXME: this is a hack
-        self.isSupportsMRbeforeRCR = True # set a value for if the issuer supports (or requires) mint requests prior to redeem coin requests
+        self.isRequiresMRbeforeRCR = True # set a value for if the issuer supports (or requires) mint requests prior to redeem coin requests
 
     def handle(self, message):
         if not isinstance(message, CoinsRedeem) and not isinstance(message, CoinsAccept) and not isinstance(message, CoinsReject):
@@ -587,7 +564,7 @@ class Coins(Handler):
             self.manager.persistant.mintRequestID = self.newRequestID()
             self.manager.persistant.target = self.newTarget()
 
-            if self.isSupportsMRbeforeRCR:
+            if self.isRequiresMRbeforeRCR:
                 self.manager.isMessageType.persistant.request_id = self.manager.persistant.mintRequestID
 
                 # setup blinds only for the MintRequest message
@@ -680,6 +657,9 @@ class Mint(Handler):
         self.manager = manager
         self.manager.isMessageType.addCallback(self.handle)
 
+        #FIXME: this is a hack
+        self.isRequiresMRbeforeRCR = True # set a value for if the issuer supports (or requires) mint requests prior to redeem coin requests
+
     def handle(self, message):
         if not isinstance(message, MintRequest) and not isinstance(message, MintAccept) and not isinstance(message, MintReject):
             if message.messageLayer.globals.lastState == MessageHello: # we are now on a different message. Oops.
@@ -696,22 +676,23 @@ class Mint(Handler):
             print 'Got a MintRequest. I did not know we got these.'
 
         elif isinstance(message, MintAccept):
-            if self.manager.persistant.mintingRequestID != self.manager.isMessageType.persistant.request_id:
+            if self.manager.persistant.mintRequestID != self.manager.isMessageType.persistant.request_id:
                 raise MessageError('request_id changed. Was: %s Now %s' % (self.manager.persistant.mintingRequestID, self.manager.isMessageType.persistant.request_id))
                         
             self.manager.isMessageType.removeCallback(self.handle) #remove the callback. Not coming here again
 
-            if self.isSupportsMRbeforeRCR:
-                self.manager.isMessageType.persistant.trasaction_id = self.dsdb_lock #this is probably the wrong one! look it up
-                raise MessageError('look at comment above')
+            if self.isRequiresMRbeforeRCR:
+                # We've already done the MintRequest. Nothing stopping us from trying to Redeem now.
+                self.manager.isMessageType.persistant.trasaction_id = self.manager.persistant.mintRequestID 
                 self.manager.isMessageType.persistant.target = self.manager.persistant.target
                 self.manager.isMessageType.persistant.coins = self.manager.persistant.coins
 
-                self.manager.isMessageType.removeCallback(self.handle)
-                self._createAndOutputIS(RedeemCoins)
+                #FIXME: why isn't the callback registered?
+                #self.manager.isMessageType.removeCallback(self.handle)
+                self._createAndOutputIS(RedeemCoinsRequest)
             else:
-                self.manager.isMessageType.persistant.request_id = self.manager.persistant.target
-                raise MessageError('target is the wrong thing to use.')
+                # We already did the RedeemRequest. Time to fetch
+                self.manager.isMessageType.persistant.request_id = self.manager.persistant.mintRequestID
 
                 self.manager.isMessageType.removeCallback(self.handle)
                 self._createAndOutputIS(FetchMintedRequest)
@@ -732,6 +713,9 @@ class RedeemCoins(Handler):
         self.manager = manager
         self.manager.isMessageType.addCallback(self.handle)
 
+        #FIXME: this is a hack
+        self.isRequiresMRbeforeRCR = True # set a value for if the issuer supports (or requires) mint requests prior to redeem coin requests
+
     def handle(self, message):
         if not isinstance(message, RedeemCoinsRequest) and not isinstance(message, RedeemCoinsAccept) and not isinstance(message, RedeemCoinsReject):
             if message.messageLayer.globals.lastState == MessageHello: # we are now on a different message. Oops.
@@ -748,13 +732,28 @@ class RedeemCoins(Handler):
             print 'Got a RedeemCoinsRequest. I did not know we got these.'
 
         elif isinstance(message, RedeemCoinsAccept):
+            if self.isRequiresMRbeforeRCR:
+                # We have our MintRequest and RedeemCoinsRequests in. All to do now is Fetch our coins!
 
-            self.manager.isMessageType.removeCallback(self.handle) #remove the callback. Not coming here again
+                self.manager.isMessageType.persistant.request_id = self.manager.persistant.mintRequestID
 
-            self.manager.isMessageLayer.persistant.request_id = self.manager.persistant.target
-            raise MessageError('target is the wrong thing to use.')
+                self.manager.isMessageType.removeCallback(self.handle) #remove the callback. Not coming here again
+                self._createAndOutputIS(FetchMintedRequest)
 
-            self._createAndOutputIS(FetchMintedRequest)
+            else:
+                # We have done our RedeemCoinsRequest. Now do a MintRequest, and then finaly a FetchMintedRequest
+
+                self.manager.isMessageType.persistant.request_id = self.manager.persistant.mintRequestID
+
+                # setup blinds only for the MintRequest message
+                blinds = []
+                for b in self.manager.persistant.mintBlanks:
+                    b.blind_blank(self.manager.entity.cdds) # XXX should this be in makeBlanks() instead?
+                    blinds.append((b.key_identifier, b.blind_value))
+                self.manager.isMessageType.persistant.blinds = blinds
+
+                self.manager.isMessageType.removeCallback(self.handle)
+                self._createAndOutputIS(MintRequest)
 
         elif isinstance(message, RedeemCoinsReject):
             self.reason = self.manager.isMessageType.persistant.reason
@@ -770,7 +769,7 @@ class FetchMinted(Handler):
 
     def handle(self, message):
         if not isinstance(message, FetchMintedRequest) and not isinstance(message, FetchMintedAccept) and not \
-                        isinstance(message, FetchMintedReject) and not isinstance(message, FetchMintedWait):
+                        isinstance(message, FetchMintedFailure) and not isinstance(message, FetchMintedWait):
             if message.messageLayer.globals.lastState == MessageHello: # we are now on a different message. Oops.
                 raise MessageError('FetchMinted should have already been removed. It was not. Very odd. Message: %s LastMessage: %s' % (message.identifier,
                                                                                                                 message.messageLayer.globals.lastState))
@@ -790,7 +789,8 @@ class FetchMinted(Handler):
             self.signatures = self.manager.isMessageType.persistant.signatures
             self.manager.persistant.signatures = self.signatures
 
-            successes, failures = self.verifySignatures(self.signatures, self.manager.persistant.mintingKeysDenomination, self.manager.persistant.mintBlanks)
+            successes, failures = self.verifySignatures(self.signatures, self.manager.persistant.mintingKeysDenomination, self.manager.persistant.mintBlanks,
+                                                        self.manager.entity.cdds)
             self.manager.persistant.newCoins = successes
             self.manager.persistant.mintingFailures = failures
 
@@ -798,14 +798,18 @@ class FetchMinted(Handler):
             if failures:
                 self.manager.failure(self, message)
 
-        elif isinstance(message, FetchMintedWait) or isinstance(message, FetchMintedReject):
+            self.manager.isMessageType.removeCallback(self.handle)
+
+        elif isinstance(message, FetchMintedWait) or isinstance(message, FetchMintedFailure):
             self.reason = self.manager.isMessageType.persistant.reason
             # undo the damage and tell someone
             self.manager.failure(message, self)
 
+            self.manager.isMessageType.removeCallback(self.handle)
+
         self._setLastState(message.identifier)
 
-    def verifySignatures(self, signatures, minting_keys, minting_blanks, cdd):
+    def verifySignatures(self, signatures, minting_keys, minting_blanks, cdds):
         """verifies the signatures received and makes coins out of blanks."""
         successes = []
         failures = []
@@ -818,9 +822,11 @@ class FetchMinted(Handler):
         for i in range(len(signatures)):
             sig = signatures[i]
             bnk = minting_blanks[i]
-            unblinded = bnk.unblind_signature(sig)
+            #FIXME another 'Only one CDD per transaction' belief. This one may be valid -- talking to IS
+            cdd = cdds[minting_blanks[0].currency_identifier]
+            unblinded = bnk.unblind_signature(sig, cdd)
             try:
-                coin = bnk.newCoin(unblinded, cdd, minting_keys.search(bnk.denomination))
+                coin = bnk.newCoin(unblinded, cdd, minting_keys[bnk.denomination])
                 # the call to newCoin verifies the signature
                 successes.append(coin)
             except CryptoError:

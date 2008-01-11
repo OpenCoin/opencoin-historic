@@ -1,4 +1,5 @@
 import types
+from Crypto.Util import number
 
 class CryptoContainer:
     def __init__(self, signing=None, encryption=None, blinding=None, hashing=None):
@@ -229,6 +230,8 @@ class RSABlindingAlgorithm(BlindingAlgorithm):
 
     def update(self, input):
         """updates the algorithm with more hashing information."""
+        if isinstance(input, types.LongType):
+            input = number.long_to_bytes(input)
         self.input = self.input + input
         return self
 
@@ -281,13 +284,15 @@ class RSASigningAlgorithm(SigningAlgorithm):
     def sign(self, message):
         """returns the signature of the message with the key."""
         try:
-            result = self.key.private().sign(message, '')[0]
+            key = self.key.private()
+            result = key.sign(message, '')[0]
             if isinstance(message, types.StringType):
                 from Crypto.Util import number
                 return number.long_to_bytes(result)
             return result
-        except PyCryptoRSAError:
-            raise CryptoError
+        except PyCryptoRSAError, reason:
+            print reason
+            raise CryptoError('PyCryptoRSAError: %s' % reason)
 
     def verify(self, signature):
         """returns if the signature of the input is valid."""

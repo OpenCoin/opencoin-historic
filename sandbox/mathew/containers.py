@@ -249,11 +249,13 @@ class CurrencyBlank(CurrencyBase):
 
         return self.blind_value
 
-    def unblind_signature(self, signature, cdds):
+    def unblind_signature(self, signature, cdd):
         """Returns the unblinded value of the blinded signature."""
-        blinding = cdds[self.currency_identifier].issuer_cipher_suite.blinding
+        blinding = cdd.issuer_cipher_suite.blinding
+        
+        blinding.reset(signature)
 
-        return blinding.unblind(signature, self.blind_factor)
+        return blinding.unblind()
 
     def newCoin(self, signature, currency_description_document=None, minting_key=None):
         """Returns a coin using the unblinded signature.

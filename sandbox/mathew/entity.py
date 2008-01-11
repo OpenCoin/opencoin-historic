@@ -1,13 +1,14 @@
 import containers
 import message
+from crypto import CryptoError
 
 class Entity:
     pass
 
 class IssuerDSDBEntity(Entity):
-    def __init__(self, cdd, dsdb_key, mk=None, dsdb_database=None, minted=None, dsdb_cert_length=None,
-                 mk_before_length=None, mk_coin_not_after_length=None, mk_mint_not_after_length=None, mint_waiting=None,
-                 mint_failures=None, mint_before_redeem=True):
+    def __init__(self, cdd, dsdb_key, mk=None, dsdb_database={}, minted={}, dsdb_cert_length=None,
+                 mk_before_length=None, mk_coin_not_after_length=None, mk_mint_not_after_length=None, mint_waiting={},
+                 mint_failures={}, mint_before_redeem=True):
         self.cdd = cdd # the cdd
         #self.mk = mk # a list of all active minting keys
         self.dsdb_key = dsdb_key # the dsdb_certificate
@@ -25,9 +26,6 @@ class IssuerDSDBEntity(Entity):
         self.mint_before_redeem = mint_before_redeem # a boolean of if we require minting before redeeming or vice versa (if false)
 
         self.addMintingKeys(mk)
-
-        if not dsdb_database: # setup a empty database
-            self.dsdb_database = {}
 
     def addMintingKeys(self, keys):
         """Adds minting keys from the list of keys to minting_key_key_id and minting_keys_denomination."""
@@ -61,6 +59,48 @@ class IssuerDSDBEntity(Entity):
 
         return messageType
 
+    def attemptToMint(self):
+        """Goes through the list of mint_waited and tries to mint all the requests which haven't been attempted yet.
+        Note: it will attempt to mint everything and then put them back if they haven't been redeemed yet."""
+        
+        #self.minted = minted # dictionary the coins we have minted which haven't been sent by id
+        #self.mint_waiting = mint_waiting # a dictionary of a reason why it isn't fetchable and either the minted or unminted blanks
+        #self.mint_failures = mint_failures # a dictionary of a reason why the request failed
+
+        #FIXME: for now, just take from mint_waiting and stick in minted or mint_failures. Worry about other stuff later
+        
+        for request_id in self.mint_waiting.keys():
+            reason, value = self.mint_waiting[request_id]
+
+            if reason == 'No attempt to mint':
+                failure = False
+                failure_condition = ''
+                successes = []
+                
+                for key_identifier, blind in value:
+                    signing = self.cdd.issuer_cipher_suite.signing.__class__(self.minting_keys_key_id[key_identifier].public_key)
+                    try:
+                        signature = signing.sign(blind)
+                    except CryptoError:
+                        failure = True
+                        failure_condition = 'Unable to blind'
+                        break
+
+                    successes.append(signature)
+
+                if failure:
+                    self.mint_failures[request_id] = failure_condition
+                else:
+                    self.minted[request_id] = successes
+
+                # FIXME: This is where we would test for if we should keep it in mint_waiting for future redemption, or whatnot.
+                del self.mint_waiting[request_id]
+
+            elif reason == 'Request not credited':
+                raise NotImplementedError
+
+
+                
 
 class WalletEntity(Entity):
     def __init__(self, cdds=None, minting_keys=None, coins=None, requests=None, universe=None):
