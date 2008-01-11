@@ -181,6 +181,7 @@ class UnlockCoins(Handler):
                 self.type, self.result = self.unlock(self.transaction_id)
                 
                 if self.type == 'ACCEPT':
+                    self.manager.messageType.removeCallback(self.handle)
                     self.__createAndOutput(UnlockCoinsPass)
                     
                 elif self.type == 'REJECT':
@@ -188,6 +189,8 @@ class UnlockCoins(Handler):
                     if self.transaction_id != transaction_id:
                         raise MessageError('transaction_id changed. Was: %s, Now: %s' % (self.transation_id, transaction_id))
                     self.manager.messageType.persistant.reason = self.reason
+
+                    self.manager.messageType.removeCallback(self.handle)
                     self.__createAndOutput(UnlockCoinsFailure)
 
                 else:

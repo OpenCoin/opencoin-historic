@@ -232,13 +232,13 @@ class CurrencyBlank(CurrencyBase):
         content.append('"%s"="%s"' % ('serial', base64.b64encode(self.serial)))
         return 'Currency={' + ';'.join(content) + '}'
 
-    def blind_blank(self):
+    def blind_blank(self, cdds):
         """Returns the blinded value of the hash of the coin for signing."""
         if self.blind_factor:
             raise MessageError('CurrenyBlank already has a blind factor')
 
-        blinding = self.currency_identifier.issuer_cipher_suite.blinding
-        hashing = self.currency_identifier.issuer_cipher_suite.hashing
+        blinding = cdds[self.currency_identifier].issuer_cipher_suite.blinding
+        hashing = cdds[self.currency_identifier].issuer_cipher_suite.hashing
         blinding.reset()
         hashing.reset()
 
@@ -249,9 +249,9 @@ class CurrencyBlank(CurrencyBase):
 
         return self.blind_value
 
-    def unblind_signature(self, signature):
+    def unblind_signature(self, signature, cdds):
         """Returns the unblinded value of the blinded signature."""
-        blinding = self.currency_identifier.issuer_cipher_suite.blinding
+        blinding = cdds[self.currency_identifier].issuer_cipher_suite.blinding
 
         return blinding.unblind(signature, self.blind_factor)
 

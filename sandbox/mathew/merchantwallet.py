@@ -399,7 +399,7 @@ class BlankAndMintingKey(Handler):
 
         for b in blanks:
             # FIXME: This will break if the old key cannot be used to mint.
-            newBlank = containers.CurrencyBlank(b.standard_identifier, b.currency_identifier, b.denomination, mintingKeys[b.denomination])
+            newBlank = containers.CurrencyBlank(b.standard_identifier, b.currency_identifier, b.denomination, mintingKeys[b.denomination].key_identifier)
             newBlank.generateSerial()
             newBlanks.append(newBlank)
 
@@ -533,6 +533,9 @@ class Coins(Handler):
         self.manager = manager
         self.manager.walletMessageType.addCallback(self.handle)
 
+        #FIXME: this is a hack
+        self.isSupportsMRbeforeRCR = True # set a value for if the issuer supports (or requires) mint requests prior to redeem coin requests
+
     def handle(self, message):
         if not isinstance(message, CoinsRedeem) and not isinstance(message, CoinsAccept) and not isinstance(message, CoinsReject):
             if message.messageLayer.globals.lastState == MessageHello: # we are now on a different message. Oops.
@@ -550,7 +553,8 @@ class Coins(Handler):
                                             self.manager.persistant.dsdb_certificate, self.manager.entity.cdds)
 
             if type == 'ACCEPT':
-                if not self.validDSDBLock(self.dsdb_lock):
+                self.dsdb_lock = self.manager.persistant.dsdb_lock
+                if not self.validDSDBLock(self.dsdb_lock, self.timeNow()):
                     raise MessageError('Invalid DSDB lock. You are an idiot for letting this happen.')
 
                 self._createAndOutputWallet(CoinsAccept)
@@ -584,18 +588,26 @@ class Coins(Handler):
             self.manager.persistant.target = self.newTarget()
 
             if self.isSupportsMRbeforeRCR:
-                self.managerisMessageLayer.persistant.request_id = self.manager.persistant.mintRequestID
-                self.manager.isMessageLayer.persistant.blinds = self.manager.persistant.mintingBlanks
+                self.manager.isMessageType.persistant.request_id = self.manager.persistant.mintRequestID
 
-                self._createAndOutput(Mint)
+                # setup blinds only for the MintRequest message
+                blinds = []
+                for b in self.manager.persistant.mintBlanks:
+                    b.blind_blank(self.manager.entity.cdds) # XXX should this be in makeBlanks() instead?
+                    blinds.append((b.key_identifier, b.blind_value))
+                self.manager.isMessageType.persistant.blinds = blinds
+
+                #self.manager.walletMessageType.removeCallback(self.handle)
+                self._createAndOutputIS(MintRequest)
 
             else:
-                self.manager.isMessageLayer.persistant.trasaction_id = self.dsdb_lock #this is probably the wrong one! look it up
+                self.manager.isMessageType.persistant.trasaction_id = self.dsdb_lock #this is probably the wrong one! look it up
                 raise MessageError('look at comment above')
-                self.manager.isMessageLayer.persistant.target = self.manager.persistant.target
-                self.manager.isMessageLayer.persistant.coins = self.manager.persistant.coins
+                self.manager.isMessageType.persistant.target = self.manager.persistant.target
+                self.manager.isMessageType.persistant.coins = self.manager.persistant.coins
 
-                self._createAndOutput(RedeemCoins)
+                #self.manager.isMessageType.removeCallback(self.handle)
+                self._createAndOutput(RedeemCoinsRequest)
                 
         self._setLastState(message.identifier)
 
@@ -606,12 +618,15 @@ class Coins(Handler):
 
         return now< dsdb_lock
 
-    def newRequestId(self):
-        raise NotImplementedError
+    def newRequestID(self):
+        import crypto
+        return crypto._r.getRandomNumber(128)
 
     def newTarget(self):
-        raise NotImplementedError
-    
+        # FIXME: This should be more involved and defined somewhere. Just use a number for now
+        import crypto
+        return crypto._r.getRandomNumber(128)
+
     def verifyCoins(self, coins, mintingKeys, blanks, dsdb_keycertificate, cdds):
         failure = False
         failures = []
@@ -687,20 +702,25 @@ class Mint(Handler):
             self.manager.isMessageType.removeCallback(self.handle) #remove the callback. Not coming here again
 
             if self.isSupportsMRbeforeRCR:
-                self.manager.isMessageLayer.persistant.trasaction_id = self.dsdb_lock #this is probably the wrong one! look it up
+                self.manager.isMessageType.persistant.trasaction_id = self.dsdb_lock #this is probably the wrong one! look it up
                 raise MessageError('look at comment above')
-                self.manager.isMessageLayer.persistant.target = self.manager.persistant.target
-                self.manager.isMessageLayer.persistant.coins = self.manager.persistant.coins
+                self.manager.isMessageType.persistant.target = self.manager.persistant.target
+                self.manager.isMessageType.persistant.coins = self.manager.persistant.coins
 
+                self.manager.isMessageType.removeCallback(self.handle)
                 self._createAndOutputIS(RedeemCoins)
             else:
-                self.manager.isMessageLayer.persistant.request_id = self.manager.persistant.target
+                self.manager.isMessageType.persistant.request_id = self.manager.persistant.target
                 raise MessageError('target is the wrong thing to use.')
 
+                self.manager.isMessageType.removeCallback(self.handle)
                 self._createAndOutputIS(FetchMintedRequest)
             
-        elif isinstance(message, LockCoinsFailure):
+        elif isinstance(message, MintReject):
             self.reason = self.manager.isMessageType.persistant.reason
+
+            self.manager.isMessageType.removeCallback(self.handle)
+            
             # undo the damage and tell someone
             self.manager.failure(message, self)
 
@@ -770,7 +790,7 @@ class FetchMinted(Handler):
             self.signatures = self.manager.isMessageType.persistant.signatures
             self.manager.persistant.signatures = self.signatures
 
-            successes, failures = self.verifySignatures(self.signatures, self.manager.persistant.mintingKeysDenomination, self.manager.persistant.mintingBlanks)
+            successes, failures = self.verifySignatures(self.signatures, self.manager.persistant.mintingKeysDenomination, self.manager.persistant.mintBlanks)
             self.manager.persistant.newCoins = successes
             self.manager.persistant.mintingFailures = failures
 

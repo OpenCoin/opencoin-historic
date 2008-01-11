@@ -7,7 +7,7 @@ class Entity:
 class IssuerDSDBEntity(Entity):
     def __init__(self, cdd, dsdb_key, mk=None, dsdb_database=None, minted=None, dsdb_cert_length=None,
                  mk_before_length=None, mk_coin_not_after_length=None, mk_mint_not_after_length=None, mint_waiting=None,
-                 mint_failures=None):
+                 mint_failures=None, mint_before_redeem=True):
         self.cdd = cdd # the cdd
         #self.mk = mk # a list of all active minting keys
         self.dsdb_key = dsdb_key # the dsdb_certificate
@@ -22,6 +22,7 @@ class IssuerDSDBEntity(Entity):
         self.mk_mint_not_after_length = mk_mint_not_after_length # XXX the time to do the mint_not_after for
         self.minting_keys_key_id = {} # dictionary of minting keys by key_identifier
         self.minting_keys_denomination = {} # dictionary by by denomination of (list of valid minting keys)
+        self.mint_before_redeem = mint_before_redeem # a boolean of if we require minting before redeeming or vice versa (if false)
 
         self.addMintingKeys(mk)
 

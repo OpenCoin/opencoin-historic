@@ -209,14 +209,14 @@ class RSAEncryptionAlgorithm(EncryptionAlgorithm):
         from Crypto.Util import number
         try:
             return self.key.public().encrypt(self.input, '')[0]
-        except PyCryptoError:
+        except PyCryptoRSAError:
             raise CryptoError
     
     def decrypt(self):
         from Crypto.Util import number
         try:
             return self.key.private().decrypt(self.input)
-        except PyCryptoError:
+        except PyCryptoRSAError:
             raise CryptoError
         
 
@@ -234,15 +234,19 @@ class RSABlindingAlgorithm(BlindingAlgorithm):
 
     def blind(self, blinding_factor=None):
         """returns the blinding of the input with the key and the blinding factor."""
-        if not blinding_factor and not self.blinding_factor:
+        if blinding_factor:
+            self.blinding_factor = blinding_factor
+            
+        elif not self.blinding_factor:
             # self.key.size returns the size of the key - 1, which is acceptable
-            blinding_factor = _r.getRandomNumber(self.key.size())
+            self.blinding_factor = _r.getRandomNumber(self.key.size())
 
-        self.blinding_factor = blinding_factor
+        else:
+            pass #self.blinding_factor is already set
 
         try:
-            return self.key.public().blind(self.input, blinding_factor), blinding_factor
-        except PyCryptoError:
+            return self.key.public().blind(self.input, self.blinding_factor), self.blinding_factor
+        except PyCryptoRSAError:
             raise CryptoError
 
     def unblind(self, blinding_factor=None):

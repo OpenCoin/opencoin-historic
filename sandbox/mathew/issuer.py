@@ -138,6 +138,8 @@ class MintingKey(Handler):
             if type == 'PASS':
                 self.minting_certificate = result
                 self.manager.messageType.persistant.minting_certificate = self.minting_certificate
+
+                self.manager.messageType.removeCallback(self.handle)
                 self.__createAndOutput(MintingKeyPass)
             elif type == 'FAILURE':
                 self.manager.messageType.persistant.reason = result
@@ -145,15 +147,18 @@ class MintingKey(Handler):
                 self.reason = 'Unknown key_id'
 
                 self.manager.messageType.persistant.reason = self.reason
+                self.manager.messageType.removeCallback(self.handle)
                 self.__createAndOutput(MintingKeyFailure)
             else:
                 self.reason = 'Unknown denomination'
                     
                 self.manager.messageType.persistant.reason = self.reason
+                self.manager.messageType.removeCallback(self.handle)
                 self.__createAndOutput(MintingKeyFailure)
 
         elif isinstance(message, MintingKeyPass) or isinstance(message, MintingKeyFailure):
             # we output this. Next step can only be Goodbye
+            print 'we should never get here!'
             self.manager.messageType.removeCallback(self.handle)
 
     def findKey(self, key_id, denomination):
