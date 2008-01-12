@@ -253,8 +253,12 @@ class BlankAndMintingKey(Handler):
                 # connect to dsdb
                 self.manager.connectToDSDB(self.manager.persistant.dsdb_certificate)
 
+                # get list of denominations we are minting
+                #FIXME: This is a spot where we assume only one cdd
+                self.minting_denominations = self.getMintingDenominations(self.blanks, self.manager.entity.cdds)
+                
                 # self.performMagic is a special function doing anything we want.
-                self.performMagic(self.blanks, self.dsdb_certificate)
+                self.performMagic(self.blanks, self.dsdb_certificate, self.minting_denominations)
             else:
                 self.manager.walletMessageType.persistant.reason = result
                 self._createAndOutputWallet(BlankReject)
@@ -291,21 +295,21 @@ class BlankAndMintingKey(Handler):
 
         return dontHave
         
-    def listUnknownKeysDenomination(self, blanks, entity):
+    def listUnknownKeysDenomination(self, wanted_denominations, entity):
         """Returns a list of all the Denominations we need to request."""
         denominations = []
-        for b in blanks:
-            if b.denomination not in denominations:
-                denominations.append(b.denomination)
+        for denomination in wanted_denominations:
+            if denomination not in denominations:
+                denominations.append(denomination)
 
         return denominations
         
     def removeKnownKeysDenomination(self, blanks, entity):
         raise NotImplementedError
     
-    def performMagic(self, blanks, dsdb_certificate):
+    def performMagic(self, blanks, dsdb_certificate, wanted_denominations):
         self.neededKeyIDs = self.listUnknownKeysKeyID(blanks, self.manager.entity)
-        self.neededDenominations = self.listUnknownKeysDenomination(blanks, self.manager.entity)
+        self.neededDenominations = self.listUnknownKeysDenomination(wanted_denominations, self.manager.entity)
 
         self.getMintingKeyAndContinue()
 
@@ -331,7 +335,7 @@ class BlankAndMintingKey(Handler):
             self.manager.entity.addMintingKeys(self.collapseMintingKeys(self.mintingKeysKeyID, self.mintingKeysDenomination))
                     
             # Make blanks
-            self.manager.persistant.mintBlanks = self.makeBlanks(self.blanks, self.manager.entity.cdds, self.mintingKeysDenomination)
+            self.manager.persistant.mintBlanks = self.makeBlanks(self.blanks, self.minting_denominations, self.mintingKeysDenomination)
             self.manager.persistant.mintingKeysDenomination = self.mintingKeysDenomination
             self.manager.persistant.mintingKeysKeyID = self.mintingKeysKeyID
 
@@ -364,30 +368,17 @@ class BlankAndMintingKey(Handler):
             else:
                 raise MessageError('Received an impossible type: %s' % type)
 
-    def makeBlanks(self, blanks, cdds, mintingKeys):
-        """I have no idea why we take the inputs we do. It looks like it makes new CurrencyBlanks. Why do we input the blanks? 
-        it makes no sense. We do need the cdd though, I think.
+    def makeBlanks(self, blanks, wanted_denominations, mintingKeys):
+        """This function accepts an obfuscated blanks, the wanted denominations, and the minting_keys_by_denomination
+        and makes a new set of blanks to mint.
         """
-        # Okay. This is how this function is going to work. It goes through and sees if the values of coins is the same as the
-        # blanks. If it is... Fuck. That doesn't work. Okay... just making copies of coins for now.
 
         newBlanks = []
 
-        worth = 0
-        for b in blanks:
-            worth += float(b.denomination)
+        blank = blanks[0] # FIXME: This is a place where we assume one CDD
 
-        blank = blanks[0]
-
-        wantedDenominations = []
-        for denomination in cdds[blank.currency_identifier].denominations:
-            d = float(denomination)
-            if worth - d >= 0:
-                times = int(worth / d)
-                wantedDenominations.extend([denomination] * times)
-                worth -= d * times
-
-        for denomination in wantedDenominations:
+        # make the blanks
+        for denomination in wanted_denominations:
             # FIXME: This will break if the old key cannot be used to mint.
             newBlank = containers.CurrencyBlank(blank.standard_identifier, blank.currency_identifier, denomination, mintingKeys[denomination].key_identifier)
             newBlank.generateSerial()
@@ -395,6 +386,31 @@ class BlankAndMintingKey(Handler):
 
         return newBlanks
             
+    def getMintingDenominations(self, blanks, cdds):
+        # figure out how much the blanks we have are worth
+        worth = 0
+        for b in blanks:
+            worth += float(b.denomination)
+
+        # a copy of the blank for minting purposes
+        # FIXME: this is another place we accept only one cdd
+        blank = blanks[0]
+
+        # Figure out what denominations we need to make coins for
+        wantedDenominations = []
+        cdd_denominations = cdds[blank.currency_identifier].denominations[:]
+        cdd_denominations.reverse() # reverse them so they go from high to low
+        for denomination in cdd_denominations:
+            d = float(denomination)
+            if worth - d >= 0:
+                times = int(worth / d)
+                wantedDenominations.extend([denomination] * times)
+                worth -= d * times
+
+        assert(worth == 0)
+
+        return wantedDenominations
+
     def makeTransactionID(self):
         import crypto
         return crypto._r.getRandomNumber(128)

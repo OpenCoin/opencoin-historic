@@ -105,3 +105,6 @@ if __name__=='__main__':
     walletPoor.coins[1] = copyCoin # walletPoors coins are now two copies of the first coin
     walletPoor.spendCoins('poor', coinsOne[0].currency_identifier, ['1', '1']) # spend two copies of the same coin
 
+    # now give poor 5 '5's to test the aggregation
+    walletOierw.spendCoins('poor', 'OpenCent', ['5'] * 5)
+

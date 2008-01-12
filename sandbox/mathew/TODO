@@ -1,0 +1,19 @@
+Todo:
+
+Figure out options for an IS [MR->(MA)->RCR->(RCA)->FMR->(FMA), MR->(MA)->RCR->(FMA), RCR->(RCA)->MR->(MA)->FMR->(FMA), RCR->(RCA)->MR->(FMA)]
+Implement ability to redeem coins of different worths
+Move DSDB lock/unlock and IS redeem logic to the entity
+Implement json/other handler
+Implement Hello
+
+Tests:
+Try to redeem coins without locking them first
+Try to lock two coins and then redeem two copies of the first coin
+Try to lock two copies of the same coin
+Try to redeem coins of different worth
+Try to lock two coins and only redeem one
+Try to lock two coins and redeem three
+Try to lock two coins and redeem them both coins twice
+Try to spend a coin and respend it
+
+
