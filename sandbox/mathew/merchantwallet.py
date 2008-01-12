@@ -373,9 +373,23 @@ class BlankAndMintingKey(Handler):
 
         newBlanks = []
 
+        worth = 0
         for b in blanks:
+            worth += float(b.denomination)
+
+        blank = blanks[0]
+
+        wantedDenominations = []
+        for denomination in cdds[blank.currency_identifier].denominations:
+            d = float(denomination)
+            if worth - d >= 0:
+                times = int(worth / d)
+                wantedDenominations.extend([denomination] * times)
+                worth -= d * times
+
+        for denomination in wantedDenominations:
             # FIXME: This will break if the old key cannot be used to mint.
-            newBlank = containers.CurrencyBlank(b.standard_identifier, b.currency_identifier, b.denomination, mintingKeys[b.denomination].key_identifier)
+            newBlank = containers.CurrencyBlank(blank.standard_identifier, blank.currency_identifier, denomination, mintingKeys[denomination].key_identifier)
             newBlank.generateSerial()
             newBlanks.append(newBlank)
 
@@ -556,7 +570,6 @@ class Coins(Handler):
                 self.manager.failure(self, message)
         
         elif isinstance(message, CoinsAccept):
-            self.manager.walletMessageType.removeCallback(self.handle)
 
             #figure out what request ID we will be using
             self.manager.persistant.mintRequestID = self.newRequestID()
@@ -572,16 +585,15 @@ class Coins(Handler):
                     blinds.append((b.key_identifier, b.blind_value))
                 self.manager.isMessageType.persistant.blinds = blinds
 
-                #self.manager.walletMessageType.removeCallback(self.handle)
+                self.manager.walletMessageType.removeCallback(self.handle)
                 self._createAndOutputIS(MintRequest)
 
             else:
-                self.manager.isMessageType.persistant.trasaction_id = self.dsdb_lock #this is probably the wrong one! look it up
-                raise MessageError('look at comment above')
+                self.manager.isMessageType.persistant.trasaction_id = self.manager.persistant.mintRequestID
                 self.manager.isMessageType.persistant.target = self.manager.persistant.target
                 self.manager.isMessageType.persistant.coins = self.manager.persistant.coins
 
-                #self.manager.isMessageType.removeCallback(self.handle)
+                self.manager.isMessageType.removeCallback(self.handle)
                 self._createAndOutput(RedeemCoinsRequest)
                 
         self._setLastState(message.identifier)
@@ -756,6 +768,7 @@ class RedeemCoins(Handler):
         elif isinstance(message, RedeemCoinsReject):
             self.reason = self.manager.isMessageType.persistant.reason
             # undo the damage and tell someone
+            self.manager.isMessageType.removeCallback(self.handle)
             self.manager.failure(message, self)
 
         self._setLastState(message.identifier)

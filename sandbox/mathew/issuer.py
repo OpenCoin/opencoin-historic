@@ -367,6 +367,9 @@ class RedeemCoins(Handler):
         if len(coins) == 0:
             raise MessageError('transaction %s has no coins' % transaction_id)
 
+        if len(coins) != len(set(coins)):
+            return 'REJECT', 'Sent two copies of the same coin!' #FIXME: This error isn't in the standard
+
         for c in coins:
             type, result = self.testCoin(c, transaction_id, currency_description_document, minting_keys_key_id)
             if type == 'ACCEPT':
@@ -451,8 +454,15 @@ class RedeemCoins(Handler):
         return 'ACCEPT', None
 
     def figureWorth(self, coins):
-        #FIXME: implement me!
-        return None
+        """Figure worth returns the worth of all the coins."""
+        #FIXME: figureWorth assumes that the worth is the sum if the number values of the worth
+        worth = 0
+        for c in coins:
+            w = float(c.denomination)
+            worth += w
+        
+        print 'Worth: %s' % worth
+        return worth
 
     def creditTarget(self, target, worth):
         #FIXME: Implement me!

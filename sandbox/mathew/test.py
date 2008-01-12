@@ -101,4 +101,7 @@ if __name__=='__main__':
     walletPoor.coins.append(doubleCoin) # add the original coin and try to double spend it
     walletPoor.spendCoins('poor', coinsOne[0].currency_identifier, ['1', '1']) # spend both coins to make sure we include it
 
-    
+    copyCoin = walletPoor.coins[0]
+    walletPoor.coins[1] = copyCoin # walletPoors coins are now two copies of the first coin
+    walletPoor.spendCoins('poor', coinsOne[0].currency_identifier, ['1', '1']) # spend two copies of the same coin
+
