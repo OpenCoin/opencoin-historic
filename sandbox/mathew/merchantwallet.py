@@ -689,16 +689,13 @@ class Mint(Handler):
             if self.manager.persistant.mintRequestID != self.manager.isMessageType.persistant.request_id:
                 raise MessageError('request_id changed. Was: %s Now %s' % (self.manager.persistant.mintingRequestID, self.manager.isMessageType.persistant.request_id))
                         
-            self.manager.isMessageType.removeCallback(self.handle) #remove the callback. Not coming here again
-
             if self.isRequiresMRbeforeRCR:
                 # We've already done the MintRequest. Nothing stopping us from trying to Redeem now.
                 self.manager.isMessageType.persistant.trasaction_id = self.manager.persistant.mintRequestID 
                 self.manager.isMessageType.persistant.target = self.manager.persistant.target
                 self.manager.isMessageType.persistant.coins = self.manager.persistant.coins
 
-                #FIXME: why isn't the callback registered?
-                #self.manager.isMessageType.removeCallback(self.handle)
+                self.manager.isMessageType.removeCallback(self.handle)
                 self._createAndOutputIS(RedeemCoinsRequest)
             else:
                 # We already did the RedeemRequest. Time to fetch
@@ -795,8 +792,6 @@ class FetchMinted(Handler):
             print 'Got a FetchMintedRequest. I did not know we got these.'
 
         elif isinstance(message, FetchMintedAccept):
-            self.manager.isMessageType.removeCallback(self.handle) #remove the callback. Not coming here again
-
             self.signatures = self.manager.isMessageType.persistant.signatures
             self.manager.persistant.signatures = self.signatures
 
@@ -811,8 +806,7 @@ class FetchMinted(Handler):
             if failures:
                 self.manager.failure(self, message)
 
-            #FIXME: Why isn't it in the callbacks?
-            #self.manager.isMessageType.removeCallback(self.handle)
+            self.manager.isMessageType.removeCallback(self.handle)
 
         elif isinstance(message, FetchMintedWait) or isinstance(message, FetchMintedFailure):
             self.reason = self.manager.isMessageType.persistant.reason
