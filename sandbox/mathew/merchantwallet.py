@@ -570,7 +570,7 @@ class Coins(Handler):
                 # setup blinds only for the MintRequest message
                 blinds = []
                 for b in self.manager.persistant.mintBlanks:
-                    b.blind_blank(self.manager.entity.cdds) # XXX should this be in makeBlanks() instead?
+                    b.blind_blank(self.manager.entity.cdds, self.manager.entity.minting_keys_key_id) # XXX should this be in makeBlanks() instead?
                     blinds.append((b.key_identifier, b.blind_value))
                 self.manager.isMessageType.persistant.blinds = blinds
 
@@ -798,7 +798,8 @@ class FetchMinted(Handler):
             if failures:
                 self.manager.failure(self, message)
 
-            self.manager.isMessageType.removeCallback(self.handle)
+            #FIXME: Why isn't it in the callbacks?
+            #self.manager.isMessageType.removeCallback(self.handle)
 
         elif isinstance(message, FetchMintedWait) or isinstance(message, FetchMintedFailure):
             self.reason = self.manager.isMessageType.persistant.reason
@@ -824,7 +825,7 @@ class FetchMinted(Handler):
             bnk = minting_blanks[i]
             #FIXME another 'Only one CDD per transaction' belief. This one may be valid -- talking to IS
             cdd = cdds[minting_blanks[0].currency_identifier]
-            unblinded = bnk.unblind_signature(sig, cdd)
+            unblinded = bnk.unblind_signature(sig)
             try:
                 coin = bnk.newCoin(unblinded, cdd, minting_keys[bnk.denomination])
                 # the call to newCoin verifies the signature

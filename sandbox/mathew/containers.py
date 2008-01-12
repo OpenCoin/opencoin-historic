@@ -232,30 +232,27 @@ class CurrencyBlank(CurrencyBase):
         content.append('"%s"="%s"' % ('serial', base64.b64encode(self.serial)))
         return 'Currency={' + ';'.join(content) + '}'
 
-    def blind_blank(self, cdds):
+    def blind_blank(self, cdds, minting_keys_key_id):
         """Returns the blinded value of the hash of the coin for signing."""
         if self.blind_factor:
             raise MessageError('CurrenyBlank already has a blind factor')
 
-        blinding = cdds[self.currency_identifier].issuer_cipher_suite.blinding
+        self.blinding = cdds[self.currency_identifier].issuer_cipher_suite.blinding.__class__(minting_keys_key_id[self.key_identifier].public_key)
         hashing = cdds[self.currency_identifier].issuer_cipher_suite.hashing
-        blinding.reset()
         hashing.reset()
 
         hashing.update(self.content_part())
-        blinding.update(hashing.digest())
+        self.blinding.update(hashing.digest())
         
-        self.blind_value, self.blind_factor = blinding.blind()
+        self.blind_value, self.blind_factor = self.blinding.blind()
 
         return self.blind_value
 
-    def unblind_signature(self, signature, cdd):
+    def unblind_signature(self, signature):
         """Returns the unblinded value of the blinded signature."""
-        blinding = cdd.issuer_cipher_suite.blinding
-        
-        blinding.reset(signature)
+        self.blinding.reset(signature)
 
-        return blinding.unblind()
+        return self.blinding.unblind()
 
     def newCoin(self, signature, currency_description_document=None, minting_key=None):
         """Returns a coin using the unblinded signature.

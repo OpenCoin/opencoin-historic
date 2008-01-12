@@ -77,7 +77,23 @@ if __name__=='__main__':
     obfuscated = aCoin.newObfuscatedBlank(dsdb_key)
     if not aCoin.validate_with_CDD_and_MintingKey(myCDD, aMK):
         pass
-        #raise Exception('Ahh!')
+    
+    # test out blinding/unblinding
+    aCoin = coinsOne[0]
+    aMK = mintingKeys[0]
+    aBlind = containers.CurrencyBlank(aCoin.standard_identifier, aCoin.currency_identifier, aCoin.denomination, aMK.key_identifier)
+    aBlind.generateSerial()
+    aBlind.blind_blank({myCDD.currency_identifier: myCDD}, {aMK.key_identifier: aMK})
+    aBlindValue = aBlind.blind_value
+
+    aSigning = myCDD.issuer_cipher_suite.signing.__class__(aMK.public_key)
+    aBlindedSignature = aSigning.sign(aBlindValue)
+
+    aSignature = aBlind.unblind_signature(aBlindedSignature)
+    aNewCoin = aBlind.newCoin(aSignature, myCDD, aMK)
+
+    print 'We can make valid coins and blind/unblind and make new coins' 
+    
     
     print 'And this is the last thing I expect to work. the spending is broken.'
     walletNils.spendCoins('oierw', coinsTwo[0].currency_identifier, ['1', '1', '5'])
