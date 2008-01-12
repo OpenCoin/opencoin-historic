@@ -291,7 +291,7 @@ class BlankAndMintingKey(Handler):
         dontHave = []
         for key_id in needed:
             if key_id not in entity.minting_keys_key_id:
-                dontHave.append(b)
+                dontHave.append(key_id)
 
         return dontHave
         
@@ -794,7 +794,9 @@ class FetchMinted(Handler):
             self.manager.persistant.newCoins = successes
             self.manager.persistant.mintingFailures = failures
 
-            self.manager.success(self, message)
+            if successes:
+                self.depositCoins(self.manager.entity.coins, successes)
+                self.manager.success(self, message)
             if failures:
                 self.manager.failure(self, message)
 
@@ -834,7 +836,11 @@ class FetchMinted(Handler):
                 failures.append(bnk, sig)
 
         return successes, failures
-        
+
+    def depositCoins(self, entity_coins, coins):
+        """Adds the coins to our wallet."""
+        entity_coins.extend(coins)
+
 class UnlockCoins(Handler):
     def __init__(self, manager, firstMessage):
         self.manager = manager

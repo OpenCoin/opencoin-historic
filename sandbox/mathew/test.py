@@ -36,8 +36,6 @@ if __name__=='__main__':
 
     dsdb_key = entity.createDSDBCertificate(myCDD, now, now + 10*365*86400)
 
-    print 'we have a CCD, a slew of MintKeys and a DSDBKey!'
-
     #make the entity for the IS and DSDB
     issuerEntity = entity.IssuerDSDBEntity(myCDD, dsdb_key, mintingKeys)
 
@@ -65,11 +63,11 @@ if __name__=='__main__':
 
     walletOierw = makeWallet(coinsOne, (myCDD,), mintingKeys, universe)
     walletNils = makeWallet(coinsTwo, (myCDD,), mintingKeys, universe)
+    walletPoor = makeWallet([], (myCDD,), [], universe)
 
     universe.addMerchantWallet(walletOierw, 'oierw')
     universe.addMerchantWallet(walletNils, 'nils')
-
-    print 'gah! we have coins and wallets too!'
+    universe.addMerchantWallet(walletPoor, 'poor')
 
     # test out the entire obfuscation/unobfuscation
     aCoin = coinsOne[0]
@@ -92,12 +90,15 @@ if __name__=='__main__':
     aSignature = aBlind.unblind_signature(aBlindedSignature)
     aNewCoin = aBlind.newCoin(aSignature, myCDD, aMK)
 
-    print 'We can make valid coins and blind/unblind and make new coins' 
-    
-    
-    print 'And this is the last thing I expect to work. the spending is broken.'
     walletNils.spendCoins('oierw', coinsTwo[0].currency_identifier, ['1', '1', '5'])
 
-    print 'Wow. we spent. That means I implemented the rest of the work with entities (becuase we have to remove coins from nils, add them to me, etc...)'
+    # give a cent to the poor
+    walletOierw.spendCoins('poor', coinsOne[0].currency_identifier, ['1'])
+    
+    # and now the poor is sneaky
+    doubleCoin = walletPoor.coins[0]
+    walletPoor.spendCoins('poor', coinsOne[0].currency_identifier, ['1'])
+    walletPoor.coins.append(doubleCoin) # add the original coin and try to double spend it
+    walletPoor.spendCoins('poor', coinsOne[0].currency_identifier, ['1', '1']) # spend both coins to make sure we include it
 
     

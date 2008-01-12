@@ -144,22 +144,28 @@ class MintingKey(Handler):
                 self.__createAndOutput(MintingKeyPass)
             elif type == 'FAILURE':
                 self.manager.messageType.persistant.reason = result
-                self.__createAndOutput(MintingKeyFailure)
-                self.reason = 'Unknown key_id'
+                if result == 'Unknown key_id':
+                    self.reason = 'Unknown key_id'
 
-                self.manager.messageType.persistant.reason = self.reason
-                self.manager.messageType.removeCallback(self.handle)
-                self.__createAndOutput(MintingKeyFailure)
+                    self.manager.messageType.persistant.reason = self.reason
+
+                    self.manager.messageType.removeCallback(self.handle)
+                    self.__createAndOutput(MintingKeyFailure)
+                elif result == 'Unknown denomination':
+                    self.reason = 'Unknown denomination'
+                        
+                    self.manager.messageType.persistant.reason = self.reason
+
+                    self.manager.messageType.removeCallback(self.handle)
+                    self.__createAndOutput(MintingKeyFailure)
+                else:
+                    raise MessageError('Received impossible result: %s' % result)
             else:
-                self.reason = 'Unknown denomination'
-                    
-                self.manager.messageType.persistant.reason = self.reason
-                self.manager.messageType.removeCallback(self.handle)
-                self.__createAndOutput(MintingKeyFailure)
+                raise MessageError('Received impossible type: %s' % type)
 
         elif isinstance(message, MintingKeyPass) or isinstance(message, MintingKeyFailure):
             # we output this. Next step can only be Goodbye
-            print 'we should never get here!'
+            print 'we should never get here. Message: %s' % message.identifier
             self.manager.messageType.removeCallback(self.handle)
 
     def findKey(self, key_id, denomination):
@@ -345,6 +351,9 @@ class RedeemCoins(Handler):
             # we output this. Next step can only be Goodbye
             self.manager.messageType.removeCallback(self.handle)
 
+        else:
+            raise MessageError('Trying to handle a message we are not designed for: %s' % message.identifier)
+
     def redeem(self, transaction_id, target, coins):
         """redeem checks the validity of the coins.
         redeem first checks the validity of the coins, then checks the coins against the DSDB
@@ -453,15 +462,15 @@ class HandlerManager(object):
         self.manager = None
         
     def startConversation(self, message, result):
-        if isinstance(message, self.messages.DKR.__class__):
+        if isinstance(message, DSDBKeyRequest):
             self.setHandler(DSDBKey(self, message))
-        elif isinstance(message, self.messages.FMR.__class__):
+        elif isinstance(message, FetchMintedRequest):
             self.setHandler(FetchMinted(self, message))
-        elif isinstance(message, self.messages.MR.__class__):
+        elif isinstance(message, MintRequest):
             self.setHandler(Mint(self, message))
-        elif isinstance(message, self.messages.MKFD.__class__) or isinstance(message, self.messages.MKFK.__class__):
+        elif isinstance(message, MintingKeyFetchDenomination) or isinstance(message, MintingKeyFetchKeyID):
             self.setHandler(MintingKey(self, message))
-        elif isinstance(message, self.messages.RCR.__class__):
+        elif isinstance(message, RedeemCoinsRequest):
             self.setHandler(RedeemCoins(self, message))
         else:
             raise MessageError("Message %s does not start a conversation" % message.identifier)

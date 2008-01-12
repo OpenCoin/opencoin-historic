@@ -243,6 +243,8 @@ class Coins(Handler):
             print 'Got a CoinsRedeem. I did not know we got these.'
 
         elif isinstance(message, CoinsAccept):
+            self.removeSpentCoins(self.manager.entity.coins, self.manager.coins)
+            
             self.manager.walletMessageType.removeCallback(self.handle)
             self.manager.success(message, self)
 
@@ -256,3 +258,7 @@ class Coins(Handler):
         self._setLastState(message.identifier)
 
 
+    def removeSpentCoins(self, entity_coins, coins):
+        """Removes spent coins from our wallet."""
+        for c in coins:
+            entity_coins.remove(c)
