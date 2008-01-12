@@ -133,7 +133,7 @@ class LockCoins(Handler):
         return time.time()
 
     def unobfuscate(self, obfuscated, dsdb_key):
-        enc = dsdb_key.cipher.__class__(dsdb_key.public_key)
+        enc = dsdb_key.cipher(dsdb_key.public_key)
         enc.update(obfuscated)
         
         try:

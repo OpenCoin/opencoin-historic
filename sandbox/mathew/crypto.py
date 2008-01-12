@@ -8,6 +8,17 @@ class CryptoContainer:
         self.blinding = blinding
         self.hashing = hashing
 
+        import types
+
+        if self.signing and not isinstance(self.signing, types.ClassType):
+            raise CryptoError('Tried to add something to the container that was not a class!')
+        if self.hashing and not isinstance(self.hashing, types.ClassType):
+            raise CryptoError('Tried to add something to the container that was not a class!')
+        if self.encryption and not isinstance(self.encryption, types.ClassType):
+            raise CryptoError('Tried to add something to the container that was not a class!')
+        if self.blinding and not isinstance(self.blinding, types.ClassType):
+            raise CryptoError('Tried to add something to the container that was not a class!')
+
     def __str__(self):
         include = []
         if self.signing:

@@ -78,7 +78,7 @@ class IssuerDSDBEntity(Entity):
                 successes = []
                 
                 for key_identifier, blind in value:
-                    signing = self.cdd.issuer_cipher_suite.signing.__class__(self.minting_keys_key_id[key_identifier].public_key)
+                    signing = self.cdd.issuer_cipher_suite.signing(self.minting_keys_key_id[key_identifier].public_key)
                     try:
                         signature = signing.sign(blind)
                     except CryptoError:
@@ -258,9 +258,9 @@ def createCDD():
 
     denominations = ['1', '5', '25', '100', '500', '2500', '10000']
 
-    hashing = crypto.SHA256HashingAlgorithm()
-    signing = crypto.RSASigningAlgorithm(key)
-    blinding = crypto.RSABlindingAlgorithm(key)
+    hashing = crypto.SHA256HashingAlgorithm
+    signing = crypto.RSASigningAlgorithm
+    blinding = crypto.RSABlindingAlgorithm
 
     cipher_suite = crypto.CryptoContainer(signing=signing, blinding=blinding, hashing=hashing)
 
@@ -282,14 +282,14 @@ def createMK(denomination, cdd, not_before, mint_not_after, coin_not_after):
     if mint_not_after <= not_before or mint_not_after > coin_not_after:
         raise MessageError('those variables do not make sense')
 
-    hashing = cdd.issuer_cipher_suite.hashing.__class__()
-    hashing.reset()
+    hashing = cdd.issuer_cipher_suite.hashing()
     hashing.update(key.__str__())
 
     minting_key = containers.MintKey(hashing.digest(), cdd.currency_identifier, denomination, not_before,
                                         mint_not_after, coin_not_after, key)
 
     signing = cdd.issuer_cipher_suite.signing
+    hashing = cdd.issuer_cipher_suite.hashing
 
     minting_key.setSignature(cdd.issuer_public_master_key, signing, hashing)
     
@@ -306,13 +306,15 @@ def createDSDBCertificate(cdd, not_before, not_after):
     if not_before > not_after:
         raise MessageError('that does not make sense')
 
-    hashing = cdd.issuer_cipher_suite.hashing.__class__(str(key))
-    signing = cdd.issuer_cipher_suite.signing
+    hashing = cdd.issuer_cipher_suite.hashing(str(key))
 
-    encrypting = crypto.RSAEncryptionAlgorithm(key)
+    encrypting = crypto.RSAEncryptionAlgorithm
 
     cert = containers.DSDBKey(hashing.digest(), not_before, not_after, encrypting, key)
 
+    signing = cdd.issuer_cipher_suite.signing
+    hashing = cdd.issuer_cipher_suite.hashing
+    
     cert.addAdSignature(cdd.issuer_public_master_key, signing, hashing)
     
     if not cert.verify_with_CDD(cdd):
@@ -330,8 +332,8 @@ def makeCoin(cdd, mintingKey):
     blank = containers.CurrencyBlank(cdd.standard_version, cdd.currency_identifier, mintingKey.denomination, mintingKey.key_identifier)
     blank.generateSerial()
 
-    hashing = cdd.issuer_cipher_suite.hashing.__class__()
-    signing = cdd.issuer_cipher_suite.signing.__class__(mintingKey.public_key)
+    hashing = cdd.issuer_cipher_suite.hashing()
+    signing = cdd.issuer_cipher_suite.signing(mintingKey.public_key)
 
     hashing.update(blank.content_part())
     signature = signing.sign(hashing.digest())

@@ -14,15 +14,15 @@ class ContainerWithBase(Container):
         Container.__init__(self)
 
     def _verifyASignature(self, signature_algorithm, hashing_algorithm, signature, key, content_part):
-        hasher = hashing_algorithm.__class__(content_part)
-        signer = signature_algorithm.__class__(key, hasher.digest())
+        hasher = hashing_algorithm(content_part)
+        signer = signature_algorithm(key, hasher.digest())
         return signer.verify(signature.signature)
     
     def _performSigning(self, key, signing_algorithm, hashing_algorithm):
         """sign the container using the key, signing algorithm and hashing algorithm."""
         contentpart = self.content_part()
-        signer = signing_algorithm.__class__(key)
-        hasher = hashing_algorithm.__class__()
+        signer = signing_algorithm(key)
+        hasher = hashing_algorithm()
         hasher.update(contentpart)
         signature = signer.sign(hasher.digest())
         hasher.reset()
@@ -129,7 +129,7 @@ class MintKey(ContainerWithSignature):
         if self.currency_identifier != cdd.currency_identifier:
             return False # we have to be using the same currency identifier
 
-        if self.key_identifier != cdd.issuer_cipher_suite.hashing.__class__(str(self.public_key)).digest():
+        if self.key_identifier != cdd.issuer_cipher_suite.hashing(str(self.public_key)).digest():
             return False # the key identifier is not valid
 
         if self.signature:
@@ -237,9 +237,8 @@ class CurrencyBlank(CurrencyBase):
         if self.blind_factor:
             raise MessageError('CurrenyBlank already has a blind factor')
 
-        self.blinding = cdds[self.currency_identifier].issuer_cipher_suite.blinding.__class__(minting_keys_key_id[self.key_identifier].public_key)
-        hashing = cdds[self.currency_identifier].issuer_cipher_suite.hashing
-        hashing.reset()
+        self.blinding = cdds[self.currency_identifier].issuer_cipher_suite.blinding(minting_keys_key_id[self.key_identifier].public_key)
+        hashing = cdds[self.currency_identifier].issuer_cipher_suite.hashing()
 
         hashing.update(self.content_part())
         self.blinding.update(hashing.digest())
@@ -279,10 +278,9 @@ class CurrencyCoin(CurrencyBase):
             return False
 
         key = minting_key.public_key
-        signer = currency_description_document.issuer_cipher_suite.signing.__class__(key)
-        hasher = currency_description_document.issuer_cipher_suite.hashing
+        signer = currency_description_document.issuer_cipher_suite.signing(key)
+        hasher = currency_description_document.issuer_cipher_suite.hashing()
 
-        hasher.reset()
         hasher.update(self.content_part())
         signer.update(hasher.digest())
         
@@ -321,13 +319,13 @@ class CurrencyCoin(CurrencyBase):
 
     def check_obfuscated_blank_serial(self, blank, dsdb_certificate):
         """Attempts to ensure the the blank and the dsdb_key have the same serial. This may require additional information if we use something like ElGamal."""
-        enc = dsdb_certificate.cipher.__class__(dsdb_certificate.public_key, self.serial)
+        enc = dsdb_certificate.cipher(dsdb_certificate.public_key, self.serial)
         obfuscated_serial = enc.encrypt()
         return obfuscated_serial == blank.serial
 
     def newObfuscatedBlank(self, dsdb_certificate):
         """Returns an CurrencyObfuscatedBlank for a certian DSDB."""
-        enc = dsdb_certificate.cipher.__class__(dsdb_certificate.public_key)
+        enc = dsdb_certificate.cipher(dsdb_certificate.public_key)
         enc.update(self.serial)
         obfuscatedserial = enc.encrypt()
         return CurrencyObfuscatedBlank(self.standard_identifier, self.currency_identifier, self.denomination,

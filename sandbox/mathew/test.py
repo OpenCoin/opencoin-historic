@@ -84,7 +84,7 @@ if __name__=='__main__':
     aBlind.blind_blank({myCDD.currency_identifier: myCDD}, {aMK.key_identifier: aMK})
     aBlindValue = aBlind.blind_value
 
-    aSigning = myCDD.issuer_cipher_suite.signing.__class__(aMK.public_key)
+    aSigning = myCDD.issuer_cipher_suite.signing(aMK.public_key)
     aBlindedSignature = aSigning.sign(aBlindValue)
 
     aSignature = aBlind.unblind_signature(aBlindedSignature)
