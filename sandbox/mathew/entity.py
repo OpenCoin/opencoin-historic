@@ -6,7 +6,7 @@ class Entity:
     pass
 
 class IssuerDSDBEntity(Entity):
-    def __init__(self, cdd, dsdb_key, mk=None, dsdb_database={}, minted={}, dsdb_cert_length=None,
+    def __init__(self, cdd, dsdb_key, mk=None, dsdb_database={}, dsdb_requests = {}, minted={}, dsdb_cert_length=None,
                  mk_before_length=None, mk_coin_not_after_length=None, mk_mint_not_after_length=None, mint_waiting={},
                  mint_failures={}, mint_before_redeem=True):
         self.cdd = cdd # the cdd
@@ -14,6 +14,7 @@ class IssuerDSDBEntity(Entity):
         self.dsdb_key = dsdb_key # the dsdb_certificate
         self.dsdb_database = dsdb_database # the doublespending database, a dictionary by mint_key of
                                            #            (dictionaries by serial of (tuple of ('Spent',),  ('Locked', time_expire, _id))))
+        self.dsdb_requests = dsdb_requests # a dictionary of dsdb locks by request_id as a tuple of (time_expire, (serial, serial, ..., serial))
         self.minted = minted # dictionary the coins we have minted which haven't been sent by id
         self.mint_waiting = mint_waiting # a dictionary of a reason why it isn't fetchable and either the minted or unminted blanks
         self.mint_failures = mint_failures # a dictionary of a reason why the request failed
@@ -98,7 +99,6 @@ class IssuerDSDBEntity(Entity):
 
             elif reason == 'Request not credited':
                 raise NotImplementedError
-
 
                 
 

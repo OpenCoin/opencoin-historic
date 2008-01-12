@@ -37,7 +37,8 @@ class LockCoins(Handler):
                 self.blanks = self.manager.messageType.persistant.blanks # blanks is a tuple of mint_key_id and obfuscated serial
 
                 self.type, self.result = self.lock(self.key_id, self.transaction_id, self.blanks, self.manager.dsdb_key,
-                                                   self.manager.entity.dsdb_database, self.manager.entity.minting_keys_key_id, self.timeNow())
+                                                   self.manager.entity.dsdb_database, self.manager.entity.dsdb_requests,
+                                                   self.manager.entity.minting_keys_key_id, self.timeNow())
                
                 if self.type == 'ACCEPT':
                     transaction_id, self.dsdb_lock = self.result
@@ -61,12 +62,19 @@ class LockCoins(Handler):
             # we output this. Next step can only be Goodbye
             self.manager.messageType.removeCallback(self.handle)
 
-    def lock(self, dsdb_key_id, transaction_id, blanks, dsdb_key, dsdb_database, minting_keys_key_id, now):
+    def lock(self, dsdb_key_id, transaction_id, blanks, dsdb_key, dsdb_database, dsdb_requests, minting_keys_key_id, now):
         failure = False
         failures = []
 
         blanksAndSerials = []
 
+        # FIXME: This code does not work well with threading. To fix, change testBlank to something closer to unblind with
+        #        possible errors for being unable to blind or a bad minting key. Then do the call to lockBlanks which then
+        #        tries one by one to lock the serials in the database. If it gets any failures, it unwinds the locks it has
+        #        done and gives the errors it came across.
+        #
+        #        Actually, FIXME: Does the protocol allow us to just stop if we have bad keys in minting keys or are we supposed
+        #                         just keep going coming up with all the errors we can find?
         if len(blanks) == 0:
             raise MessageError('request %s has no blinds' % request_id)
 
@@ -74,7 +82,7 @@ class LockCoins(Handler):
             return 'REJECT', 'Key ID of DSDB is unknown or expired'
         
         for b in blanks:
-            type, result = self.testBlank(b, dsdb_key_id, dsdb_key, dsdb_database, minting_keys_key_id, now)
+            type, result = self.testBlank(b, dsdb_key_id, dsdb_key, dsdb_database, dsdb_requests, minting_keys_key_id, now)
             if type == 'ACCEPT':
                 blanksAndSerials.append((b, result)) # Add the tuple of the blank and the serial
             elif type == 'REJECT':
@@ -86,11 +94,11 @@ class LockCoins(Handler):
         if failure:
             return 'REJECT', failures
 
-        dsdb_lock_time = self.lockBlanks(transaction_id, blanksAndSerials, dsdb_key, dsdb_database, now)
+        dsdb_lock_time = self.lockBlanks(transaction_id, blanksAndSerials, dsdb_key, dsdb_database, dsdb_requests, now)
 
         return 'ACCEPT', (transaction_id, dsdb_lock_time)
 
-    def testBlank(self, blank, dsdb_key_id, dsdb_key, dsdb_database, minting_keys_key_id, now):
+    def testBlank(self, blank, dsdb_key_id, dsdb_key, dsdb_database, dsdb_requests, minting_keys_key_id, now):
         mint_key_id, obfuscated = blank
 
         serial = self.unobfuscate(obfuscated, dsdb_key)
@@ -111,7 +119,10 @@ class LockCoins(Handler):
                         return 'REJECT', 'Serial locked (not spent)'
                     else:
                         # the serial is no longer locked. unlock it
-                        del dsdb_database[mint_key_id][serial]
+                        time_transaction_lock_expires, keysAndSerials = dsdb_requests[transaction_id]
+                        for key, ser in keysAndSerials:
+                            del dsdb_database[key][ser]
+                        del dsdb_requests[trasaction_id]
                         return 'ACCEPT', serial
                 else:
                     raise MessageError('Got an impossible state: %s' % result[0])
@@ -143,11 +154,13 @@ class LockCoins(Handler):
 
         return serial
 
-    def lockBlanks(self, transaction_id, blanksAndSerials, dsdb_key, dsdb_database, now):
+    def lockBlanks(self, transaction_id, blanksAndSerials, dsdb_key, dsdb_database, dsdb_requests, now):
         """locks the serials in the dsdb_database and returns the dsdb_lock_time."""
         dsdb_lock_time = now + 5 * 60 # 5 minute lock #FIXME: should be setable somewhere.
 
         #FIXME this is ugly. It doesn't delete transactions as they expire
+
+        mintKeysAndSerials = [] # The list for the transaction_id level 
 
         for bas in blanksAndSerials:
             blank, serial = bas
@@ -157,6 +170,10 @@ class LockCoins(Handler):
 
             # FIXME: This assumes only one transaction at a time is going on twith the dsdb. If two concurrent transactions happen, this will not catch them
             dsdb_database[mint_key][serial] = ('Locked', dsdb_lock_time, transaction_id)
+
+            mintKeysAndSerials.append( (mint_key, serial) )
+
+        dsdb_requests[transaction_id] = (dsdb_lock_time, tuple(mintKeysAndSerials))
 
         return dsdb_lock_time
         
@@ -201,7 +218,7 @@ class UnlockCoins(Handler):
             self.manager.messageType.removeCallback(self.handle)
 
     def unlock(self, transaction_id):
-        # raise NotImplementedError
+        raise NotImplementedError
         if transaction_id < 100:
             return 'REJECT', 'Unknown transaction_id'
         if transaction_id < 10000:

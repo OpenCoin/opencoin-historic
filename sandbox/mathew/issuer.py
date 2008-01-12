@@ -333,7 +333,9 @@ class RedeemCoins(Handler):
                 self.target = self.manager.messageType.persistant.target
                 self.coins = self.manager.messageType.persistant.coins
 
-                type, result = self.redeem(self.transaction_id, self.target, self.coins)
+                type, result = self.redeem(self.transaction_id, self.target, self.coins, self.manager.entity.cdd,
+                                           self.manager.entity.minting_keys_key_id, self.manager.entity.dsdb_database,
+                                           self.manager.entity.dsdb_requests)
 
                 if type == 'ACCEPT':
                     self.manager.messageType.removeCallback(self.handle)
@@ -354,10 +356,10 @@ class RedeemCoins(Handler):
         else:
             raise MessageError('Trying to handle a message we are not designed for: %s' % message.identifier)
 
-    def redeem(self, transaction_id, target, coins):
+    def redeem(self, transaction_id, target, coins, currency_description_document, minting_keys_key_id, dsdb_database, dsdb_requests):
         """redeem checks the validity of the coins.
-        redeem first checks the validity of the coins, then checks the coins against the DSDB
-        then verifies the target.
+        redeem first checks the validity of the coins. It then verifies the target.
+        Finally, it tries to redeem all the coins at once. This action first verifies then updates the DSDB.
         """
         failure = False
         failures = []
@@ -366,7 +368,7 @@ class RedeemCoins(Handler):
             raise MessageError('transaction %s has no coins' % transaction_id)
 
         for c in coins:
-            type, result = self.testCoin(c, transaction_id)
+            type, result = self.testCoin(c, transaction_id, currency_description_document, minting_keys_key_id)
             if type == 'ACCEPT':
                 pass
             elif type == 'REJECT':
@@ -381,37 +383,79 @@ class RedeemCoins(Handler):
         if not self.checkValidTarget(target):
             return 'REJECT', 'Unknown target'
         
-        self.redeemCoins(transaction_id, target, coins)
+        type, result = self.redeemCoins(transaction_id, target, coins, dsdb_database, dsdb_requests)
+        if type == 'ACCEPT':
+            return 'ACCEPT', None
+        elif type == 'REJECT':
+            return 'REJECT', result
+        else:
+            raise MessageError('Received impossible type: %s' % type)
 
-        return 'ACCEPT', None
-
-    def testCoin(self, coin, transaction_id):
-        if not self.validKeyID(coin):
+    def testCoin(self, coin, transaction_id, currency_description_document, minting_keys_key_id):
+        if not self.validKeyID(coin, minting_keys_key_id):
             return 'REJECT', 'Unknown key_id'
-        if not self.validCoin(coin):
+
+        minting_key = minting_keys_key_id[coin.key_identifier]
+        if not self.validCoin(coin, currency_description_document, minting_key):
             return 'REJECT', 'Invalid coin'
         
-        dsdb = self.checkDSDB(coin, transaction_id)
-        if dsdb == 'EXPIRED':
-            return 'REJECT', 'Coin expired'
-        if dsdb == 'REDEEMED':
-            return 'REJECT', 'Coin already redeemed'
+        else:
+            return 'ACCEPT', None
+
+    def validKeyID(self, coin, minting_keys_key_id):
+        """Returns whether the coin has a valid key_identifier."""
+        # FIXME: does this mean that the key_identifier still has to be valid?
+        return minting_keys_key_id.has_key(coin.key_identifier)
+
+    def validCoin(self, coin, currency_description_document, minting_key):
+        """Returns whether the coin is a valid coin with signature."""
+        return coin.validate_with_CDD_and_MintingKey(currency_description_document, minting_key)
+
+    def checkValidTarget(self, target):
+        #FIXME This needs to be really implemented.
+        return True
+
+    def redeemCoins(self, transaction_id, target, coins, dsdb_database, dsdb_requests):
+        """Redeem coins updates the DSDB locking out the coins and credits the target."""
+        if not dsdb_requests.has_key(transaction_id):
+            return 'REJECT', 'Unknown transaction_id' #FIXME: This error isn't in the standard
+
+        dsdb_lock_time, keysAndSerials = dsdb_requests[transaction_id]
+
+        #FIXME: There is probably a timing attack against the dsdb here where one redeems the locked coins twice
         
+        coinKeysAndSerials = []
+        for c in coins:
+            coinKeysAndSerials.append( (c.key_identifier, c.serial) )
+
+        if len(coinKeysAndSerials) != len(coinKeysAndSerials):
+            return 'REJECT', 'Unknown transaction_id' #FIXME: This error isn't in the standard
+
+        # Check the coin keys and serials against the dsdb locked ones
+        for kAndS in keysAndSerials:
+            if kAndS not in coinKeysAndSerials:
+                return 'REJECT', 'Unknown transaction_id' # FIXME: This error isn't in the standard
+            coinKeysAndSerials.remove(kAndS) # Remove the serial from the list. This prevents trying to use the same coin twice in one redeem
+
+        # change the status of all the serials to locked
+        for key, serial in keysAndSerials:
+            dsdb_database[key][serial] = ('Spent',)
+
+        # Remove the transaction_id from the dsdb_requests
+        del dsdb_requests[transaction_id]
+
+        worth = self.figureWorth(coins)
+
+        self.creditTarget(target, worth)
+
         return 'ACCEPT', None
 
-    def validKeyID(self, coin):
-        return True
+    def figureWorth(self, coins):
+        #FIXME: implement me!
+        return None
 
-    def validCoin(self, coin):
-        return True
-
-    def checkDSDB(self, coin, transaction_id):
-        return 'NOT SPENT'
-    
-    def checkValidTarget(self, target):
-        return True
-
-    def redeemCoins(self, transaction_id, target, coins):
+    def creditTarget(self, target, worth):
+        #FIXME: Implement me!
         pass
 
     def __createAndOutput(self, message):

@@ -10,12 +10,8 @@ from message import CoinsAccept
 
 from message import MessageType
 from message import MessageStatuses
-#from message import MessageHandler
-#from message import statusHandleServer
 from message import MessageError
 from message import Hello as MessageHello
-
-#import crypto stuff
 
 class ConsumerWalletManager(object):
     def __init__(self, walletMessageType, entity, coins):
@@ -25,8 +21,6 @@ class ConsumerWalletManager(object):
         #self.isMessageType = isMessageType
         if not self.walletMessageType.globals.status.can(MessageStatuses.PrivilegeClient):
             raise MessageError('given messageType does not have PrivilegeClient')
-        #if not self.isMessageType.globals.status.can(MessageStatuses.PrivilegeClient):
-        #    raise MessageError('given messageType does not have PrivilegeClient')
         
 
         class messages: pass
@@ -43,10 +37,6 @@ class ConsumerWalletManager(object):
         self.walletMessages.BA = BlankAccept(self.resumeConversation)
         self.walletMessages.CR = CoinsReject(self.resumeConversation)
         self.walletMessages.CA = CoinsAccept(self.resumeConversation)
-
-        ## Add handlers for all the messages, using isMessages if continues conversation
-        #self.isMessageType.addMessageHandler(DSDBKeyRequest())
-        #self.isMessageType.addMessageHandler(self.isMessages.DKP)
 
         # Add handlers for all the messages using walletMessages if continues conversation
         self.walletMessageType.addMessageHandler(BlankPresent())
@@ -119,7 +109,7 @@ class Handler(object):
         self._createAndOutput(message, self.manager.walletMessageType)
         
     def _setLastState(self, state):
-        print 'setting last state: %s' % state
+        # print 'setting last state: %s' % state
         self.manager.lastMessageIdentifier = state
 
     def _verifyLastState(self, state):
@@ -154,7 +144,7 @@ class DSDBKey(Handler):
             self.manager.persistant.dsdb_certificate = self.dsdb_certificate # keep a copy for me
             self.manager.walletMessageType.persistant.dsdb_certificate = self.dsdb_certificate # and we need to encode it
             
-            if not self.validCertificate(self.dsdb_certificate, self.manager.cdd, self.getTime()):
+            if not self.validCertificate(self.dsdb_certificate, self.manager.cdd, self.timeNow()):
                 raise MessageError('Invalid DSDB Certificate')
             
             self.createBlinds(self.dsdb_certificate, self.manager.coins)
@@ -172,9 +162,8 @@ class DSDBKey(Handler):
 
         return dsdb_certificate.verify_time(time)
 
-    def getTime(self):
+    def timeNow(self):
         import time
-
         return time.time()
 
     def createBlinds(self, dsdb_certificate, coins):
@@ -197,7 +186,8 @@ class Blank(Handler):
         self.manager.walletMessageType.addCallback(self.handle)
 
     def handle(self, message):
-        if not isinstance(message, BlankPresent) and not isinstance(message, BlankAccept) and not isinstance(message, BlankReject) and not isinstance(message, BlankFailure):
+        if not isinstance(message, BlankPresent) and not isinstance(message, BlankAccept) and not isinstance(message, BlankReject) \
+                                                                                            and not isinstance(message, BlankFailure):
             if self.manager.walletMessageType.globals.lastState == MessageHello: # we are now on a different message. Oops.
                 raise MessageError('Blank should have already been removed. It was not. Very odd. Message: %s LastMessage: %s' % (message.identifier,
                                                                                                                 self.manager.walletMessageType.globals.lastState))

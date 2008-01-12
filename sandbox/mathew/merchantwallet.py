@@ -45,11 +45,6 @@ class MerchantWalletManager(object):
         #self.dsdbMessageType = dsdbMessageType
         if not self.walletMessageType.globals.status.can(MessageStatuses.PrivilegeServer):
             raise MessageError('given messageType does not have PrivilegeServer')
-        #if not self.isMessageType.globals.status.can(MessageStatuses.PrivilegeClient):
-        #    raise MessageError('given messageType does not have PrivilegeClient')
-        #if not self.dsdbMessageType.globals.status.can(MessageStatuses.PrivilegeClient):
-        #    raise MessageError('given message Type does not have PrivilegeClient')
-        
 
         class messages: pass
         self.walletMessages = messages()
@@ -107,7 +102,8 @@ class MerchantWalletManager(object):
         self.lastMessageIdentifier = None
 
 
-    # an explaination of how this class treats the exchange. We first wait for a BlankPresent from the wallet. We look at the issuer and let the client decide if he wants to accept.
+    # an explaination of how this class treats the exchange. We first wait for a BlankPresent from the wallet. We look at the issuer and 
+    # let the client decide if he wants to accept.
     # if he does, we make matching blanks and depending on the issuer, MintRequest now (may do after RedeemCoins.
     # we verify the blanks against the DSDB and then BlankAccept. We get the CoinsRedeem, test them, then CoinsAccept.
     # now we RedeemCoinsRequest, and potentially MintRequest at this point. Finally, we FetchMintedRequest to get the new coins. Done. Whew!
@@ -369,8 +365,11 @@ class BlankAndMintingKey(Handler):
                 raise MessageError('Received an impossible type: %s' % type)
 
     def makeBlanks(self, blanks, cdds, mintingKeys):
-        """I have no idea why we take the inputs we do. It looks like it makes new CurrencyBlanks. Why do we input the blanks? it makes no sense. We do need the cdd though, I think."""
-        # Okay. This is how this function is going to work. It goes through and sees if the values of coins is the same as the blanks. If it is... Fuck. That doesn't work. Okay... just making copies of coins for now.
+        """I have no idea why we take the inputs we do. It looks like it makes new CurrencyBlanks. Why do we input the blanks? 
+        it makes no sense. We do need the cdd though, I think.
+        """
+        # Okay. This is how this function is going to work. It goes through and sees if the values of coins is the same as the
+        # blanks. If it is... Fuck. That doesn't work. Okay... just making copies of coins for now.
 
         newBlanks = []
 
@@ -547,9 +546,8 @@ class Coins(Handler):
         elif isinstance(message, CoinsReject):
             # We are done. We should be nice though and Unlock the coins
             if self.validDSDBLock(self.manager.dsdbMessageType.persistant.dsdb_lock, self.timeNow()):
-                # XXX What is the line below even trying to do? - oierw
-                # self.manager.dsdbMessageType.persistant.transaction_id = self.dsdb_lock
 
+                # FIXME: The else below removes two callbacks. Which one of them is wrong?
                 self.manager.walletMessageType.removeCallback(self.handle)
                 self._createAndOutputDSDB(UnlockCoinsRequest)
             else: # the DSDB lock has already expired.
@@ -593,7 +591,7 @@ class Coins(Handler):
         dsdb_lock is really just a time, so we test if we are before the time or not.
         """
 
-        return now< dsdb_lock
+        return now < dsdb_lock
 
     def newRequestID(self):
         import crypto

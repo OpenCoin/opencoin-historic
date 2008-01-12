@@ -1,5 +1,6 @@
 import types
 from Crypto.Util import number
+import base64
 
 class CryptoContainer:
     def __init__(self, signing=None, encryption=None, blinding=None, hashing=None):
@@ -178,8 +179,6 @@ class RSAKeyPair(KeyPair):
 
     def __str__(self):
         """The string representation of the key. Always the public key."""
-        import base64
-        from Crypto.Util import number
         values = [base64.b64encode(number.long_to_bytes(self.key.n)), base64.b64encode(number.long_to_bytes(self.key.e))]
         return ','.join(values)
 
@@ -218,14 +217,12 @@ class RSAEncryptionAlgorithm(EncryptionAlgorithm):
         return self
 
     def encrypt(self):
-        from Crypto.Util import number
         try:
             return self.key.public().encrypt(self.input, '')[0]
         except PyCryptoRSAError:
             raise CryptoError
     
     def decrypt(self):
-        from Crypto.Util import number
         try:
             return self.key.private().decrypt(self.input)
         except PyCryptoRSAError:
@@ -298,7 +295,6 @@ class RSASigningAlgorithm(SigningAlgorithm):
             key = self.key.private()
             result = key.sign(message, '')[0]
             if isinstance(message, types.StringType):
-                from Crypto.Util import number
                 return number.long_to_bytes(result)
             return result
         except PyCryptoRSAError, reason:
@@ -307,7 +303,6 @@ class RSASigningAlgorithm(SigningAlgorithm):
 
     def verify(self, signature):
         """returns if the signature of the input is valid."""
-        from Crypto.Util import number
         try:
             return self.key.public().verify(self.input, (number.bytes_to_long(signature),))
         except PyCryptoRSAError:
@@ -349,7 +344,6 @@ class Random:
         """Returns a N-bit length random string."""
         r = self.getRandomNumber(N)
 
-        from Crypto.Util import number
 
         return number.long_to_bytes(r)
     
@@ -361,9 +355,7 @@ class Random:
         self.RandomPool.add_event('')
         self.RandomPool.stir()
 
-        from Crypto.Util.number import getRandomNumber
-
-        random = getRandomNumber(N, self.RandomPool.get_bytes)
+        random = number.getRandomNumber(N, self.RandomPool.get_bytes)
 
         self.RandomPool.stir()
 
@@ -377,9 +369,7 @@ class Random:
         self.RandomPool.add_event('')
         self.RandomPool.stir()
 
-        from Crypto.Util.number import getPrime
-
-        prime = getPrime(N, self.RandomPool.get_bytes)
+        prime = number.getPrime(N, self.RandomPool.get_bytes)
 
         self.RandomPool.stir()
         
