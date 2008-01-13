@@ -589,7 +589,8 @@ class Coins(Handler):
 
             #figure out what request ID we will be using
             self.manager.persistant.mintRequestID = self.newRequestID()
-            self.manager.persistant.target = self.newTarget()
+            self.manager.persistant.target = self.manager.persistant.mintRequestID # the target and the mint request should be the same methinks
+            #self.manager.persistant.target = self.newTarget()
 
             if self.isRequiresMRbeforeRCR:
                 self.manager.isMessageType.persistant.request_id = self.manager.persistant.mintRequestID

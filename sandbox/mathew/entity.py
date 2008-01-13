@@ -8,14 +8,14 @@ class Entity:
 class IssuerDSDBEntity(Entity):
     def __init__(self, cdd, dsdb_key, mk=None, dsdb_database={}, dsdb_requests = {}, minted={}, dsdb_cert_length=None,
                  mk_before_length=None, mk_coin_not_after_length=None, mk_mint_not_after_length=None, mint_waiting={},
-                 mint_failures={}, mint_before_redeem=True):
+                 mint_failures={}, mint_before_redeem=True, credited_transactions = {}):
         self.cdd = cdd # the cdd
         #self.mk = mk # a list of all active minting keys
         self.dsdb_key = dsdb_key # the dsdb_certificate
         self.dsdb_database = dsdb_database # the doublespending database, a dictionary by mint_key of
                                            #            (dictionaries by serial of (tuple of ('Spent',),  ('Locked', time_expire, _id))))
         self.dsdb_requests = dsdb_requests # a dictionary of dsdb locks by request_id as a tuple of (time_expire, (serial, serial, ..., serial))
-        self.minted = minted # dictionary the coins we have minted which haven't been sent by id
+        self.minted = minted # dictionary the (worth, (coins we have minted which haven't been sent) by id
         self.mint_waiting = mint_waiting # a dictionary of a reason why it isn't fetchable and either the minted or unminted blanks
         self.mint_failures = mint_failures # a dictionary of a reason why the request failed
         self.dsdb_cert_length = dsdb_cert_length #XXX The time the dsdb cert is good for
@@ -25,6 +25,7 @@ class IssuerDSDBEntity(Entity):
         self.minting_keys_key_id = {} # dictionary of minting keys by key_identifier
         self.minting_keys_denomination = {} # dictionary by by denomination of (list of valid minting keys)
         self.mint_before_redeem = mint_before_redeem # a boolean of if we require minting before redeeming or vice versa (if false)
+        self.credited_transactions = credited_transactions # a dictionary by transaction_id of the amount credited
 
         self.addMintingKeys(mk)
 
@@ -78,8 +79,11 @@ class IssuerDSDBEntity(Entity):
                 failure_condition = ''
                 successes = []
                 
+                worth = 0
+                
                 for key_identifier, blind in value:
-                    signing = self.cdd.issuer_cipher_suite.signing(self.minting_keys_key_id[key_identifier].public_key)
+                    minting_key = self.minting_keys_key_id[key_identifier]
+                    signing = self.cdd.issuer_cipher_suite.signing(minting_key.public_key)
                     try:
                         signature = signing.sign(blind)
                     except CryptoError:
@@ -87,12 +91,14 @@ class IssuerDSDBEntity(Entity):
                         failure_condition = 'Unable to blind'
                         break
 
+                    worth += float(minting_key.denomination)
+
                     successes.append(signature)
 
                 if failure:
                     self.mint_failures[request_id] = failure_condition
                 else:
-                    self.minted[request_id] = successes
+                    self.minted[request_id] = (worth, successes)
 
                 # FIXME: This is where we would test for if we should keep it in mint_waiting for future redemption, or whatnot.
                 del self.mint_waiting[request_id]

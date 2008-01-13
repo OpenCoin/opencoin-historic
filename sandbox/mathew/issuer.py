@@ -51,7 +51,7 @@ class FetchMinted(Handler):
             # FIXME: Hack to ensure we try to mint things. Run the minting right now, if we have it
             self.manager.entity.attemptToMint() # this tries to mint everything waiting
             
-            type, result = self.findRequest(self.request_id)
+            type, result = self.findRequest(self.request_id, self.manager.entity.credited_transactions)
 
             if type == 'ACCEPT':
                 self.signatures = result
@@ -83,11 +83,18 @@ class FetchMinted(Handler):
             # we output this. Next step can only be Goodbye
             self.manager.messageType.removeCallback(self.handle)
 
-    def findRequest(self, request_id):
+    def findRequest(self, request_id, minting_keys_key_id):
         if self.manager.entity.minted.has_key(request_id):
-            result = 'ACCEPT', self.manager.entity.minted[request_id]
-            del self.manager.entity.minted[request_id]
-            return result
+            #FIXME: hack for half thought out work
+            if self.manager.entity.credited_transactions.has_key(request_id):
+                worth, blinds = self.manager.entity.minted[request_id]
+                if worth == self.manager.entity.credited_transactions[request_id]:
+                    result = 'ACCEPT', blinds
+                    del self.manager.entity.minted[request_id]
+                    del self.manager.entity.credited_transactions[request_id]
+                    return result
+                else:
+                    return 'FAILURE', 'Request credited for different amount' #FIXME: This message is not in the standard
 
         if self.manager.entity.mint_waiting.has_key(request_id):
             reason, currency = self.manager.entity.mint_waiting[request_id]
@@ -103,6 +110,7 @@ class FetchMinted(Handler):
         if self.manager.entity.mint_failures.has_key(request_id):
             return 'FAILURE', self.manager.entity.mint_failures[request_id]
 
+        return 'FAILURE', 'We did not catch it any other way. Odd'
 
     def __createAndOutput(self, message):
         m = message()
@@ -335,7 +343,7 @@ class RedeemCoins(Handler):
 
                 type, result = self.redeem(self.transaction_id, self.target, self.coins, self.manager.entity.cdd,
                                            self.manager.entity.minting_keys_key_id, self.manager.entity.dsdb_database,
-                                           self.manager.entity.dsdb_requests)
+                                           self.manager.entity.dsdb_requests, self.manager.entity.credited_transactions)
 
                 if type == 'ACCEPT':
                     self.manager.messageType.removeCallback(self.handle)
@@ -356,7 +364,8 @@ class RedeemCoins(Handler):
         else:
             raise MessageError('Trying to handle a message we are not designed for: %s' % message.identifier)
 
-    def redeem(self, transaction_id, target, coins, currency_description_document, minting_keys_key_id, dsdb_database, dsdb_requests):
+    def redeem(self, transaction_id, target, coins, currency_description_document, minting_keys_key_id, dsdb_database, dsdb_requests,
+                                                                                                        credited_transactions):
         """redeem checks the validity of the coins.
         redeem first checks the validity of the coins. It then verifies the target.
         Finally, it tries to redeem all the coins at once. This action first verifies then updates the DSDB.
@@ -383,10 +392,10 @@ class RedeemCoins(Handler):
         if failure:
             return 'REJECT', failures
 
-        if not self.checkValidTarget(target):
+        if not self.checkValidTarget(target, credited_transactions):
             return 'REJECT', 'Unknown target'
         
-        type, result = self.redeemCoins(transaction_id, target, coins, dsdb_database, dsdb_requests)
+        type, result = self.redeemCoins(transaction_id, target, coins, dsdb_database, dsdb_requests, credited_transactions)
         if type == 'ACCEPT':
             return 'ACCEPT', None
         elif type == 'REJECT':
@@ -414,11 +423,13 @@ class RedeemCoins(Handler):
         """Returns whether the coin is a valid coin with signature."""
         return coin.validate_with_CDD_and_MintingKey(currency_description_document, minting_key)
 
-    def checkValidTarget(self, target):
+    def checkValidTarget(self, target, credited_transactions):
         #FIXME This needs to be really implemented.
-        return True
+        
+        # hack implementation just verifies we don't already have a credited transaction of that type sitting around
+        return not credited_transactions.has_key(target)
 
-    def redeemCoins(self, transaction_id, target, coins, dsdb_database, dsdb_requests):
+    def redeemCoins(self, transaction_id, target, coins, dsdb_database, dsdb_requests, credited_transactions):
         """Redeem coins updates the DSDB locking out the coins and credits the target."""
         if not dsdb_requests.has_key(transaction_id):
             return 'REJECT', 'Unknown transaction_id' #FIXME: This error isn't in the standard
@@ -449,7 +460,7 @@ class RedeemCoins(Handler):
 
         worth = self.figureWorth(coins)
 
-        self.creditTarget(target, worth)
+        self.creditTarget(target, worth, credited_transactions)
 
         return 'ACCEPT', None
 
@@ -464,9 +475,8 @@ class RedeemCoins(Handler):
         print 'Worth: %s' % worth
         return worth
 
-    def creditTarget(self, target, worth):
-        #FIXME: Implement me!
-        pass
+    def creditTarget(self, target, worth, credited_transactions):
+        credited_transactions[target] = worth
 
     def __createAndOutput(self, message):
         m = message()
