@@ -23,22 +23,12 @@ for the use of send instead of write!
 
 This alltogether should allow something along the line of:
 
-    Create a wallet
     >>> w = Wallet()
-
-    Create http client transport (we want so send via http)
-    >>> ct = HTTPClientTransport()
-
-    Connect (does not do anything anyhow)
-    >>> ct.connect('http://opencoin.org/testwallet')
-
-    Create a TestingTransport so that we have something to work with
-    >>> tt = TestingTransport() 
-    >>> tt.connect(ct)
+    >>> tt = SimpleTestTransport() 
     
     Pass the wallets side transport to the wallet. With sendMoney it will
     immediately start to communicate
-    >>> w.sendMoney(ct)
+    >>> w.sendMoney(tt)
 
     See, it sends us (we are the other side, pretending to be a wallet
     receiving money) a message. These are no real messages at all
@@ -222,9 +212,6 @@ class Message:
 
 class Transport:
    
-    def __init__(self):
-        pass
-
     def setProtocol(self,protocol):
         "This sets the protocl instance that is used with this transport"
         self.protocol = protocol
@@ -277,14 +264,73 @@ class HTTPClientTransport(Transport):
         data = message.toJson()
         response = urllib.urlopen(self.url,data).read()
         self.newMessage(Message(jsontext=response))
-       
+
+class SimpleTestTransport(Transport):
+    """
+    >>> w = Wallet()
+    >>> st = SimpleTestTransport()
+    >>> w.sendMoney(st)
+    >>> st.send('foo')
+    <Message('sendMoney',[1, 2])>
+    """
+    def __init__(self):
+        self.messages = []
+        self.write = self.messages.append
+
+    def read(self):
+        'return one buffered message. Returns None if there are not any'
+        if self.messages:
+            return self.messages.pop(0)
+        else:
+            return None
+
+        
+    def send(self,type,data=None):
+        """a shortcut for doing 
+         
+          transport.write(Message("foo",[somedata,..]))
+          transport.read()
+        
+        instead just 
+
+          transport.send("foo",[somedata,...])"""
+
+        self.newMessage(Message(type,data))
+        return self.read()
+      
 class TestingTransport(Transport):
-    """Some tricking around to be able to test other transports. This one 
+    """
+    # This class does nothing good right now, pretty much ignore it #
+    
+    Some tricking around to be able to test other transports. This one 
     connects to another Transport, assuming that we manually read and write
     data, while the other side behaves like a 'real' transport.
     
     Note that on a TestingTransport you have the convinience method of 
     'send'.
+
+    >>> w = Wallet()
+    >>> ct = HTTPClientTransport()
+    >>> ct.connect('http://opencoin.org/testwallet')
+
+    >>> tt = TestingTransport() 
+    >>> tt.connect(ct)
+    
+    >>> w.sendMoney(ct)
+    >>> tt.read()
+    <Message('sendMoney',[1, 2])>
+    
+    >>> tt.read()
+
+    >>> tt.send('foobar')
+    <Message('Please send a receipt',None)>
+
+    >>> tt.send('Receipt')
+    <Message('Goodbye',None)>
+    
+    >>> tt.send('Another receipt')
+    <Message('finished',None)>
+
     """
 
     def __init__(self):
@@ -295,7 +341,9 @@ class TestingTransport(Transport):
         
         self.other = otherTransport
 
-        #maybe a bit of a hack?
+        #Just a hack, does nothing clever yet. Instead of replacing the write,
+        #it should do something that actually uses it. Now idea yet how to do
+        # it
         self.other.write = self.newMessage
 
     def write(self,message):
@@ -326,6 +374,19 @@ class TestingTransport(Transport):
             return self.messages.pop(0)
         else:
             return None
+
+    def send(self,type,data=None):
+        """a shortcut for doing 
+         
+          transport.write(Message("foo",[somedata,..]))
+          transport.read()
+        
+        instead just 
+
+          transport.send("foo",[somedata,...])"""
+
+        self.write(Message(type,data))
+        return self.read()
 
 
 ######################## Entities ##################################
