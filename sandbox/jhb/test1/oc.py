@@ -1,5 +1,7 @@
+from __future__ import generators
 from parsing import decodeHumanReadable,encodeHumanReadable
 import json, md5
+
 
 class Container(object):
     
@@ -154,6 +156,109 @@ class Wallet:
     def receiveMoney(self):
         messages = self.transport.receive()
         self.transport.send('Received',messages[0].data)
+
+    def testProtocol(self):
+        out = None
+        while not out:
+            yield 'foo'
+
+
+class Protocoll:
+
+
+    def write(self,type,data):
+        pass
+    
+    def read(self):
+        pass
+
+class WalletSendMoney(Protocoll):
+
+    def __init__(self):
+        self.states = {'start':[self.sendmoney,self.abort]}
+        self.state=None
+
+    def sendmoney(self):
+        self.state = 'waitforreceipt'
+        return ('SENDMONEY',[1,2])
+
+    def yourreceipt(self):
+        receipt = self.read()
+        return ('OK')
+
+    def abot(self):
+        self.state = 'aborted'
+        
+class WalletGetMoney(Protocoll):
+    
+    def __init__(self):
+        self.states = {'start':[self.hello,self.abort]}
+        self.state=None
+
+    def start(self):
+        self.write('HELLO')
+        self.read()
+                
+    def abort(self):
+        self.state = 'aborted'
+
+
+class Proto2:
+    
+    def __init__(self):
+        self.state = self.start
+
+    def start(self,message):
+       pass
+
+    def finish(self,message):
+        return Message('finished')
+
+
+class WalletSender(Proto2):
+
+    def start(self,message,data):
+        self.state = self.waitForReceipt
+        return Message('sendMoney',[1,2])
+
+    def waitForReceipt(self,message,data):
+        if message == 'Receipt':
+            self.state=self.finish
+            return Message('Goodbye')
+        else:
+            return Message('Please send a receipt')
+
+
+
+class WalletRecipient(Proto2):
+
+    def start(self,message,data):
+        self.state=self.finish
+        return Message('Receipt')
+
+    def Goodbye(self,message,data):
+        self.state = finish
+        return Message('Goodbye')
+
+
+class Message2:
+    
+    def __init__(self,type,data=None):
+        self.type = type
+        self.data = data
+
+def test_wallets():
+    """
+    
+    >>> ws = WalletSender()
+    >>> wr = WalletRecipient()
+    >>> m1 = ws.state(None,None)
+    >>> m2 = wr.state(*m1)
+    >>> m3 = ws.state(*m2)
+    >>> m3
+    """
+
+
 
 class Transport:
 
