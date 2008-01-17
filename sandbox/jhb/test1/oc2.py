@@ -161,11 +161,14 @@ class WalletRecipientProtocol(Protocol):
         Protocol.__init__(self)
 
     def start(self,message):
-        self.state=self.Goodbye
-        return Message('Receipt')
+        if message.type == 'sendMoney':
+            self.state=self.Goodbye
+            return Message('Receipt')
+        else:
+            return Message('Please send me money, mama')
 
     def Goodbye(self,message):
-        self.state = finish
+        self.state = self.finish
         return Message('Goodbye')
 
 ########################## Messages ##############################
@@ -211,16 +214,16 @@ class Message:
 
 
 class Transport:
-   
+
+    def __init__(self):
+        "Constructor. Override this"
+
     def setProtocol(self,protocol):
         "This sets the protocl instance that is used with this transport"
         self.protocol = protocol
         protocol.setTransport(self)
 
-    def connect(self,other):
-        """Connect, whatever that means. Could be HTTP, Bluetooth, Local, xmpp"""
-
-    def write(self):
+    def write(self,message):
         " The protocol will write into this"
 
     def newMessage(self,message):
@@ -228,20 +231,97 @@ class Transport:
         put in the new message to deliver it to the protocol"""
         self.protocol.newMessage(message)
 
- 
-class SocketTransport(Transport):
-    "Something to do everything manually. So much not implemented..."
+    def start(self):
+        """start the transport"""
 
-    def connect(self,port):
-        'would open a local socket'
 
-       
+class SocketServerTransport(Transport):
+    """ No idea how to test this with a doctest
+
+        So, please run testWalletServer.py then testClientServer.py in different 
+        shells
+
+    """
+    def __init__(self,addr,port):
+        self.addr = addr
+        self.port = port
+        self.debug = 0
+
+    def start(self):
+        """This is a prove that I have no  understanding of sockets. Whats
+        a socket, whats a conn, when is it open, when closed?"""
+
+        import socket
+        self.runserver = 1
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
+        s.bind((self.addr, self.port))
+        s.listen(1)
+        conn, addr = s.accept()
+        self.conn = conn
+        while self.runserver:
+            print 'connection from', addr
+            try:
+                data = self.conn.recv(2048)
+            except:
+                conn, addr = s.accept()
+                self.conn = conn
+                data = conn.recv(2048)
+            data  = data.replace('\r','')
+            try:
+                m = Message(jsontext=data)
+                self.newMessage(m)
+            except Exception, e:
+                try:
+                    self.write(Message('WrongFormat',str(e)))
+                except:
+                    pass
+        conn.close()
+
+    def write(self,message):
+        if self.debug:
+            print message
+        self.conn.send(message.toJson())
+        if message.type == 'finished':
+            self.conn.close()
+            self.runserver = 0
+
+
+class SocketClientTransport(Transport):
+    """
+    >>> w = Wallet()
+    >>> sct = SocketClientTransport('copycan.org',12008)
+    >>> w.sendMoney(sct)
+
+    """
+    def __init__(self,addr,port):
+        self.addr = addr
+        self.port = port
+        self.debug = 0
+
+    def start(self):
+        import socket
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.connect((self.addr, self.port))
+        
+    def write(self,message):   
+        self.socket.send(message.toJson())
+        if message.type == 'finished':
+            self.socket.close()
+            return
+        else:            
+            data = self.socket.recv(2048)
+            if self.debug:
+                print message
+            self.newMessage(Message(jsontext=data))
+            
+        
+
 class HTTPClientTransport(Transport):
     """To use if the other side is reachable via http.
 
     >>> import urllib
-    >>> t = HTTPClientTransport()
-    >>> t.connect('https://opencoin.org/Members/jhb/testresponse')
+    >>> t = HTTPClientTransport('https://opencoin.org/Members/jhb/testresponse')
 
     This is for testing only
     >>> t.messages = []
@@ -256,7 +336,7 @@ class HTTPClientTransport(Transport):
     <Message('TestResponse',{'everything': 'good'})>
     """
 
-    def connect(self,url):
+    def __init__(self,url):
         self.url = url
 
     def write(self,message):
@@ -310,8 +390,7 @@ class TestingTransport(Transport):
     'send'.
 
     >>> w = Wallet()
-    >>> ct = HTTPClientTransport()
-    >>> ct.connect('http://opencoin.org/testwallet')
+    >>> ct = HTTPClientTransport('http://opencoin.org/testwallet')
 
     >>> tt = TestingTransport() 
     >>> tt.connect(ct)
@@ -404,29 +483,15 @@ class Wallet:
 
         protocol = WalletSenderProtocol(self)
         transport.setProtocol(protocol)
-        
+        transport.start()        
         #Trigger execution of the protocol
         protocol.newMessage(Message(None))    
 
+    def receiveMoney(self,transport):
+        protocol = WalletRecipientProtocol(self)
+        transport.setProtocol(protocol)
+        transport.start()        
 
-#        #return self.getProtocolRunner(protocol,transport)
-#   
-#    def getProtocolRunner(self,protocol,transport):
-#        '''repeatedly get a new message from the transport, stuff it into
-#         the protocols state, which outputs a message, send the message back into the 
-#         transport, until we actually get a Message('finished') from the protocol'''
-#
-#        while 1:
-#            message = transport.read(1)
-#            if not message:
-#                message = Message(None)
-#            output = protocol.state(message)
-#            if output.type in ['finished','failure']:                
-#                yield output
-#                break
-#            else:
-#                transport.write(output)
-#                yield output
     
 
 def _test():
