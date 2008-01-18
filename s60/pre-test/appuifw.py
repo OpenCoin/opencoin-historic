@@ -641,7 +641,7 @@ def _confirm(label):
     else:
         return None
 
-def note(text, type):
+def note(text,type='info'):
     if type == "error":
         icon = wx.ICON_ERROR
     else:

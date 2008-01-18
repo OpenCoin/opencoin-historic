@@ -6,6 +6,8 @@ import appuifw,e32,socket,httplib
 from graphics import *
 from key_codes import EKeyLeftArrow, EKeyRightArrow
 
+import oc2
+
 def callback():
     print 'foo callback'
 
@@ -112,7 +114,14 @@ class Wallet:
 
     def receiveCoins(self):
         name = self.getActiveCurrency()['name']
-        appuifw.popup_menu([u'internet',u'bluetooth'],u'Receive %s via' % name)
+        selection = appuifw.popup_menu([u'internet',u'bluetooth'],u'Receive %s via' % name)
+        if selection == 0:
+            w = oc2.Wallet()
+            sst = oc2.SocketServerTransport('0.0.0.0',12008)
+            appuifw.note(u'ready to go')
+            w.receiveMoney(sst)
+            appuifw.note(u'got coins: %s' % repr(w.coins))
+
 
     def sendCoinsBT(self):
         self.sock=socket.socket(socket.AF_BT,socket.SOCK_STREAM)
