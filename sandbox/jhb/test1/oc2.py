@@ -156,12 +156,14 @@ class WalletSenderProtocol(Protocol):
     
 class WalletRecipientProtocol(Protocol):
 
-    def __init__(self,wallet):
+    def __init__(self,wallet=None):
         self.wallet = wallet
         Protocol.__init__(self)
 
     def start(self,message):
         if message.type == 'sendMoney':
+            if self.wallet:
+                self.wallet.coins.extend(message.data)
             self.state=self.Goodbye
             return Message('Receipt')
         else:
@@ -254,19 +256,16 @@ class SocketServerTransport(Transport):
         import socket
         self.runserver = 1
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
+        #s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
         s.bind((self.addr, self.port))
         s.listen(1)
-        conn, addr = s.accept()
-        self.conn = conn
+        self.socket = s
+        self.init_conn()
         while self.runserver:
-            print 'connection from', addr
-            try:
+            data = self.conn.recv(2048)
+            if len(data) == 0:
+                self.init_conn()
                 data = self.conn.recv(2048)
-            except:
-                conn, addr = s.accept()
-                self.conn = conn
-                data = conn.recv(2048)
             data  = data.replace('\r','')
             try:
                 m = Message(jsontext=data)
@@ -276,7 +275,12 @@ class SocketServerTransport(Transport):
                     self.write(Message('WrongFormat',str(e)))
                 except:
                     pass
-        conn.close()
+        self.conn.close()
+
+    def init_conn(self):
+        conn, addr = self.socket.accept()
+        self.conn = conn
+        return conn
 
     def write(self,message):
         if self.debug:
@@ -284,7 +288,11 @@ class SocketServerTransport(Transport):
         self.conn.send(message.toJson())
         if message.type == 'finished':
             self.conn.close()
+           
             self.runserver = 0
+            self.socket.close()
+            #self.init_conn()
+            #self.protocol.state = self.protocol.start
 
 
 class SocketClientTransport(Transport):
@@ -490,7 +498,8 @@ class Wallet:
     def receiveMoney(self,transport):
         protocol = WalletRecipientProtocol(self)
         transport.setProtocol(protocol)
-        transport.start()        
+        transport.start()
+
 
     
 
