@@ -1,4 +1,5 @@
-import oc2, sys
+import oc import oc2, 
+import sys
 
 if len(sys.argv) > 1:
     addr = sys.argv[1]

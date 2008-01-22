@@ -1,209 +1,3 @@
-"""
-This some playground for me to understand some of the problems involved in getting
-our system working.
-
-This is basically taking Mathews ideas (as far as I understood them), adding a bit of 
-my little ideas, and coming to the following idea:
-
-- Protocols that are basically state machines (or workflow engines, me is coming
-  from a plone background). So you have a protocol, which has a state and can consume messages.
-
-- Messages are little objects that have a type and carry data. They can serialize themselves,
-  e.g. to Json.
-
-- Transports, that bascially reflect one side of a communication. They transport messages,
-  and are hooked to protocols. A protocol writes to a transport, and the transport stuffs
-  new messages into the the protocol when it gets some.
-
-- Entities like Wallets. These will then do things, as triggered by the gui (no gui yet)
-
-Testing is done by using a TestTransport, which basically can be connected to any other
-transport (end) to manually communicate with the other side. Check the TestTransport 
-for the use of send instead of write!
-
-This alltogether should allow something along the line of:
-
-    >>> w = Wallet()
-    >>> tt = SimpleTestTransport() 
-    
-    Pass the wallets side transport to the wallet. With sendMoney it will
-    immediately start to communicate
-    >>> w.sendMoney(tt)
-
-    See, it sends us (we are the other side, pretending to be a wallet
-    receiving money) a message. These are no real messages at all
-    >>> tt.read()
-    <Message('sendMoney',[1, 2])>
-    
-    Any new messages, after we have been doing nothing?
-    >>> tt.read()
-
-    Nope, there weren't. Lets send some nonsense
-    >>> tt.send('foobar')
-    <Message('Please send a receipt',None)>
-
-    Ok, the protocol does not like other message, but wanted us
-    to send a receipt. If it insists...
-    >>> tt.send('Receipt')
-    <Message('Goodbye',None)>
-    
-   This was so fun, lets see if we can do some more?
-    >>> tt.send('Another receipt')
-    <Message('finished',None)>
-
-    Ok, we are done
-    
-"""
-#This is needed for the file to run on s60 
-from __future__ import generators
-
-# we also import json and urllib somewhere else in the file. We could do it 
-# here, but s60 might slow down with unnecessary imports
-
-######################## Protocolls #########################
-
-"""
-Protocol have states, which are basically methods that consume messages, do
-something and return messages. The states are just methods, and one state
-might change the state of its protocol to another state. 
-
-A protocol writes to a transport, using Transport.write. It receives messages
-from the transport with Protocol.newMessage.
-
-A state (a protocol method) returns messages, it does not write directly back
-to a transport (XXX not sure about this, what if a state needs to communicate
-with another enity). Instead newMessage by default writes back to the transport.
-(XXX maybe the transport could take the returned message, and write it up its own,
-ah write method?)
-"""
-
-
-class Protocol:
-    
-    def __init__(self):
-        'Set the initial state'
-        
-        self.state = self.start
-
-    def setTransport(self,transport):
-        'get the transport we are working with'
-        
-        self.transport = transport
-        
-    def start(self,message):
-        'this should be the initial state of the protocol'
-       
-        pass
-
-    def finish(self,message):
-        'always the last state. There can be other final states'
-        
-        return Message('finished')
-                    
-    def newMessage(self,message):
-        'this is used by a transport to pass on new messages to the protocol'
-
-        out = self.state(message)
-        self.transport.write(out)
-        return out
-
-class WalletSenderProtocol(Protocol):
-    """
-    This is just a fake protocol, just showing how it works
-
-    >>> sp = WalletSenderProtocol(None)
-   
-    It starts with sending some money
-    >>> sp.state(Message(None))
-    <Message('sendMoney',[1, 2])>
-    
-    >>> sp.state(Message('Foo'))
-    <Message('Please send a receipt',None)>
-
-    Lets give it a receipt
-    >>> sp.state(Message('Receipt'))
-    <Message('Goodbye',None)>
-
-    >>> sp.state(Message('Bla'))
-    <Message('finished',None)>
-
-    >>> sp.state(Message('Bla'))
-    <Message('finished',None)>
-
-    """
-
-    def __init__(self,wallet):
-        'we would need a wallet for this to work'
-
-        self.wallet = wallet
-        Protocol.__init__(self)
-
-    def start(self,message):
-        'always set the new state before returning'
-        
-        self.state = self.waitForReceipt
-        return Message('sendMoney',[1,2])
-
-    def waitForReceipt(self,message):
-        'after sending we need a receipt'
-
-        if message.type == 'Receipt':
-            self.state=self.finish
-            return Message('Goodbye')
-        else:
-            return Message('Please send a receipt')
-
-    
-class WalletRecipientProtocol(Protocol):
-
-    def __init__(self,wallet=None):
-        self.wallet = wallet
-        Protocol.__init__(self)
-
-    def start(self,message):
-        if message.type == 'sendMoney':
-            if self.wallet:
-                self.wallet.coins.extend(message.data)
-            self.state=self.Goodbye
-            return Message('Receipt')
-        else:
-            return Message('Please send me money, mama')
-
-    def Goodbye(self,message):
-        self.state = self.finish
-        return Message('Goodbye')
-
-########################## Messages ##############################
-
-class Message:
-    
-    def __init__(self,type=None,data=None,jsontext=None):
-        if jsontext:
-            self.fromJson(jsontext)
-        else:            
-            self.type = type
-            self.data = data
-    
-    def __repr__(self):
-        return "<Message(%s,%s)>" % (repr(self.type),repr(self.data))
-
-    def toJson(self):
-        'serialize to json'
-
-        import json
-        return json.write([self.type,self.data])
-
-    def fromJson(self,text):
-        'serialize from json'
-
-        import json
-        out = json.read(text)
-        if len(out) == 2:
-            self.type = out[0]
-            self.data = out[1]
-        return self
-    
-############################# Transports ####################################
 
 """A transport has a write method, to which the protocol sends new data. The 
    transport send of this data, and delivers the response (or new data without
@@ -213,7 +7,7 @@ class Message:
    point in time.
   
    """
-
+from messages import Message
 
 class Transport:
 
@@ -296,8 +90,10 @@ class SocketServerTransport(Transport):
 
 
 class SocketClientTransport(Transport):
+    'Commented out while offline'
     """
-    >>> w = Wallet()
+    >>> import entities
+    >>> w = entities.Wallet()
     >>> sct = SocketClientTransport('copycan.org',12008)
     >>> w.sendMoney(sct)
 
@@ -325,7 +121,8 @@ class SocketClientTransport(Transport):
             
         
 
-class HTTPClientTransport(Transport):
+class HTTPClientTransport(Transport): 
+    'doctest disabled while offline'
     """To use if the other side is reachable via http.
 
     >>> import urllib
@@ -355,6 +152,7 @@ class HTTPClientTransport(Transport):
 
 class SimpleTestTransport(Transport):
     """
+    >>> from entities import Wallet
     >>> w = Wallet()
     >>> st = SimpleTestTransport()
     >>> w.sendMoney(st)
@@ -397,6 +195,7 @@ class TestingTransport(Transport):
     Note that on a TestingTransport you have the convinience method of 
     'send'.
 
+    >>> from entities import Wallet
     >>> w = Wallet()
     >>> ct = HTTPClientTransport('http://opencoin.org/testwallet')
 
@@ -475,40 +274,6 @@ class TestingTransport(Transport):
         self.write(Message(type,data))
         return self.read()
 
-
-######################## Entities ##################################
-
-
-
-class Wallet:
-    "Just a testwallet. Does nothing, really"
-
-    def __init__(self):
-        self.coins = []
-
-    def sendMoney(self,transport):
-        "Sends some money to the given transport."
-
-        protocol = WalletSenderProtocol(self)
-        transport.setProtocol(protocol)
-        transport.start()        
-        #Trigger execution of the protocol
-        protocol.newMessage(Message(None))    
-
-    def receiveMoney(self,transport):
-        protocol = WalletRecipientProtocol(self)
-        transport.setProtocol(protocol)
-        transport.start()
-
-
-    
-
-def _test():
-
+if __name__ == "__main__":
     import doctest
     doctest.testmod()
-
-if __name__ == "__main__":
-    _test()
-
-
