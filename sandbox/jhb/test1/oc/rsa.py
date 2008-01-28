@@ -345,8 +345,8 @@ def encrypt_int(message, ekey, n):
     if not type(message) is types.LongType:
         raise TypeError("You must pass a long or an int")
 
-    if math.floor(log(message, 2)) > math.floor(log(n, 2)):
-        raise OverflowError("The message is too long")
+    #if math.floor(log(message, 2)) > math.floor(log(n, 2)):
+    #    raise OverflowError("The message is too long")
 
     return fast_exponentiation(message, ekey, n)
 
@@ -388,7 +388,8 @@ def chopstring(message, key, n, funcref):
 
     msglen = len(message)
     mbits  = msglen * 8
-    nbits  = int(math.floor(log(n, 2)))
+    #nbits  = int(math.floor(log(n, 2)))
+    nbits = 1024
     nbytes = nbits / 8
     blocks = msglen / nbytes
 
@@ -449,7 +450,10 @@ def bits(integer): #Gets number of bits in integer
       result += 1
    return result
 
-def fast_exponentiation(base, exponent, modulo=None): #Allows fast exponentation with and without moduli
+
+fast_exponentiation = pow
+def fast_exponentiation2(base, exponent, modulo=None): #Allows fast exponentation with and without moduli
+   print 'in fast_expon' 
    result = 1L
    if modulo == None:
       iteration = bits(exponent)
@@ -508,15 +512,20 @@ def fast_exponentiation2(a, p, n):
 # Do doctest if we're not imported
 if __name__ == "__main__":
     if 1:
+        import time
         (pub,priv) =  gen_pubpriv_keys(512)
+        t = time.time()
         print 'keys ',pub, priv
-        message = 'foobar '*3
+        message = 'serial '*5
         print 'cleartext ', message
-        cypher = encrypt(message,pub)
-        print 'cyphertext: ',cypher
-        print 'decrypted', decrypt(cypher,priv)
-    (a,p,n) = (62,65,133)
-    print fast_exponentiation(a, p,n)
+        for i in range(10):
+            cypher = encrypt(message,pub)
+            print 'cyphertext: ',cypher
+            print 'decrypted', decrypt(cypher,priv)
+        print time.time() - t
+        print `fast_exponentiation`
+    #(a,p,n) = (62,65,133)
+    #print fast_exponentiation(a, p,n)
     #print fast_exponentiation2(a, p,n)
     #print fast_exponentiation3(a, p,n)
 __all__ = ["gen_pubpriv_keys", "encrypt", "decrypt", "sign", "verify"]
