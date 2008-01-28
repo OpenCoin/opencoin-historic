@@ -55,14 +55,12 @@ class Container(object):
             i += 1
         return self        
 
-
     def toJson(self):
         return json.write(self.toPython())
 
     def fromJson(self,text):
         return self.fromPython(json.read(text))
-        
-        
+                
 
 class CDD(Container):
 

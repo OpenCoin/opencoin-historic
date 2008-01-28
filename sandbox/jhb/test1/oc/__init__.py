@@ -61,11 +61,12 @@ def _test():
 
     import doctest
     doctest.testmod()
-    import protocols, messages, entities, transports
+    import protocols, messages, entities, transports, containers
     doctest.testmod(protocols)
     doctest.testmod(messages)
     doctest.testmod(entities)
     doctest.testmod(transports)
+    doctest.testmod(containers)
 
 if __name__ == "__main__":
     _test()
