@@ -2,7 +2,7 @@
 # This script creates tabs that let you switch between different applications
 
 
-import appuifw,e32,socket,httplib
+import appuifw,e32,socket,httplib, urllib
 from graphics import *
 from key_codes import EKeyLeftArrow, EKeyRightArrow
 
@@ -118,7 +118,8 @@ class Wallet:
         if selection == 0:
             w = oc2.Wallet()
             sst = oc2.SocketServerTransport('0.0.0.0',12008)
-            appuifw.note(u'ready to go')
+            r = urllib.urlopen('https://opencoin.org/myownip')
+            appuifw.note(u'send the coins now')
             w.receiveMoney(sst)
             appuifw.note(u'got coins: %s' % repr(w.coins))
 
