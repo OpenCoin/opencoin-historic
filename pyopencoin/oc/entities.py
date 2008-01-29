@@ -21,6 +21,20 @@ class Wallet:
         transport.setProtocol(protocol)
         transport.start()
 
+    def listen(self,transport):
+        """
+        >>> import transports
+        >>> w = Wallet()
+        >>> stt = transports.SimpleTestTransport()
+        >>> w.listen(stt)
+        >>> stt.send('HANDSHAKE',{'protocol': 'opencoin 1.0'})
+        <Message('HANDSHAKE_ACCEPT',None)>
+        >>> stt.send('sendMoney',[1,2])
+        <Message('Receipt',None)>        
+        """
+        protocol = protocols.answerHandshakeProtocol(sendMoney=protocols.WalletRecipientProtocol(self))
+        transport.setProtocol(protocol)
+        transport.start()
 
 class Issuer:
 

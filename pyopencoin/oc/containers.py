@@ -215,6 +215,7 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
 
 CDD = CurrencyDescriptionDocument
 
+
 class MintKey(ContainerWithSignature):
 
     fields = ['key_identifier', 

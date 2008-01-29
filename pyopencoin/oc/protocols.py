@@ -15,42 +15,20 @@ ah write method?)
 Before returning the message, the state should set the protocols state to the next
 state (sounds a bit ackward, its easy, check the states code)
 """
-class Message:
+
+from messages import Message
     
-    def __init__(self,type=None,data=None,jsontext=None):
-        if jsontext:
-            self.fromJson(jsontext)
-        else:            
-            self.type = type
-            self.data = data
-    
-    def __repr__(self):
-        return "<Message(%s,%s)>" % (repr(self.type),repr(self.data))
-
-    def toJson(self):
-        'serialize to json'
-
-        import json
-        return json.write([self.type,self.data])
-
-    def fromJson(self,text):
-        'serialize from json'
-
-        import json
-        out = json.read(text)
-        if len(out) == 2:
-            self.type = out[0]
-            self.data = out[1]
-        return self
-    
-
 
 class Protocol:
-    
+    """A protocol ties messages and actions togehter, it is basically one side
+       of an interaction. E.g. when A exchanges a coin with B, A would use the
+       walletSenderProtocol, and B the walletRecipientProtocol."""
+
     def __init__(self):
         'Set the initial state'
         
         self.state = self.start
+        self.result = None
 
     def setTransport(self,transport):
         'get the transport we are working with'
@@ -80,6 +58,33 @@ class Protocol:
 
     def newState(self,method):
         self.state = method
+
+
+class answerHandshakeProtocol(Protocol):
+
+
+    def __init__(self,**mapping):
+        Protocol.__init__(self)
+        self.mapping = mapping
+
+    def start(self,message):
+
+        if message.type == 'HANDSHAKE':
+            if message.data['protocol'] == 'opencoin 1.0':
+                self.newState(self.dispatch)
+                return Message('HANDSHAKE_ACCEPT')
+            else:
+                self.newState(self.goodby)
+                return Message('HANDSHAKE_REJECT','did not like the protocol version')
+        else:
+            return Message('PROTOCOL_ERROR','please do a handshake')
+
+
+    def dispatch(self,message):        
+        self.result = message
+        nextprotocol = self.mapping[message.type]
+        self.transport.setProtocol(nextprotocol)
+        return nextprotocol.newMessage(message)
 
 class WalletSenderProtocol(Protocol):
     """
@@ -126,6 +131,25 @@ class WalletSenderProtocol(Protocol):
             return Message('Goodbye')
         else:
             return Message('Please send a receipt')
+
+class WalletRecipientProtocol(Protocol):
+
+    def __init__(self,wallet=None):
+        self.wallet = wallet
+        Protocol.__init__(self)
+
+    def start(self,message):
+        if message.type == 'sendMoney':
+            if self.wallet:
+                self.wallet.coins.extend(message.data)
+            self.state=self.Goodbye
+            return Message('Receipt')
+        else:
+            return Message('Please send me money, mama')
+
+    def Goodbye(self,message):
+        self.state = self.finish
+        return Message('Goodbye')
 
 
 class fetchMintingKeyProtocol(Protocol):
@@ -240,7 +264,6 @@ class giveMintingKeyProtocol(Protocol):
     >>> gmp.state(Message('MINTING_KEY_FETCH_DENOMINATION',2))
     <Message('MINTING_KEY_PASS','foobar')>
 
-
     >>> gmp.newState(gmp.giveKey)
     >>> gmp.state(Message('MINTING_KEY_FETCH_KEYID','abc'))
     <Message('MINTING_KEY_PASS','foobar')>
@@ -295,24 +318,6 @@ class giveMintingKeyProtocol(Protocol):
         else:
             return Message('MINTING_KEY_FAILURE',error)
 
-class WalletRecipientProtocol(Protocol):
-
-    def __init__(self,wallet=None):
-        self.wallet = wallet
-        Protocol.__init__(self)
-
-    def start(self,message):
-        if message.type == 'sendMoney':
-            if self.wallet:
-                self.wallet.coins.extend(message.data)
-            self.state=self.Goodbye
-            return Message('Receipt')
-        else:
-            return Message('Please send me money, mama')
-
-    def Goodbye(self,message):
-        self.state = self.finish
-        return Message('Goodbye')
 
 if __name__ == "__main__":
     import doctest

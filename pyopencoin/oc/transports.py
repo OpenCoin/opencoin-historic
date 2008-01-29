@@ -170,7 +170,7 @@ class SimpleTestTransport(Transport):
         else:
             return None
 
-        
+ 
     def send(self,type,data=None):
         """a shortcut for doing 
          
@@ -183,7 +183,67 @@ class SimpleTestTransport(Transport):
 
         self.newMessage(Message(type,data))
         return self.read()
-      
+
+
+
+
+class ServerTestTransport(Transport):
+    """ 
+    This is really really weird. We test two entities,
+    they write to each other, and we can see the whole
+    conversation. 
+
+    XXX need a way to inject somewhere....
+    maybe if we had a servertransport.test(server.callback) method
+    that would yield every so often...
+
+    >>> from entities import Wallet
+    >>> client = Wallet()
+    >>> server = Wallet()
+    >>> t = ServerTestTransport(client.sendMoney)
+    >>> server.receiveMoney(t)
+    Client <Message('sendMoney',[1, 2])>
+    Server <Message('Receipt',None)>
+    Client <Message('Goodbye',None)>
+    Server <Message('Goodbye',None)>
+    Client <Message('finished',None)>
+    """
+
+
+    def __init__(self,callback):
+        self.callback = callback
+
+    def start(self):
+        clienttransport = ClientTestTransport(self)
+        self.callback(clienttransport)
+
+    def write(self,message):
+        print 'Server', message
+        if message.type != 'finished':
+            self.other.newMessage(message)
+
+
+class ClientTestTransport(Transport):
+    
+    def __init__(self,other=None):
+        if other:
+            #Lets connect the two
+            self.other = other
+            other.other = self
+
+    def write(self,message):
+        print 'Client', message
+        if message.type != 'finished':
+            self.other.newMessage(message)
+
+#Server will call start on the transport
+#Should trigger client to start
+#client writes message
+
+
+
+
+
 class TestingTransport(Transport):
     """
     # This class does nothing good right now, pretty much ignore it #
