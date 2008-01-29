@@ -209,7 +209,6 @@ class ServerTestTransport(Transport):
     Client <Message('finished',None)>
     """
 
-
     def __init__(self,callback):
         self.callback = callback
 
@@ -235,6 +234,67 @@ class ClientTestTransport(Transport):
         print 'Client', message
         if message.type != 'finished':
             self.other.newMessage(message)
+
+
+class ServerTestTransport2(Transport):
+    """ 
+    
+    >>> from entities import Wallet
+    >>> client = Wallet()
+    >>> server = Wallet()
+    >>> t = ServerTestTransport2(client.sendMoney)
+    >>> server.receiveMoney(t)
+    >>> ct = t.clienttransport
+    >>> m = ct.buffer
+    >>> m
+    <Message('sendMoney',[1, 2])>
+
+    >>> t.newMessage(m)
+    >>> m2 = t.buffer
+    >>> m2
+    <Message('Receipt',None)>
+
+    XXX in the end the ServerTestTransport could be simplified - it
+    does not really need the client on the other side. 
+
+    >>> w2 = Wallet()
+    >>> tt = SimpleTestTransport()
+    >>> w2.listen(tt)
+   
+    XXX All nice, but how do I get the listen method to switch after the handshake?
+    """
+
+    def __init__(self,callback):
+        self.callback = callback
+        self.buffer = None
+
+    def start(self):
+        self.clienttransport = ClientTestTransport2(self)
+        self.callback(self.clienttransport)
+
+    def write(self,message):
+        self.buffer = message
+        return
+        if message.type != 'finished':
+            self.other.newMessage(message)
+
+
+class ClientTestTransport2(Transport):
+    
+    def __init__(self,other=None):
+        if other:
+            #Lets connect the two
+            self.other = other
+            other.other = self
+        self.buffer = None
+
+    def write(self,message):
+        self.buffer = message
+        return
+        if message.type != 'finished':
+            self.other.newMessage(message)
+
+
 
 #Server will call start on the transport
 #Should trigger client to start
