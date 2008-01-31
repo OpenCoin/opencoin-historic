@@ -109,8 +109,8 @@ IS:
 
 * Send 
 
-    TRANSFER_TOKEN( transaction_id, list_of_options, target, \
-                    list_of_blinds, list_of_coins )
+    TRANSFER_TOKEN_REQUEST( transaction_id, list_of_options, target, \
+                            list_of_blinds, list_of_coins )
 
   to IS (issuer service), where 
   * transaction_id is a base64(random(128bit)) referencing this transaction
@@ -121,7 +121,7 @@ IS:
     * value(list_of_blinds) > value(list_of_coins): payment reference
     * value(list_of_blinds) < value(list_of_coins): account reference
 
-  For now, only 'pure' transactions are allowed, so either of these must 
+  For now, only 'pure' transactions are allowed, so one of these must 
   be empty:
   * target        : coin exchange (value(list_of_blinds) = value(list_of_coins))
   * list_of_coins : mint request
@@ -134,14 +134,15 @@ IS:
                            list( (coin1.key_id,  reason1), ... )  )
 
   where "reason" may be some general failure like "500 minting not available".
-  Otherwise the IS answers
+  If minting was requested and acccepted but postponed, IS answers
+
+    TRANSFER_TOKEN_DELAY( transaction_id, message )
+
+  If the request is accepted with no delay, IS answers
 
     TRANSFER_TOKEN_ACCEPT( transaction_id, message, list_of_singed_blinds)
 
-  If no minting was requested, list_of_singed_blinds ist empty.
-  If minting was requested but delayed by the issuer, list_of_singed_blinds 
-  is empty and message contains "300 minting delayed".
-
+  (with list_of_singed_blinds empty if no minting was required)
 
 
 #4 wallet send minting request to issuer  
