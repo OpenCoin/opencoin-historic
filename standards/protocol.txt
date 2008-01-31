@@ -104,7 +104,46 @@ IS:
 
   Keep (r, blank, blind) in mind. 
   
-  
+
+#3.5 "TRANSFER_TOKEN": A generic wallet-issuer request
+
+* Send 
+
+    TRANSFER_TOKEN( transaction_id, list_of_options, target, \
+                    list_of_blinds, list_of_coins )
+
+  to IS (issuer service), where 
+  * transaction_id is a base64(random(128bit)) referencing this transaction
+    e.g. for later resume after an abort. 
+  * option may contain variable=value pairs like "JITM=mandatory".
+  * target 
+    * value(list_of_blinds) = value(list_of_coins): empty
+    * value(list_of_blinds) > value(list_of_coins): payment reference
+    * value(list_of_blinds) < value(list_of_coins): account reference
+
+  For now, only 'pure' transactions are allowed, so either of these must 
+  be empty:
+  * target        : coin exchange (value(list_of_blinds) = value(list_of_coins))
+  * list_of_coins : mint request
+  * list_of_blinds: redemption
+
+  If at least one of the blinds or coins is rejected, the issuer answers
+
+    TRANSFER_TOKEN_REJECT( transaction_id, reason,
+                           list( (blind1.key_id, reason1), ... ), \
+                           list( (coin1.key_id,  reason1), ... )  )
+
+  where "reason" may be some general failure like "500 minting not available".
+  Otherwise the IS answers
+
+    TRANSFER_TOKEN_ACCEPT( transaction_id, message, list_of_singed_blinds)
+
+  If no minting was requested, list_of_singed_blinds ist empty.
+  If minting was requested but delayed by the issuer, list_of_singed_blinds 
+  is empty and message contains "300 minting delayed".
+
+
+
 #4 wallet send minting request to issuer  
 
 * Send 
