@@ -150,30 +150,33 @@ IS:
 
 #4 wallet send minting request to issuer  
 
-* Send 
+* Send (was: MINT_REQUEST)
 
-    MINT_REQUEST(request_id, list( (blind1.key_id, blind1), ... ) )
+    TRANSFER_TOKEN_REQUEST( transaction_id, list_of_options, target, \
+                            list_of_blinds, (empty list) )
 
   to issuer service
 
-* Issuer: if key_id is not current:
+* Issuer: if request will not be minted (e.g., "Bad Key ID" if the key_id
+  is not current):
 
-    MINT_REJECT( list( (blind1.key_id, "Bad Key ID"), ... ) )
+    TRANSFER_TOKEN_REJECT( transaction_id, reason,
+                           list( (blind1.key_id, reason1), ... ), \
+                           (empty list1)  )
 
-  Elif request will not be minted (e.g., payment not yet received):
+  ElseIf minting is done just-in-time, IS answers
 
-    MINT_REJECT( list( (blind1.key_id, "Reason1"), ... ) )
-  
-  Else: IS passes (maybe asynchronous) request to mint and:
-    MINT_ACCEPT(request_id)
+    TRANSFER_TOKEN_ACCEPT( transaction_id, message, list_of_singed_blinds)
+
+  Else IS queues blind to the mint and tells wallet to wait
+
+    TRANSFER_TOKEN_DELAY( transaction_id, message )
 
   Session is terminated.
 
 
-
-  Mint processes request (signs blind with key_id)
-
-  Mint passes "signed blind"="blind coin" back to IS 
+  In case of delayed minting, mint processes request (signs blind with key_id)
+  some time later and passes "signed blind"="blind coin" back to IS 
 
 
 #5 Wallet gets coin back
