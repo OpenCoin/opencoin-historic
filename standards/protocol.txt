@@ -176,7 +176,7 @@ IS:
 
   Else IS queues blind to the mint and tells wallet to wait
 
-    TRANSFER_TOKEN_DELAY( transaction_id, message )
+    TRANSFER_TOKEN_DELAY( transaction_id, reason )
 
   Session is terminated.
 
@@ -187,23 +187,25 @@ IS:
 
 #5 Wallet gets coin back
 
-* Wallet asks issuer service "fetch_signed_blind request_id"
+* Wallet asks issuer service (was: FETCH_MINTED_REQUEST)
 
-    FETCH_MINTED_REQUEST(request_id)
+    TRANSFER_TOKEN_RESUME( transaction_id )
 
-* IS either rejects finally or temporarily
+* IS either rejects finally
 
-    FETCH_MINTED_FAILURE(request_id, "Reason")
-    FETCH_MINTED_WAIT(request_id, "Reason")
+    TRANSFER_TOKEN_REJECT( transaction_id, reason,
+                           list( (blind1.key_id, reason1), ... ), (empty list) )
  
-    Possible failures: "Request ID Unknown", "Request ID expired", "Request ID rejected"
-    Possible waits:    "Processing request"
+  with reasons like "TID Unknown", "TID expired", "TID rejected", ...,
+  or tells to wait longer
 
+    TRANSFER_TOKEN_DELAY( transaction_id, reason )
+    
   (question: what about key expiration while request is in mining queue)
 
   or passes signed blinds to wallet Bob, must preserve order
 
-    FETCH_MINTED_ACCEPT(request_id, list(signature_of_blind1, ...) )
+    TRANSFER_TOKEN_ACCEPT( transaction_id, message, list_of_singed_blinds)
     
   Session terminates
 
