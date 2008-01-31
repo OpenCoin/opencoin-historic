@@ -134,15 +134,18 @@ IS:
                            list( (coin1.key_id,  reason1), ... )  )
 
   where "reason" may be some general failure like "500 minting not available".
-  If minting was requested and acccepted but postponed, IS answers
-
-    TRANSFER_TOKEN_DELAY( transaction_id, message )
-
   If the request is accepted with no delay, IS answers
 
     TRANSFER_TOKEN_ACCEPT( transaction_id, message, list_of_singed_blinds)
 
   (with list_of_singed_blinds empty if no minting was required)
+  If minting was requested and acccepted but postponed, IS answers
+
+    TRANSFER_TOKEN_DELAY( transaction_id, message )
+
+  In this case, the wallet can fetch the signed blinds later by 
+
+    TRANSFER_TOKEN_RESUME( transaction_id )
 
 
 #4 wallet send minting request to issuer  
