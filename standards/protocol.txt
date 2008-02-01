@@ -156,7 +156,7 @@ IS:
 
 #4 wallet send minting request to issuer  
 
-* Send (was: MINT_REQUEST)
+* Send [was: MINT_REQUEST]
 
     TRANSFER_TOKEN_REQUEST( transaction_id, list_of_options, target, \
                             list_of_blinds, (empty list) )
@@ -187,7 +187,7 @@ IS:
 
 #5 Wallet gets coin back
 
-* Wallet asks issuer service (was: FETCH_MINTED_REQUEST)
+* Wallet asks issuer service [was: FETCH_MINTED_REQUEST]
 
     TRANSFER_TOKEN_RESUME( transaction_id )
 
@@ -351,7 +351,7 @@ if DSDB is required (normal case):
 
 * Wallet locks serials at IS (see above LOCK_COINS)
 
-* Wallet sends coins + target to IS (was: REDEEM_COINS_REQUEST)
+* Wallet sends coins + target to IS [was: REDEEM_COINS_REQUEST]
 
    TRANSFER_TOKEN_REQUEST( transaction_id, list_of_options, target, \
                            (empty list), list_of_coins )
