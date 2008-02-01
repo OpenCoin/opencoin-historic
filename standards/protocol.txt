@@ -2,8 +2,10 @@ OpenCoin
 
 ToDo
 ====
+* do the stuff in ./TODO
 * replace "coin" with "token"
 * decide whether the protocol atoms are tokens or lists of tokens
+* throw out reduntant "TRANSFER_TOKEN" explanatoins
 
 
 How the wallet creates a coin and communicates with an issuer
