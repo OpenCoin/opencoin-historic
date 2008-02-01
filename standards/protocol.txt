@@ -115,6 +115,9 @@ IS:
 
 #3.5 "TRANSFER_TOKEN": A generic wallet-issuer request
 
+The atom for this transaction is a list of coins - if one of the coins /blanks
+fail, the whole transaction fails.
+
 * Send 
 
    TRANSFER_TOKEN_REQUEST( transaction_id, list_of_options, target, \
@@ -339,9 +342,15 @@ if DSDB is required (normal case):
         UNLOCK_COINS_REQUEST(transaction_id)
 
     * Wallet Bob sends buy request (blanks + coins)
+
     
         TRANSFER_TOKEN_REQUEST( transaction_id, list_of_options, "", \
                                 list_of_blinds, list_of_coins )
+
+
+    (the transaction_id has to be the same as in the lock request, and 
+     the list of coins has to match the list of locked coins. You can't
+     have split / partial redemption)
 
     * IS has to check if sum of blanks and coins are equal
 
