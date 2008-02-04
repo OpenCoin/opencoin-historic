@@ -26,13 +26,13 @@ How the wallet creates a coin and communicates with an issuer
      issuer cipher suite          = HASH-ALG, SIGN-ALG, BLINDING-ALG
      issuer public master key     = base64(pM)
      
-     issuer                       = Hash(pM)
+     issuer                       = base64(hash(pM))
      base64(sig(sM,hash(content part)))
    }
 
    (question: is the "short currency identifier" needed?)
-   (question: "not use after", "random collision free serial"?)
-   (future: add additionial signatures, e.g. from wallet software vendors)
+   (question: "not use after")
+   (future: add additionial signatures, e.g. from wallet software vendors (set up in containers already))
 
 * issuer publishes CDD at "currency identifier" URL
 
@@ -40,7 +40,7 @@ How the wallet creates a coin and communicates with an issuer
   Master key holder generates keys certificate
 
   {
-    key identifier      = base64(id(pP))
+    key identifier      = base64(hash(pP))
     currency identifier = http://opencent.net/OpenCent
     denomination        = denomination
     not_before          = TIME(...)
@@ -48,29 +48,27 @@ How the wallet creates a coin and communicates with an issuer
     coin_not_after      = TIME(...)
     public key          = base64(pP)
 
-    issuer              = Hash(pM)
+    issuer              = base64(hash(pM))
     base64(sig(sM, hash(content part)))
   }
 
   
   Questions:
-  * Time format:  YYYYMMDDHHMMSS  20071211144111 or SecondsSinceEpoch or ISO 8601?
-  * id() = sha256()?
-  * CDD?
+  * CDD? (What does this question mean?)
 
 * issuer creates DSDB keypair (pD,sD)
 
   {
-    key identifier   = base64(id(pD))
+    key identifier   = base64(hash(pD))
     not_before       = TIME(...)
     not_after        = TIME(...)
     cipher           = ENCRYPTION-ALG
     public key       = base64(pD)
 
-    issuer           = Hash(pM)
+    issuer           = base64(hash(pM))
     signature        = base64(sig(sM, hash(content part)))
 
-    signer           = Hash(pM)
+    signer           = base64(hash(pM))
     signature        = base64(sig(sM, hash(content part)))
   }   
 
@@ -177,7 +175,7 @@ fail, the whole transaction fails.
 
   ElseIf minting is done just-in-time, IS answers
 
-    TRANSFER_TOKEN_ACCEPT( transaction_id, message, list_of_singed_blinds)
+    TRANSFER_TOKEN_ACCEPT( transaction_id, message, list_of_signed_blinds)
 
   Else IS queues blind to the mint and tells wallet to wait
 
@@ -207,6 +205,7 @@ fail, the whole transaction fails.
     TRANSFER_TOKEN_DELAY( transaction_id, reason )
     
   (question: what about key expiration while request is in mining queue)
+  (oierw thinks: as long as the key is valid for minting when the request is made, we are good)
 
   or passes signed blinds to wallet Bob, must preserve order
 
@@ -279,21 +278,17 @@ if DSDB is required (normal case):
       - parse cdd for issuer service location
       - parse blanks for necessary minting key ids
       - start session with authenticated issuer service (IS) (secured and authenticated by transport layer, e.g. SSL)
-        - create transaction id (two-party secret agreement (collision free))
-          Possible example with https.
-            USE_HTTPS_SESSIONID
-            YES|NO
         - get all missing minting key certs (MINTING_KEY_FETCH_KEYID)
-        - IS sends key certs or rejects a key id (unknown, outdated) (MINTING_KEY_PASS/FAIL_MINTING_KEY_FAILURE)
+        - IS sends key certs or rejects a key id (unknown, outdated) (MINTING_KEY_PASS/FAILURE)
         - lock list of encrypted coin serial numbers at IS (DSDB) 
-            LOCK_COINS_REQUEST( DSDB_key_key_id, transaction_id,
-                                list( (key_identifier1, encrypted_serial1), ... ) )
+            LOCK_COIN_REQUEST( DSDB_key_key_id, transaction_id,
+                               list( (key_identifier1, encrypted_serial1), ... ) )
 
         - IS either accepts with locking time or rejects with list of rejected serials + reason (locked, spent) 
             If all coins lock:
-               LOCK_COINS_ACCEPT(transaction_id, lock_expires)
+               LOCK_COIN_ACCEPT(transaction_id, lock_expires)
             If some coins cannot lock, no coins are locked.
-               LOCK_COINS_FAILURE(transaction_id, list( (key_identifier1, encrypted_serial1, "Reason1"), ...))
+               LOCK_COIN_FAILURE(transaction_id, list( (key_identifier1, encrypted_serial1, "Reason1"), ...))
 
                      Reasons:
                           
@@ -315,20 +310,20 @@ if DSDB is required (normal case):
       BLANK_ACCEPT
 
       Note: After BLANK_ACCEPT, a BLANK_REJECT(emptylist, "Reason) can be given to abort the transaction until
-            COINS_SPEND is sent
+            COIN_SPEND is sent
             
 * Wallet Alice sends coins to Wallet Bob (this time including their clear serial and signature)
   
-    COINS_SPEND( list(coin1, ...) )
+    COIN_SPEND( list(coin1, ...) )
 
 * Wallet Bob checks that the coins match the blanks and that signatures are valid
 
 * Wallet Bob accepts transaction or rejects with reason (unknown, invalid) for each rejected coin
 
-     COINS_REJECT( list( (coin1, "Reason1") ) )
-     COINS_REJECT( emptylist, "Reason")
+     COIN_REJECT( list( (coin1, "Reason1") ) )
+     COIN_REJECT( emptylist, "Reason")
 
-     COINS_ACCEPT
+     COIN_ACCEPT
 
 * Wallet Bob terminates session with Wallet Alice
 
@@ -339,7 +334,7 @@ if DSDB is required (normal case):
 if DSDB is required (normal case):
     
     * in case of reject in the checking phase delete the blanks, otherwise
-        UNLOCK_COINS_REQUEST(transaction_id)
+        UNLOCK_COIN_REQUEST(transaction_id)
 
     * Wallet Bob sends buy request (blanks + coins)
 
@@ -360,7 +355,7 @@ if DSDB is required (normal case):
 
 #7 Redeeming Coins 
 
-* Wallet locks serials at IS (see above LOCK_COINS)
+* Wallet locks serials at IS (see above LOCK_COIN)
 
 * Wallet sends coins + target to IS [was: REDEEM_COINS_REQUEST]
 
