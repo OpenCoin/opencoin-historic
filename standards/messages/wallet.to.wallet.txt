@@ -4,7 +4,7 @@
 
 =============
 = BLANK     =
-= COINS     =
+= COIN      =
 =============
 
 BLANK
@@ -60,7 +60,7 @@ B:
   BLANK_ACCEPT
         Note:   After ACCEPT, a REJECT #hex_string(0) can be given to abort the transaction
         Prior:  BLANK_PRESENT
-        Follow: COINS_REDEEM
+        Follow: COIN_REDEEM
                 BLANK_REJECT (Message from self)
 
 
@@ -69,32 +69,32 @@ COINS
 -----
 
 A:
-  COINS_REDEEM  #hex_string(number_of)
+  COIN_REDEEM   #hex_string(number_of)
                 #base64(coin1)
                 #base64(coin2)
         Prior:  BLANK_ACCEPT
-        Follow: COINS_REJECT
-                COINS_ACCEPT
+        Follow: COIN_REJECT
+                COIN_ACCEPT
 
 B:
-  COINS_REJECT  #hex_string(number_of)
+  COIN_REJECT   #hex_string(number_of)
                 #base64(coin1) "Reason1"
                 #base64(coin2) "Reason2"
                     Reasons:
                         Invalid coin
                         Unknown coin
                             Note: Used when the coin we are given is different than the blank
-        Prior:  COINS_REDEEM
-        Follow: COINS_REDEEM
+        Prior:  COIN_REDEEM
+        Follow: COIN_REDEEM
                 Goodbye
 
-  COINS_REJECT  #hex_string(0) "Reason"
+  COIN_REJECT   #hex_string(0) "Reason"
                     Reasons:
                         *I can't think of anything valid*
-        Prior:  COINS_REDEEM
-        Follow: COINS_REDEEM
+        Prior:  COIN_REDEEM
+        Follow: COIN_REDEEM
                 Goodbye
 
-  COINS_ACCEPT
-        Prior:  COINS_REDEEM
+  COIN_ACCEPT
+        Prior:  COIN_REDEEM
         Follow: Goodbye

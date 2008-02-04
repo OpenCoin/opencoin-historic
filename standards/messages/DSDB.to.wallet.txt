@@ -3,58 +3,58 @@
 ******************
 
 =================
-= LOCK_COINS    =
-= UNLOCK_COINS  =
+= LOCK_COIN     =
+= UNLOCK_COIN   =
 =================
 
-LOCK_COINS
+LOCK_COIN
 ----------
 
 Wallet:
-  LOCK_COINS_REQUEST    #key_id_of_DSDB #hex_string(transaction_id) #hex_string(#number_of_obfuscated_blanks)
-                        #key_identifier1 #encrypted_serial1
-                        #key_identifier2 #encrypted_serial2
+  LOCK_COIN_REQUEST #key_id_of_DSDB #hex_string(transaction_id) #hex_string(#number_of_obfuscated_blanks)
+                    #key_identifier1 #encrypted_serial1
+                    #key_identifier2 #encrypted_serial2
     Prior:  Hello
-    Follow: LOCK_COINS_ACCEPT
-            LOCK_COINS_FAILURE
+    Follow: LOCK_COIN_ACCEPT
+            LOCK_COIN_FAILURE
 
 DSDB:
-  LOCK_COINS_ACCEPT     #hex_string(transaction_id) TIME(lock_expires)
-    Prior:  LOCK_COINS_REQUEST
+  LOCK_COIN_ACCEPT      #hex_string(transaction_id) TIME(lock_expires)
+    Prior:  LOCK_COIN_REQUEST
     Follow: Goodbye
 
-  LOCK_COINS_FAILURE    #hex_string(transaction_id) #hex_string(number_of_failures)
-                        #key_identifier1 #encrypted_serial1 "Reason 1"
-                        #key_identifier2 #encrypted_serial2 "Reason 2"
-                            Reasons:
-                                Key ID of DSDB is unknown or expired        Permanant
-                                Key ID of blank is unknown or expired       Permanant
-                                Decryption of serial failed                 Permanant
-                                Serial already redeemed                     Permanant
-                                Serial locked (not spent)                   Temporary
-    Prior:  LOCK_COINS_REQUEST
+  LOCK_COIN_FAILURE #hex_string(transaction_id) #hex_string(number_of_failures)
+                    #key_identifier1 #encrypted_serial1 "Reason 1"
+                    #key_identifier2 #encrypted_serial2 "Reason 2"
+                        Reasons:
+                            Key ID of DSDB is unknown or expired        Permanant
+                            Key ID of blank is unknown or expired       Permanant
+                            Decryption of serial failed                 Permanant
+                            Serial already redeemed                     Permanant
+                            Serial locked (not spent)                   Temporary
+    Prior:  LOCK_COIN_REQUEST
     Follow: Goodbye
 
 
 
-UNLOCK_COINS
-------------
+UNLOCK_COIN
+-----------
 
 Wallet:
-  UNLOCK_COINS_REQUEST  #hex_string(transaction_id)
+  UNLOCK_COIN_REQUEST   #hex_string(transaction_id)
     Prior:  Hello
-    Follow: UNLOCK_COINS_PASS
-            UNLOCK_COINS_FAILURE
+    Follow: UNLOCK_COIN_PASS
+            UNLOCK_COIN_FAILURE
 
 DSDB:
-  UNLOCK_COINS_PASS
-    Prior:  UNLOCK_COINS_REQUEST
+  UNLOCK_COIN_PASS
+    Prior:  UNLOCK_COIN_REQUEST
     Follow: Goodbye
     
-  UNLOCK_COINS_FAILURE  #hex_string(transaction_id) "Reason"
+  UNLOCK_COIN_FAILURE   #hex_string(transaction_id) "Reason"
                             Reasons:
                                 Unknown transaction_id
                                 Transaction already completed
                                 Lock expired *Not really a failure...*
-    Prior:  UNLOCK_COINS_REQUEST
+    Prior:  UNLOCK_COIN_REQUEST
     Follow: Goodbye
