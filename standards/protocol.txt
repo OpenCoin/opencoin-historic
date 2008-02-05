@@ -106,7 +106,7 @@ IS:
 
     blind = blinding(r, pub_minting_key, hash(blank))
  
-  Calculate a collision-free random request ID (128 bit)
+  Calculate a collision-free random transaction ID (128 bit)
 
   Keep (r, blank, blind) in mind. 
   
@@ -117,9 +117,16 @@ The atom for this transaction is a list of coins - if one of the coins /blanks
 fail, the whole transaction fails.
 
 * Send 
+   
+   XXX target might be an attack target, maybe insert authentication
+   XXX make the transaction type explicit?
 
    TRANSFER_TOKEN_REQUEST( transaction_id, list_of_options, target, \
                             list_of_blinds, list_of_coins )
+    
+   XXX list of blinds -> list of (blinds + denomination key/id)
+   XXX both sides need to enforce correctness of 
+
 
   to IS (issuer service), where 
   * transaction_id is a base64(random(128bit)) referencing this transaction
@@ -249,6 +256,7 @@ Bob - receives the coin
   }
 
      BLANK_PRESENT( dsdb_keycertificate list(blank1, blank2, ...) )
+     XXX remove crypto reference
 
 * Wallet Bob check:
 
@@ -375,7 +383,7 @@ if DSDB is required (normal case):
 #8 Accepting coins
 
 * IS checks:
-    - if minting keys are still valid
+    - if minting keys are still valid (XXX coin has not expired)
     - if serial is still valid (against DSDB)
     - if signature is valid
     - if target is valid
