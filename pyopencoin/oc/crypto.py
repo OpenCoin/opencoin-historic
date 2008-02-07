@@ -182,6 +182,19 @@ class RSAKeyPair(KeyPair):
         values = [base64.b64encode(number.long_to_bytes(self.key.n)), base64.b64encode(number.long_to_bytes(self.key.e))]
         return ','.join(values)
 
+    def stringPrivate(self):
+        if self.hasPrivate():
+            key = self.key
+            return ','.join([base64.b64encode(number.long_to_bytes(i)) for i in [key.d,key.p,key.q]])
+        else: 
+            return ''
+    
+    def toJson(self):
+        import json
+
+        return json.write(dict(public=str(self),private=self.stringPrivate())
+
+
     def newPublicKeyPair(self):
         return RSAKeyPair(self.key.publickey())
 

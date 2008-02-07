@@ -26,7 +26,7 @@ class Container(object):
     Serialize to json
     >>> j = c.toJson()
     >>> j
-    '["foo","bar"]'
+    '[["foo","foo"],["bar","bar"]]'
 
     Lets deserialize
     >>> c = Container()
@@ -55,12 +55,12 @@ class Container(object):
         return "<%s(%s)>" % (self.__class__.__name__,arguments)
 
     def toPython(self):
-        return [getattr(self,field) for field in self.fields]
+        return [(field,getattr(self,field)) for field in self.fields]
 
     def fromPython(self,data):
         i = 0
         for field in self.fields:
-            setattr(self,field,data[i])
+            setattr(self,field,data[i][1])
             i += 1
         return self        
 
@@ -181,8 +181,8 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
   
     >>> j = cdd.toJson()
     >>> j
-    '["http://opencoin.org/OpenCoinProtocol/1.0","http://opencent.net/OpenCent","OC","opencoin://issuer.opencent.net:8002",[1,2,5,10,20,50,100,200,500,1000],["sha-256","rsa","rsa"],"foobar"]'
-
+    '[["standard_version","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["short_currency_identifier","OC"],["issuer_service_location","opencoin://issuer.opencent.net:8002"],["denominations",[1,2,5,10,20,50,100,200,500,1000]],["issuer_cipher_suite",["sha-256","rsa","rsa"]],["issuer_public_master_key","foobar"]]'
+ 
     >>> cdd3 = CDD().fromJson(j)
     >>> cdd3 = cdd
 

@@ -1,7 +1,23 @@
 import protocols
 from messages import Message
 
-class Wallet:
+class Entity(object):
+
+    def toPython(self):
+        return self.__dict__
+
+    def fromPython(self,data):
+        self.__dict__ = data     
+        
+    def toJson(self):
+        return json.write(self.toPython())
+
+    def fromJson(self,text):
+        return self.fromPython(json.read(text))
+
+
+
+class Wallet(Entity):
     "Just a testwallet. Does nothing, really"
 
     def __init__(self):
@@ -30,17 +46,26 @@ class Wallet:
         >>> stt.send('HANDSHAKE',{'protocol': 'opencoin 1.0'})
         <Message('HANDSHAKE_ACCEPT',None)>
         >>> stt.send('sendMoney',[1,2])
-        <Message('Receipt',None)>        
+        <Message('Receipt',None)>
         """
         protocol = protocols.answerHandshakeProtocol(sendMoney=protocols.WalletRecipientProtocol(self))
         transport.setProtocol(protocol)
         transport.start()
 
-class Issuer:
+class Issuer(Entity):
+    """An isser
 
+    >>> i = Issuer()
+    >>> i.createKeys(256)
+    >>> i.keys.public()
+    >>> i.keys
+    >>> str(i.keys)
+    >>> i.keys.stringPrivate()
+    """
     def __init__(self):
         self.dsdb = DSDB()
         self.mint = Mint()
+        self.keys = None
 
     def getKeyByDenomination(self,denomination):
         raise 'KeyFetchError'
@@ -48,6 +73,11 @@ class Issuer:
     def getKeyById(self,keyid):
         raise 'KeyFetchError'
 
+    def createKeys(self,keylength=1024):
+        import crypto
+        keys = crypto.createRSAKeyPair(keylength)
+        self.keys = keys
+    
 
 class KeyFetchError(Exception):
     pass
@@ -57,7 +87,9 @@ class DSDB:
     pass
 
 class Mint:
-    pass
+
+    def __init__(self):
+        self.keys = {}    
 
 class Blank:
     pass

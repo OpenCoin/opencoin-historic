@@ -1,5 +1,10 @@
 """RSA module
 
+!!! This is just a playground, for understanding some bits and pieces,
+this is not at all the production code!!!
+
+
+
 Module for calculating large primes, and RSA encryption, decryption,
 signing and verification. Includes generating public and private keys.
 """
