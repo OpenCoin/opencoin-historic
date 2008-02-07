@@ -192,7 +192,7 @@ class RSAKeyPair(KeyPair):
     def toJson(self):
         import json
 
-        return json.write(dict(public=str(self),private=self.stringPrivate())
+        return json.write(dict(public=str(self),private=self.stringPrivate()))
 
 
     def newPublicKeyPair(self):
