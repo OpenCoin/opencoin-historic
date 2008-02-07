@@ -101,7 +101,7 @@ class HashingAlgorithm:
 
     def reset(self):
         """resets the hash to it's default value."""
-        raise NotImplemenetedError
+        raise NotImplementedError
 
     def __str__(self):
         """returns only the name of the hash function in accordance with the HASH-ALG name."""
@@ -125,7 +125,7 @@ class RSAKeyPair(KeyPair):
 
     >>> simple_public_key = RSAKeyPair(n=3233L, e=17L)
 
-    >>> simple_private_key = RSAKeyPair(n=3233L, e=17L, p=61L, q=53L, d=2753L)
+    >>> simple_private_key = RSAKeyPair(n=3233L, e=17L, d=2753L)
 
     >>> simple_public_key.hasPrivate()
     False
@@ -170,9 +170,13 @@ class RSAKeyPair(KeyPair):
     >>> new_public_key.hasPrivate()
     False
 
-    Okay. Now we'll check the private key information
-    >>> simple_private_key.key.u
-    20L
+    Check the private key values. pycrypto's RSA only requires n, e, and d.
+    >>> simple_private_key.key.n
+    3233L
+    >>> simple_private_key.key.e
+    17L
+    >>> simple_private_key.key.d
+    2753L
 
     >>> print simple_private_key
     DKE=,EQ==
@@ -182,6 +186,32 @@ class RSAKeyPair(KeyPair):
 
     >>> simple_private_key.toJson()
     '{"public":"DKE=,EQ==",\\n"private":"CsE=,PQ==,NQ=="}'
+
+
+    Test the other generation methods for private keys
+    >>> key_2 = RSAKeyPair(n=3233L, e=17L, d=2753L, p=61L, q=53L)
+    >>> key_3 = RSAKeyPair(n=3233L, e=17L, d=2753L, p=61L, q=53L, u=20L)
+    >>> key_4 = RSAKeyPair(key=key_3.key)
+    >>> key_5 = RSAKeyPair(key=simple_private_key.key)
+   
+    >>> simple_private_key.key.n == key_2.key.n == key_3.key.n == key_4.key.n
+    True
+
+    >>> simple_private_key.key.d == key_2.key.d == key_3.key.d == key_4.key.d
+    True
+
+    >>> simple_private_key.key.e == key_2.key.e == key_3.key.e == key_4.key.e
+    True
+
+    Test p, q, and u. When pycrypto makes the key, if we supply a p and q, u is created
+    automatically.
+    >>> key_2.key.p == key_3.key.p == key_4.key.p
+    True
+    >>> key_2.key.q == key_3.key.q == key_4.key.q
+    True
+    >>> key_2.key.u == key_3.key.u == key_4.key.u
+    True
+    
     """ 
     def __init__(self, key=None, p=None, q=None, e=None, d=None, n=None, u=None):
         self.key = key
@@ -246,6 +276,38 @@ def createRSAKeyPair(N):
 
 
 class RSAEncryptionAlgorithm(EncryptionAlgorithm):
+    """Performs RSA encryption
+    >>> private = RSAKeyPair(n=3233L, e=17L, d=2753L, p=61L, q=53L)
+    >>> public = private.newPublicKeyPair()
+
+    >>> public.hasPrivate()
+    False
+
+    >>> priv_enc = RSAEncryptionAlgorithm(private)
+    >>> pub_enc = RSAEncryptionAlgorithm(public)
+
+    >>> print priv_enc
+    RSAEncryptionAlgorithm
+    >>> print pub_enc
+    RSAEncryptionAlgorithm
+
+    >>> pub_enc.encrypt(14L)
+    2549L
+
+    >>> priv_enc.decrypt(2549L)
+    14L
+
+    >>> pub_enc.decrypt(2549L)
+    Traceback (most recent call last):
+    ...
+    CryptoError: Do not have private key
+
+    >>> pub_enc.encrypt('0')
+    '\\x02p'
+
+    >>> priv_enc.decrypt('\x02p')
+    '0'
+    """
     from Crypto.PublicKey import RSA
 
     def __init__(self, key):
@@ -256,20 +318,41 @@ class RSAEncryptionAlgorithm(EncryptionAlgorithm):
 
         self.ALGNAME = 'RSAEncryptionAlgorithm'
         
-    def encrypt(self, input):
+    def encrypt(self, message):
         try:
-            return self.key.public().encrypt(input, '')[0]
-        except PyCryptoRSAError:
-            raise CryptoError
+            return self.key.public().encrypt(message, '')[0]
+        except PyCryptoRSAError, reason:
+            raise CryptoError(reason)
     
-    def decrypt(self, input):
+    def decrypt(self, message):
         try:
-            return self.key.private().decrypt(input)
-        except PyCryptoRSAError:
-            raise CryptoError
+            return self.key.private().decrypt(message)
+        except PyCryptoRSAError, reason:
+            raise CryptoError(reason)
         
 
 class RSABlindingAlgorithm(BlindingAlgorithm):
+    """Performs RSA blinding
+    >>> private = RSAKeyPair(n=3233L, e=17L)
+
+    >>> blind = RSABlindingAlgorithm(private)
+
+    >>> print blind
+    RSABlindingAlgorithm
+
+    Test a blinding. This does not work for some reason. The answer is almost certainly wrong as well.
+    >>> blind.blind(154L, 1001L)
+    ('\\tC', 1001L)
+
+    >>> blind.unblind('\\tC', 1001L)
+    154L
+
+    >>> blind.blind('\x9a', '\x03\xe9')
+    ('\\tC', '\x03\xe9')
+
+    >>> blind.unblind('\tC')
+    '0'
+    """
     def __init__(self, key, blinding_factor=None):
         BlindingAlgorithm.__init__(self, key)
         self.blinding_factor = blinding_factor
@@ -287,13 +370,13 @@ class RSABlindingAlgorithm(BlindingAlgorithm):
         else:
             pass #self.blinding_factor is already set
 
-        if isinstance(input, types.LongType):
-            input = number.long_to_byptes(input)
+        if isinstance(message, types.LongType):
+            message = number.long_to_bytes(message)
 
         try:
-            return self.key.public().blind(input, self.blinding_factor), self.blinding_factor
-        except PyCryptoRSAError:
-            raise CryptoError
+            return self.key.public().blind(message, self.blinding_factor), self.blinding_factor
+        except PyCryptoRSAError, reason:
+            raise CryptoError(reason)
 
     def unblind(self, message, blinding_factor=None):
         """returns the unblinded value of the input."""
@@ -301,13 +384,13 @@ class RSABlindingAlgorithm(BlindingAlgorithm):
             self.blinding_factor = blinding_factor
 
         # change the input to a bytestream if a long number
-        if isinstance(input, types.LongType):
-            input = number.long_to_bytes(input)
+        if isinstance(message, types.LongType):
+            message = number.long_to_bytes(message)
 
         try:
-            return self.key.public().unblind(self.input, self.blinding_factor)
-        except PyCryptoRSAError:
-            raise CryptoError
+            return self.key.public().unblind(message, self.blinding_factor)
+        except PyCryptoRSAError, reason:
+            raise CryptoError(reason)
         
 
     
@@ -328,14 +411,14 @@ class RSASigningAlgorithm(SigningAlgorithm):
 
             return result
         except PyCryptoRSAError, reason:
-            raise CryptoError('PyCryptoRSAError: %s' % reason)
+            raise CryptoError(reason)
 
     def verify(self, message, signature):
         """returns if the signature of the input is valid."""
         try:
             return self.key.public().verify(message, (number.bytes_to_long(signature),))
-        except PyCryptoRSAError:
-            raise CryptoError
+        except PyCryptoRSAError, reason:
+            raise CryptoError(reason)
 
 class SHA256HashingAlgorithm(HashingAlgorithm):
     def __init__(self, input=None):
