@@ -1,3 +1,33 @@
+"""A Crypto library.
+    >>> private = createRSAKeyPair(1024)
+    >>> public = private.newPublicKeyPair()
+
+    >>> public.hasPrivate()
+    False
+    
+    >>> hash = SHA256HashingAlgorithm()
+ 
+    >>> text = 'Foobar'
+    >>> digest = hash.update(text).digest()
+
+    >>> blinder = RSABlindingAlgorithm(public)
+    >>> blinded, factor = blinder.blind(digest)
+
+    >>> signer = RSASigningAlgorithm(private)
+    >>> blinded_sig = signer.sign(blinded)
+    
+    >>> unblinded_sig = blinder.unblind(blinded_sig)
+
+    >>> sig_verifier = RSASigningAlgorithm(public)
+    >>> sig_verifier.verify(digest, unblinded_sig)
+    True
+
+    We can test encryption using the SHA256 digest as well
+    >>> encrypt = RSAEncryptionAlgorithm(public)
+    >>> decrypt = RSAEncryptionAlgorithm(private)
+    >>> digest == decrypt.decrypt(encrypt.encrypt(digest))
+    True
+    """
 import types
 from Crypto.Util import number
 import base64
@@ -341,17 +371,24 @@ class RSABlindingAlgorithm(BlindingAlgorithm):
     RSABlindingAlgorithm
 
     Test a blinding. This does not work for some reason. The answer is almost certainly wrong as well.
-    >>> blind.blind(154L, 1001L)
-    ('\\tC', 1001L)
+    >>> blinded, factor = blind.blind(154L, 1001L)
 
-    >>> blind.unblind('\\tC', 1001L)
+    >>> blinded
+    '\\tC'
+
+    >>> factor == 1001L
+    True
+
+    >>> blind.unblind(blinded, factor)
     154L
 
-    >>> blind.blind('\x9a', '\x03\xe9')
-    ('\\tC', '\x03\xe9')
+    >>> blinded, factor = blind.blind('\x9a', '\x03\xe9')
 
-    >>> blind.unblind('\tC')
-    '0'
+    >>> blinded
+    '\\tC'
+    
+    >>> blind.unblind(blinded)
+    '\\x9a'
     """
     def __init__(self, key, blinding_factor=None):
         BlindingAlgorithm.__init__(self, key)
@@ -395,6 +432,44 @@ class RSABlindingAlgorithm(BlindingAlgorithm):
 
     
 class RSASigningAlgorithm(SigningAlgorithm):
+    """An implementation of the RSA signing algorithm.
+    >>> private = createRSAKeyPair(1024)
+    >>> public = private.newPublicKeyPair()
+
+    >>> public.hasPrivate()
+    False
+
+    >>> message = _r.getRandomString(1022)
+    
+    >>> signer = RSASigningAlgorithm(private)
+    >>> verifier = RSASigningAlgorithm(public)
+
+    >>> print signer
+    RSASigningAlgorithm
+    >>> print verifier
+    RSASigningAlgorithm
+
+    >>> signature = signer.sign(message)
+
+    >>> verifier.verify(message, signature)
+    True
+
+    If the signature is missing the first byte, it cannot pass
+    >>> signature = signature[1:] 
+
+    >>> verifier.verify(message, signature)
+    False
+
+    >>> message = _r.getRandomString(1025)
+
+    >>> signer.sign(message)
+    Traceback (most recent call last):
+      ...
+    CryptoError: Ciphertext too large
+
+    >>> verifier.verify(message, signature)
+    False
+    """
     def __init__(self, key):
         SigningAlgorithm.__init__(self, key)
         self.ALGNAME = 'RSASigningAlgorithm'
@@ -506,6 +581,7 @@ class Random:
             
 _r = Random()    
 
+# We need a copy of the error from Crypto.PublicKey.RSA, so import, make a copy, and delete the module
 import Crypto.PublicKey.RSA as quickRSA
 PyCryptoRSAError = quickRSA.error
 del quickRSA

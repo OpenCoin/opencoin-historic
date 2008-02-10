@@ -103,19 +103,6 @@ class ContainerWithBase(Container):
         signer = signature_algorithm(key, hasher.digest())
         return signer.verify(signature.signature)
     
-    def _performSigning(self, key, signing_algorithm, hashing_algorithm):
-        """sign the container using the key, signing algorithm and hashing algorithm."""
-    
-        contentpart = self.content_part()
-        signer = signing_algorithm(key)
-        hasher = hashing_algorithm()
-        hasher.update(contentpart)
-        signature = signer.sign(hasher.digest())
-        hasher.reset()
-        hasher.update(str(key))
-        keyprint = hasher.digest()
-        return Signature(keyprint, signature)
-    
 
 class ContainerWithSignature(ContainerWithBase):
 
@@ -130,11 +117,6 @@ class ContainerWithSignature(ContainerWithBase):
                                       self.signature, 
                                       key, 
                                       self.content_part())
-
-    def setSignature(self, key, signing_algorithm, hashing_algorithm):
-        """This sets the signature part of the container."""
-
-        self.signature = self._performSigning(key, signing_algorithm, hashing_algorithm)
 
 
 class ContainerWithAdSignatures(ContainerWithBase):
@@ -157,9 +139,6 @@ class ContainerWithAdSignatures(ContainerWithBase):
         return False # If we didn't match keyprints, we fail verification
 
     
-    def addAdSignature(self, key, signing_algorithm, hashing_algorithm):
-
-        self.signatures.append(self._performSigning(key, signing_algorithm, hashing_algorithm))
 
 
 
@@ -184,9 +163,36 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
     '[["standard_version","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["short_currency_identifier","OC"],["issuer_service_location","opencoin://issuer.opencent.net:8002"],["denominations",[1,2,5,10,20,50,100,200,500,1000]],["issuer_cipher_suite",["sha-256","rsa","rsa"]],["issuer_public_master_key","foobar"]]'
  
     >>> cdd3 = CDD().fromJson(j)
-    >>> cdd3 = cdd
+    >>> cdd3 == cdd
+    True
 
+    And now, lets play with a signed CDD
+    >>> import crypto
+    >>> private_key = crypto.createRSAKeyPair(1024)
+    >>> public_key = private_key.newPublicKeyPair()
+
+    >>> public_key.hasPrivate()
+    False
+
+    >>> cdd4 = CDD(standard_version = 'http://opencoin.org/OpenCoinProtocol/1.0',
+    ...            currency_identifier = 'http://opencent.net/OpenCent',
+    ...            short_currency_identifier = 'OC',
+    ...            issuer_service_location = 'opencoin://issuer.opencent.net:8002',
+    ...            denominations = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000],
+    ...            issuer_cipher_suite = ['SHA256HashingAlgorithm', 'RSASigningAlgorithm', 'RSABlindingAlgorithm'],
+    ...            issuer_public_master_key = public_key.toJson())
     
+    >>> hasher = crypto.SHA256HashingAlgorithm()
+    >>> signer = crypto.RSASigningAlgorithm(private_key)
+
+    >>> keyprint = hasher.update(cdd4.issuer_public_master_key).digest()
+    >>> signature = signer.sign(hasher.reset(cdd4.content_part()).digest())
+
+    >>> cdd4.adSignatures.append(Signature(keyprint, signature))
+
+    >>> cdd4.verify_self()
+    True
+
     """
 
     
@@ -201,17 +207,13 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
 
     def __init__(self,**kwargs):
         ContainerWithSignature.__init__(self, **kwargs)
-        self.adSignatures = kwargs.get('adSignatures',None)
+        self.adSignatures = kwargs.get('adSignatures',[])
 
     def verify_self(self):
         """Verifies the self-signed certificate."""
         return self.verifySignature(self.issuer_cipher_suite.signing, 
                                     self.issuer_cipher_suite.hashing, 
                                     self.issuer_public_master_key)
-
-    def sign_self(self, signing, hashing):
-        """Signs the self-signed certificate."""
-        return self.setSignature(self.issuer_public_master_key, signing, hashing)
 
 CDD = CurrencyDescriptionDocument
 
