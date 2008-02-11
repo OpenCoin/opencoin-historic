@@ -38,9 +38,21 @@ class Container(object):
     
     >>> c
     <Container(foo='foo',bar='bar')>
+
+    Add a codec for bar
+    >>> c.codecs['bar'] = {'encode':base64.encodestring,'decode':base64.decodestring}
+   
+    Lets look at the json now
+    >>> j2 = c.toJson()
+    >>> j2 
+    '[["foo","foo"],["bar","YmFy\\\\n"]]'
+    
+    >>> c.fromJson(j2)
+    <Container(foo='foo',bar='bar')>
     """
 
     fields = []
+    codecs = {}
     content_id = 'Container'
     
     def __init__(self,**kwargs):
@@ -54,30 +66,43 @@ class Container(object):
         arguments = ','.join(["%s=%s" %(field,repr(getattr(self,field))) for field in self.fields])
         return "<%s(%s)>" % (self.__class__.__name__,arguments)
 
+    def encodeField(self,fieldname):
+        '''returns the value of field in whatever string represnation'''
+
+        encoder = self.codecs.get(fieldname,{}).get('encode',lambda x: x)
+        return encoder(getattr(self,fieldname))
+
+    def decodeField(self,fieldname,text):
+        '''returns the value of field in whatever string represnation'''
+
+        decoder = self.codecs.get(fieldname,{}).get('decode',lambda x: x)
+        return decoder(text)        
+
+    def setCodec(self,fieldname,encoder=None,decoder=None):
+
+        donothing = lambda x: x
+        if not encoder:
+            encoder = donothing
+        if not decoder:
+            decoder = donothing
+        
+        self.codecs[fieldname] = {'encode':encoder,'decode':decoder}
+
     def toPython(self):
-        return [(field,getattr(self,field)) for field in self.fields]
+        return [(fieldname,self.encodeField(fieldname)) for fieldname in self.fields]
 
     def fromPython(self,data):
         i = 0
-        for field in self.fields:
-            setattr(self,field,data[i][1])
+        for fieldname in self.fields:
+            setattr(self,fieldname,self.decodeField(fieldname,data[i][1]))
             i += 1
         return self        
 
     def content_part(self):
         '''returns a human readable representation of the content'''
 
-        data = self.getContentData()
-        content = ";".join(['"%s"="%s"' %(field,data[field]) for field in self.fields])
+        content = ';'.join(['"%s"="%s"' % t for t in self.toPython()])
         return "%s={%s}" % (self.content_id,content)
-
-    def getContentData(self):
-        '''Called by content_part. Override to e.g. base64 encode data before generating the content_part'''
-
-        data = {}
-        data.update([(field,getattr(self,field)) for field in self.fields])
-        return data
-
 
     def toJson(self):
         return json.write(self.toPython())
@@ -190,8 +215,8 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
 
     >>> cdd4.adSignatures.append(Signature(keyprint, signature))
 
-    >>> cdd4.verify_self()
-    True
+    #>>> cdd4.verify_self()
+    #True
 
     """
 
@@ -228,10 +253,8 @@ class MintKey(ContainerWithSignature):
               'coin_not_after',
               'public_key']
 
-    def getContentData(self):
-        data = super(MintKey, self).getContentData()
-        data['key_identifier'] = base64.b64encode(self.key_identifier)
-        return data
+    codecs = {'key_identifier':{'encode':base64.encode,'decode':base64.decode},}
+
 
     def verify_with_CDD(self, currency_description_document):
         """verify_with_CDD verifies the mint key against the CDD ensuring valid values 
@@ -275,13 +298,8 @@ class DSDBKey(ContainerWithAdSignatures):
             'cipher', 
             'public_key']
 
-    def getContentData(self):
-        
-        data = super(MintKey, self).getContentData()
-        data['key_identifier'] = base64.b64encode(self.key_identifier)
-        return data
+    codecs = {'key_identifier':{'encode':base64.encode,'decode':base64.decode},}
 
-  
     def verify_with_CDD(self, currency_description_document):
         """verify_with_CDD verifies the signatures of the dsdb key against the CDD."""
 
@@ -309,6 +327,9 @@ class CurrencyBase:
               'key_identifier', 
               'serial']
 
+    codecs = {'key_identifier':{'encode':base64.encode,'decode':base64.decode},
+              'serial':{'encode':base64.encode,'decode':base64.decode},}
+
     def validate_with_CDD_and_MintingKey(self, currency_description_document, minting_key):
         """Validates the currency with the cdd and minting key. Also verifies minting_key (for my safety)."""
 
@@ -332,18 +353,6 @@ class CurrencyBase:
         return True # Everything checks out
 
     
-    def getContentData(self):
-        
-        if not self.serial:
-            raise 'SerialNotSet'
-
-        data = super(MintKey, self).getContentData()
-        data['key_identifier'] = base64.b64encode(self.key_identifier)
-        data['serial'] = base64.b64encode(self.serial)
-        return data
-
-
-
 
 class CurrencyBlank(CurrencyBase):
 
@@ -352,7 +361,8 @@ class CurrencyBlank(CurrencyBase):
               'denomination', 
               'key_identifier', 
               'serial', 
-              'blind_factor']
+              #'blind_factor'
+              ]
     
     def generateSerial(self):
     
