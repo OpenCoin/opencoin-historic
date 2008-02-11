@@ -126,23 +126,13 @@ class Signature(Container):
     '''
     fields = ['keyprint',
               'signature']
-
-
-
-class ContainerWithBase(Container):
-
-    def _verifyASignature(self, signature_algorithm, hashing_algorithm, signature, key, content_part):
-
-        hasher = hashing_algorithm(content_part)
-        signer = signature_algorithm(key, hasher.digest())
-        return signer.verify(signature.signature)
     
 
-class ContainerWithSignature(ContainerWithBase):
+class ContainerWithSignature(Container):
     
 
     def __init__(self, **kwargs):
-        ContainerWithBase.__init__(self,**kwargs)
+        Container.__init__(self,**kwargs)
         self.jsontext = None
         self.signature = kwargs.get('signature')
 
@@ -177,56 +167,11 @@ class ContainerWithSignature(ContainerWithBase):
                                       key, 
                                       self.content_part())
 
+    def _verifyASignature(self, signature_algorithm, hashing_algorithm, signature, key, content_part):
 
-class ContainerWithSignatures(ContainerWithBase):
-    '''XXX This is going to be deleted!!!
-
-       This can be signed. If we construct from jon, we always use the original json
-       to represent the container, avoiding encoding differences somewhere down the line. Can have
-       multiple signatures'''
-
-    def __init__(self, **kwargs):
-        ContainerWithBase.__init__(self,**kwargs)
-        self.jsontext = None
-        self.signatures = kwargs.get('signatures',[])
-
-    def toJson(self,signatures=0):
-        if signatures:
-            if self.jsontext:
-                return self.jsontext
-            else:
-                data = self.toPython()
-                data.append(['signatures',[s.toPython() for s in self.signatures]])
-                self.jsontext = json.write(data) #This is a hack
-                return self.jsontext
-        else:       
-            return json.write(self.toPython())
-
-    def fromJson(self,text):
-        data = json.read(text)
-        if len(data) == len(self.fields) + 1 and data[-1][0] == 'signatures':
-            signatures = []
-            for d in data[-1][1]:
-                sig = Signature()
-                signatures.append(sig.fromPython(d)) 
-            self.signatures = signatures
-            self.jsontext = text
-        return self.fromPython(data)
-
-
-    def verifyAdSignatures(self, signature_algorithm, hashing_algorithm, key, keyprint):
-        for s in self.signatures:
-            if s == keyprint:
-                return self._verifyASignature(signature_algorithm, 
-                                              hashing_algorithm, 
-                                              s, 
-                                              key, 
-                                              self.content_part())
-        return False # If we didn't match keyprints, we fail verification
-
-    
-
-
+        hasher = hashing_algorithm(content_part)
+        signer = signature_algorithm(key, hasher.digest())
+        return signer.verify(signature.signature)
 
 class CurrencyDescriptionDocument(ContainerWithSignature):
     """
