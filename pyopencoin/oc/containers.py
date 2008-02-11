@@ -19,9 +19,9 @@ class Container(object):
     >>> c
     <Container(foo='foo',bar='bar')>
 
-    Serialize human readable    
+    Serialize human readable - its actually json. 
     >>> c.content_part()
-    'Container={"foo"="foo";"bar"="bar"}'
+    '[["foo","foo"],["bar","bar"]]'
 
     Serialize to json
     >>> j = c.toJson()
@@ -101,6 +101,8 @@ class Container(object):
     def content_part(self):
         '''returns a human readable representation of the content'''
 
+        return self.toJson()
+
         content = ';'.join(['"%s"="%s"' % t for t in self.toPython()])
         return "%s={%s}" % (self.content_id,content)
 
@@ -114,10 +116,17 @@ class Container(object):
         return self.__dict__==other.__dict__
 
 
-class Signature:
-    def __init__(self, keyprint, signature):
-        self.keyprint = keyprint
-        self.signature = signature
+class Signature(Container):
+    '''
+    >>> s = Signature(keyprint='foo',signature='bar')
+    >>> s
+    <Signature(keyprint='foo',signature='bar')>
+    >>> s.toPython()
+    [('keyprint', 'foo'), ('signature', 'bar')]
+    '''
+    fields = ['keyprint',
+              'signature']
+
 
 
 class ContainerWithBase(Container):
@@ -130,10 +139,34 @@ class ContainerWithBase(Container):
     
 
 class ContainerWithSignature(ContainerWithBase):
+    
 
     def __init__(self, **kwargs):
         ContainerWithBase.__init__(self,**kwargs)
+        self.jsontext = None
         self.signature = kwargs.get('signature')
+
+
+    def toJson(self,signature=0):
+        if signature:
+            if self.jsontext:
+                return self.jsontext
+            else:
+                data = self.toPython()
+                data.append(['signature',self.signature.toPython()])
+                return json.write(data)
+        else:       
+            return json.write(self.toPython())
+
+    def fromJson(self,text):
+        data = json.read(text)
+        if len(data) == len(self.fields) + 1 and data[-1][0] == 'signature':
+            s = Signature()
+            self.signature = s.fromPython(data[-1][1])
+            self.jsontext = text
+        return self.fromPython(data)
+
+
 
     def verifySignature(self, signature_algorithm, hashing_algorithm, key):
 
@@ -144,14 +177,39 @@ class ContainerWithSignature(ContainerWithBase):
                                       self.content_part())
 
 
-class ContainerWithAdSignatures(ContainerWithBase):
-    "has multiple additional signatures, not necessarily signed by a specific party."
+class ContainerWithSignatures(ContainerWithBase):
+    '''This can be signed. If we construct from jon, we always use the original json
+       to represent the container, avoiding encoding differences somewhere down the line. Can have
+       multiple signatures'''
 
     def __init__(self, **kwargs):
         ContainerWithBase.__init__(self,**kwargs)
-        self.signatures = kwargs.get('signatures')
-        if not signatures:
-            self.signatures = []
+        self.jsontext = None
+        self.signatures = kwargs.get('signatures',[])
+
+    def toJson(self,signatures=0):
+        if signatures:
+            if self.jsontext:
+                return self.jsontext
+            else:
+                data = self.toPython()
+                data.append(['signatures',[s.toPython() for s in self.signatures]])
+                self.jsontext = json.write(data) #This is a hack
+                return self.jsontext
+        else:       
+            return json.write(self.toPython())
+
+    def fromJson(self,text):
+        data = json.read(text)
+        if len(data) == len(self.fields) + 1 and data[-1][0] == 'signatures':
+            signatures = []
+            for d in data[-1][1]:
+                sig = Signature()
+                signatures.append(sig.fromPython(d)) 
+            self.signatures = signatures
+            self.jsontext = text
+        return self.fromPython(data)
+
 
     def verifyAdSignatures(self, signature_algorithm, hashing_algorithm, key, keyprint):
         for s in self.signatures:
@@ -167,7 +225,7 @@ class ContainerWithAdSignatures(ContainerWithBase):
 
 
 
-class CurrencyDescriptionDocument(ContainerWithSignature):
+class CurrencyDescriptionDocument(ContainerWithSignatures):
     """
     Lets test a bit
     >>> cdd = CDD(standard_version = 'http://opencoin.org/OpenCoinProtocol/1.0',
@@ -175,7 +233,7 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
     ...           short_currency_identifier = 'OC', 
     ...           issuer_service_location = 'opencoin://issuer.opencent.net:8002', 
     ...           denominations = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000], 
-    ...           issuer_cipher_suite = ['sha-256', 'rsa', 'rsa'], 
+    ...           issuer_cipher_suite = ['sha256', 'rsa', 'rsa'], 
     ...           issuer_public_master_key = 'foobar')
 
     >>> data = cdd.toPython()
@@ -185,7 +243,7 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
   
     >>> j = cdd.toJson()
     >>> j
-    '[["standard_version","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["short_currency_identifier","OC"],["issuer_service_location","opencoin://issuer.opencent.net:8002"],["denominations",[1,2,5,10,20,50,100,200,500,1000]],["issuer_cipher_suite",["sha-256","rsa","rsa"]],["issuer_public_master_key","foobar"]]'
+    '[["standard_version","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["short_currency_identifier","OC"],["issuer_service_location","opencoin://issuer.opencent.net:8002"],["denominations",[1,2,5,10,20,50,100,200,500,1000]],["issuer_cipher_suite",["sha256","rsa","rsa"]],["issuer_public_master_key","foobar"]]'
  
     >>> cdd3 = CDD().fromJson(j)
     >>> cdd3 == cdd
@@ -213,9 +271,25 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
     >>> keyprint = hasher.update(cdd4.issuer_public_master_key).digest()
     >>> signature = signer.sign(hasher.reset(cdd4.content_part()).digest())
 
-    >>> cdd4.adSignatures.append(Signature(keyprint, signature))
+    >>> sig = Signature(keyprint=keyprint, signature=signature)
 
-    #>>> cdd4.verify_self()
+    >>> cdd4.signatures.append(sig)
+    >>> j4 = cdd4.toJson(1)
+    
+    >>> cdd5 = CDD().fromJson(j4)
+    >>> cdd5 == cdd4
+    True
+
+    >>> cdd5.signatures[0] == sig
+    True
+
+
+    We always use the original jsontext to represent ourself!
+    >>> cdd5.short_currency_identifier = 'Foobar'
+    >>> cdd5.toJson(1) == j4
+    True
+
+    >>> #cdd4.verify_self()
     #True
 
     """
@@ -231,7 +305,7 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
 
 
     def __init__(self,**kwargs):
-        ContainerWithSignature.__init__(self, **kwargs)
+        ContainerWithSignatures.__init__(self, **kwargs)
         self.adSignatures = kwargs.get('adSignatures',[])
 
     def verify_self(self):
@@ -290,7 +364,7 @@ class MintKey(ContainerWithSignature):
 
 
 
-class DSDBKey(ContainerWithAdSignatures):
+class DSDBKey(ContainerWithSignatures):
     
     fields=['key_identifier', 
             'not_before', 
