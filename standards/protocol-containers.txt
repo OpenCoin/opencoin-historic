@@ -13,18 +13,10 @@ Name1 = {
     
     ExtraName1 = Value4
     ExtraName2 = Value5
-    
-    RepeatableExtraName1 = Value6
-    RepeatableExtraname2 = Value7
 }
 
 ContentNames and ExtraNames are always seperated by a blank line.
-ExtraNames and RepeatableExtraNames are always seperated by a blank line.
 ContentNames are required to be in all formats. ExtraNames are optional.
-RepeatableExtraNames are optional.
-
-If RepeatableExtraNames are used and no ExtraNames are used, the spacing between
-the ContentNames and the RepeatableExtraNames shall be blankline, period, blankline.
 
 When refering to a part of a structure, Name1.ContentName1 refers to the
 value of ContentName1 in Name1. Similarily, ContentName2 refers to the
@@ -32,16 +24,14 @@ value of ContentName2 in the same structure.
 
 A special identifier, ContentPart is the combination of all ContentNames.
 
-The identifier names in ContentNames, ExtraNames, and RepeatableExtraNames cannot
-be the same as any other identifier.
+The identifier names in ContentNames and ExtraNames cannot be the same as
+any other identifier.
 
 ---------------------------------------------------
 
 ================
 = Certificates =
 ================
-
-Note: I haven't updating these to fit the requirements above yet.
 
 Currency Description Document (CCD) =
 {
@@ -55,9 +45,6 @@ Currency Description Document (CCD) =
 
     issuer                      = hash(pM)
     signature                   = base64(sig(sM,hash(content part)))
-
-    signer                      = Hash(pM)
-    ad_signature                = base64(sig(sM, hash(content part)))
 }
 
 
@@ -75,21 +62,6 @@ Mint Key =
     signature           = base64(sig(sM, hash(content part)))
 }
 
-
-DSDB Key = 
-{
-    key identifier      = base64(hash(pD))
-    not_before          = TIME(...)
-    not_after           = TIME(...)
-    cipher              = ENCRYPT-ALG
-    public key          = base64(pD)
-
-    issuer              = Hash(pM)
-    signature           = base64(sig(sM, hash(content part)))
-
-    signer              = Hash(pM)
-    ad_signature        = base64(sig(sM, hash(content part)))
-}
 
 ---------------------------------------------------
 
@@ -118,12 +90,3 @@ Coin =
     signature               = base64(sig(pP, content part))
 }
 
-
-Obfuscated Blank =
-{
-    standard identifier     = http://opencoin.org/OpenCoinProtocol/1.0
-    currency identifier     = http://opencent.net/OpenCent 
-    denomination            = denomination
-    key identifier          = key_id(signing key)
-    serial                  = base64(encrypt(pD, serial))
-}
