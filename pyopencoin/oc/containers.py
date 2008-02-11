@@ -154,7 +154,8 @@ class ContainerWithSignature(ContainerWithBase):
             else:
                 data = self.toPython()
                 data.append(['signature',self.signature.toPython()])
-                return json.write(data)
+                self.jsontext = json.write(data)
+                return self.jsontext
         else:       
             return json.write(self.toPython())
 
@@ -178,7 +179,9 @@ class ContainerWithSignature(ContainerWithBase):
 
 
 class ContainerWithSignatures(ContainerWithBase):
-    '''This can be signed. If we construct from jon, we always use the original json
+    '''XXX This is going to be deleted!!!
+
+       This can be signed. If we construct from jon, we always use the original json
        to represent the container, avoiding encoding differences somewhere down the line. Can have
        multiple signatures'''
 
@@ -225,7 +228,7 @@ class ContainerWithSignatures(ContainerWithBase):
 
 
 
-class CurrencyDescriptionDocument(ContainerWithSignatures):
+class CurrencyDescriptionDocument(ContainerWithSignature):
     """
     Lets test a bit
     >>> cdd = CDD(standard_version = 'http://opencoin.org/OpenCoinProtocol/1.0',
@@ -271,16 +274,15 @@ class CurrencyDescriptionDocument(ContainerWithSignatures):
     >>> keyprint = hasher.update(cdd4.issuer_public_master_key).digest()
     >>> signature = signer.sign(hasher.reset(cdd4.content_part()).digest())
 
-    >>> sig = Signature(keyprint=keyprint, signature=signature)
+    >>> cdd4.signature =  Signature(keyprint=keyprint, signature=signature)
 
-    >>> cdd4.signatures.append(sig)
     >>> j4 = cdd4.toJson(1)
     
     >>> cdd5 = CDD().fromJson(j4)
     >>> cdd5 == cdd4
     True
 
-    >>> cdd5.signatures[0] == sig
+    >>> cdd5.signature == cdd4.signature
     True
 
 
@@ -305,7 +307,7 @@ class CurrencyDescriptionDocument(ContainerWithSignatures):
 
 
     def __init__(self,**kwargs):
-        ContainerWithSignatures.__init__(self, **kwargs)
+        ContainerWithSignature.__init__(self, **kwargs)
         self.adSignatures = kwargs.get('adSignatures',[])
 
     def verify_self(self):
@@ -364,7 +366,7 @@ class MintKey(ContainerWithSignature):
 
 
 
-class DSDBKey(ContainerWithSignatures):
+class DSDBKey(ContainerWithSignature):
     
     fields=['key_identifier', 
             'not_before', 
