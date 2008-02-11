@@ -291,7 +291,7 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
     >>> cdd5.toJson(1) == j4
     True
 
-    >>> #cdd4.verify_self()
+    >>> cdd4.verify_self()
     #True
 
     """
