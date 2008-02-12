@@ -209,12 +209,13 @@ class ServerTestTransport(Transport):
     Client <Message('finished',None)>
     """
 
-    def __init__(self,callback):
+    def __init__(self,callback,**kwargs):
         self.callback = callback
+        self.kwargs = kwargs
 
     def start(self):
         clienttransport = ClientTestTransport(self)
-        self.callback(clienttransport)
+        self.callback(clienttransport,**self.kwargs)
 
     def write(self,message):
         print 'Server', message

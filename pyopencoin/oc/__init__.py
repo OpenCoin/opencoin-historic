@@ -67,6 +67,7 @@ def _test():
     doctest.testmod(entities)
     doctest.testmod(transports)
     doctest.testmod(containers)
+    doctest.testfile("tests.txt",optionflags=doctest.ELLIPSIS)
 
 if __name__ == "__main__":
     _test()

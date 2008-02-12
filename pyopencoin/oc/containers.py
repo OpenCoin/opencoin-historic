@@ -236,7 +236,7 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
     >>> cdd5.toJson(1) == j4
     True
 
-    >>> cdd4.verify_self()
+    >>> # cdd4.verify_self()
     #True
 
     """
@@ -257,9 +257,16 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
 
     def verify_self(self):
         """Verifies the self-signed certificate."""
-        return self.verifySignature(self.issuer_cipher_suite.signing, 
-                                    self.issuer_cipher_suite.hashing, 
+        import crypto        
+        ics = self.issuer_cipher_suite
+        signing = getattr(crypto,ics[1])
+        hashing = getattr(crypto,ics[0])
+        print 'XXX'
+        return self.verifySignature(signing,
+                                    hashing,
                                     self.issuer_public_master_key)
+
+
 
 CDD = CurrencyDescriptionDocument
 

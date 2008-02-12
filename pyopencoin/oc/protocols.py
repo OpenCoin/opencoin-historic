@@ -256,17 +256,29 @@ class giveMintingKeyProtocol(Protocol):
     """An issuer hands out a key. The other side of fetchMintingKeyProtocol.
     >>> from entities import Issuer
     >>> issuer = Issuer()
+    >>> pub1 = issuer.mint.createNewKeys('1','now','later')
     >>> gmp = giveMintingKeyProtocol(issuer)
     
     >>> gmp.state(Message('HANDSHAKE',{'protocol': 'opencoin 1.0'}))
     <Message('HANDSHAKE_ACCEPT',None)>
 
-    >>> gmp.state(Message('MINTING_KEY_FETCH_DENOMINATION',2))
-    <Message('MINTING_KEY_PASS','foobar')>
+    >>> m = gmp.state(Message('MINTING_KEY_FETCH_DENOMINATION','1'))
+    >>> m == Message('MINTING_KEY_PASS',str(pub1))
+    True
 
     >>> gmp.newState(gmp.giveKey)
-    >>> gmp.state(Message('MINTING_KEY_FETCH_KEYID','abc'))
-    <Message('MINTING_KEY_PASS','foobar')>
+    >>> m = gmp.state(Message('MINTING_KEY_FETCH_KEYID',pub1.key_id()))
+    >>> m == Message('MINTING_KEY_PASS',str(pub1))
+    True
+
+    >>> gmp.newState(gmp.giveKey)
+    >>> gmp.state(Message('MINTING_KEY_FETCH_DENOMINATION','2'))
+    <Message('MINTING_KEY_FAILURE','no key for that denomination available')>
+   
+
+    >>> gmp.newState(gmp.giveKey)
+    >>> gmp.state(Message('MINTING_KEY_FETCH_KEYID','non existient id'))
+    <Message('MINTING_KEY_FAILURE','no such keyid')>
 
     >>> gmp.newState(gmp.giveKey)
     >>> gmp.state(Message('bla','blub'))
@@ -314,7 +326,7 @@ class giveMintingKeyProtocol(Protocol):
             error = 'wrong question'
 
         if not error:            
-            return Message('MINTING_KEY_PASS',key.toPython)
+            return Message('MINTING_KEY_PASS',key.toPython())
         else:
             return Message('MINTING_KEY_FAILURE',error)
 

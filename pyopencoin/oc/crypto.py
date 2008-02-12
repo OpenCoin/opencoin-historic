@@ -286,15 +286,23 @@ class RSAKeyPair(KeyPair):
             return ','.join([base64.b64encode(number.long_to_bytes(i)) for i in [key.d,key.p,key.q]])
         else: 
             return ''
-    
+   
+    def toPython(self):
+        return str(self) 
+
     def toJson(self):
         import json
-
         return json.write(dict(public=str(self),private=self.stringPrivate()))
 
+    def key_id(self):
+        return SHA256HashingAlgorithm().update(str(self)).digest()
 
     def newPublicKeyPair(self):
         return RSAKeyPair(self.key.publickey())
+
+    def __eq__(self,other):
+        return self.toPython() == other.toPython()
+
 
 def createRSAKeyPair(N):
     """Creates an RSA keypair of size N."""

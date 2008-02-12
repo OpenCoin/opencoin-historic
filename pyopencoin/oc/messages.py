@@ -26,6 +26,9 @@ class Message:
             self.data = out[1]
         return self
 
+    def __eq__(self,other):
+        return repr(self)==repr(other)
+
 if __name__ == "__main__":
     import doctest
     doctest.testmod()    
