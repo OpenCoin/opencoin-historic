@@ -18,6 +18,9 @@ Define encryption padding
 Add default transaction_id handling (Both parties agreeing to a transaction_id)
 Add hello/versioning/protocol handshaking
 Add generic error message
+Renamings (Coin-->Token, ...)
+RFC style
+Licence - GNU FDL?
 
 
 protocol-over-https.txt
