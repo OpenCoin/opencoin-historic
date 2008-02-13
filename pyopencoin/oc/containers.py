@@ -188,7 +188,10 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
     >>> cdd2 = CDD().fromPython(data)
     >>> cdd2 == cdd
     True
-  
+
+    >>> cdd2.toJson() == cdd.toJson()
+    True
+
     >>> j = cdd.toJson()
     >>> j
     '[["standard_version","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["short_currency_identifier","OC"],["issuer_service_location","opencoin://issuer.opencent.net:8002"],["denominations",[1,2,5,10,20,50,100,200,500,1000]],["issuer_cipher_suite",["RSASigningAlgorithm","RSABlindingAlgorithm","SHA256HashingAlgorithm"]],["issuer_public_master_key","DKE=,EQ=="]]'

@@ -60,6 +60,14 @@ class CryptoContainer:
 
         return '[' + ', '.join(include) + ']'
 
+    def __eq__(self, other):
+        if not isinstance(other, CryptoContainer):
+            raise NotImplementedError
+        return self.signing.ALGNAME == other.signing.ALGNAME and \
+               self.hashing.ALGNAME == other.hashing.ALGNAME and \
+               self.blinding.ALGNAME == other.blinding.ALGNAME
+        
+
 def decodeCryptoContainer(container):
     # raise NotImplementedError, str(container)
     return CryptoContainer(signing=RSASigningAlgorithm,
@@ -330,7 +338,7 @@ class RSAKeyPair(KeyPair):
         return RSAKeyPair(self.key.publickey())
 
     def __eq__(self,other):
-        return self.toPython() == other.toPython()
+        return self.key == other.key
 
 def decodeRSAKeyPair(key):
     import base64
