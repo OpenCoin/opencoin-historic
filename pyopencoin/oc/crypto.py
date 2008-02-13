@@ -50,11 +50,11 @@ class CryptoContainer:
     def __str__(self):
         include = []
         if self.signing:
-            include.append(str(self.signing))
+            include.append(self.signing.ALGNAME)
         if self.blinding:
-            include.append(str(self.blinding))
+            include.append(self.blinding.ALGNAME)
         if self.hashing:
-            include.append(str(self.hashing))
+            include.append(self.hashing.ALGNAME)
 
         # the order is always SIGN-ALG, BLINDING-ALG, HASH-ALG
 
@@ -69,11 +69,11 @@ def decodeCryptoContainer(container):
 def encodeCryptoContainer(container):
     include = []
     if container.signing:
-        include.append(str(container.signing))
+        include.append(container.signing.ALGNAME)
     if container.blinding:
-        include.append(str(container.blinding))
+        include.append(container.blinding.ALGNAME)
     if container.hashing:
-        include.append(str(container.hashing))
+        include.append(container.hashing.ALGNAME)
 
     return include
     
@@ -384,13 +384,13 @@ class RSAEncryptionAlgorithm(EncryptionAlgorithm):
     """
     from Crypto.PublicKey import RSA
 
+    ALGNAME = 'RSAEncryptionAlgorithm'
+
     def __init__(self, key):
         if not isinstance(key, RSAKeyPair):
             raise CryptoError('key not RSAKeyPair type!. key.__class__: %s' % key.__class__)
         
         EncryptionAlgorithm.__init__(self, key)
-
-        self.ALGNAME = 'RSAEncryptionAlgorithm'
         
     def encrypt(self, message):
         try:
@@ -434,10 +434,12 @@ class RSABlindingAlgorithm(BlindingAlgorithm):
     >>> blind.unblind(blinded)
     r'\\x9a'
     """
+
+    ALGNAME = 'RSABlindingAlgorithm'
+
     def __init__(self, key, blinding_factor=None):
         BlindingAlgorithm.__init__(self, key)
         self.blinding_factor = blinding_factor
-        self.ALGNAME = 'RSABlindingAlgorithm'
 
     def blind(self, message, blinding_factor=None):
         """returns the blinding of the input with the key and the blinding factor."""
@@ -514,9 +516,11 @@ class RSASigningAlgorithm(SigningAlgorithm):
     >>> verifier.verify(message, signature)
     False
     """
+
+    ALGNAME = 'RSASigningAlgorithm'
+
     def __init__(self, key):
         SigningAlgorithm.__init__(self, key)
-        self.ALGNAME = 'RSASigningAlgorithm'
 
     def sign(self, message):
         """returns the signature of the message with the key."""
@@ -540,11 +544,13 @@ class RSASigningAlgorithm(SigningAlgorithm):
             raise CryptoError(reason)
 
 class SHA256HashingAlgorithm(HashingAlgorithm):
+
+    ALGNAME='SHA256HashingAlgorithm'
+
     def __init__(self, input=None):
         self.reset() # setup self.hash. We reset empty since HashingAlgorithm.__init__ will update!
 
         HashingAlgorithm.__init__(self, input)
-        self.ALGNAME='SHA256HashingAlgorithm'
 
     def update(self, input):
         self.hash.update(input) 

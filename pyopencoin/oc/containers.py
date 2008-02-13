@@ -191,7 +191,7 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
   
     >>> j = cdd.toJson()
     >>> j
-    '[["standard_version","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["short_currency_identifier","OC"],["issuer_service_location","opencoin://issuer.opencent.net:8002"],["denominations",[1,2,5,10,20,50,100,200,500,1000]],["issuer_cipher_suite",["sha256","rsa","rsa"]],["issuer_public_master_key","DKE=,EQ=="]]'
+    '[["standard_version","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["short_currency_identifier","OC"],["issuer_service_location","opencoin://issuer.opencent.net:8002"],["denominations",[1,2,5,10,20,50,100,200,500,1000]],["issuer_cipher_suite",["RSASigningAlgorithm","RSABlindingAlgorithm","SHA256HashingAlgorithm"]],["issuer_public_master_key","DKE=,EQ=="]]'
  
     >>> cdd3 = CDD().fromJson(j)
     >>> cdd3 == cdd
@@ -201,7 +201,7 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
     >>> cdd3.signature = sig
 
     >>> cdd3.toJson() #the format expected is questionable.
-    '[["standard_version","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["short_currency_identifier","OC"],["issuer_service_location","opencoin://issuer.opencent.net:8002"],["denominations",[1,2,5,10,20,50,100,200,500,1000]],["issuer_cipher_suite",["sha256","rsa","rsa"]],["issuer_public_master_key","DKE=,EQ=="],["signature",["keyprint","foo"],["signature","bar"]]]'
+    '[["standard_version","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["short_currency_identifier","OC"],["issuer_service_location","opencoin://issuer.opencent.net:8002"],["denominations",[1,2,5,10,20,50,100,200,500,1000]],["issuer_cipher_suite",["RSASigningAlgorithm","RSABlindingAlgorithm","SHA256HashingAlgorithm"]],["issuer_public_master_key","DKE=,EQ=="],["signature",["keyprint","foo"],["signature","bar"]]]'
     
     
     And now, lets play with a really signed CDD
