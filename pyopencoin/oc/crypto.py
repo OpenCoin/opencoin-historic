@@ -167,7 +167,7 @@ class KeyPair:
         return self.private
    
 class RSAKeyPair(KeyPair):
-    """An instance of the KeyPair which does RSA. It builds from the pycrypto RSA.
+    r"""An instance of the KeyPair which does RSA. It builds from the pycrypto RSA.
 
     First, create a public key and private key copy with known values.
     (p=61, q=53, n=pq=3233, e=17, d=2753)
@@ -358,7 +358,7 @@ def createRSAKeyPair(N):
 
 
 class RSAEncryptionAlgorithm(EncryptionAlgorithm):
-    """Performs RSA encryption
+    r"""Performs RSA encryption
     >>> private = RSAKeyPair(n=3233L, e=17L, d=2753L, p=61L, q=53L)
     >>> public = private.newPublicKeyPair()
 
@@ -385,7 +385,7 @@ class RSAEncryptionAlgorithm(EncryptionAlgorithm):
     CryptoError: Do not have private key
 
     >>> pub_enc.encrypt('0')
-    '\\x02p'
+    '\x02p'
 
     >>> priv_enc.decrypt('\x02p')
     '0'
@@ -403,18 +403,18 @@ class RSAEncryptionAlgorithm(EncryptionAlgorithm):
     def encrypt(self, message):
         try:
             return self.key.public().encrypt(message, '')[0]
-        except (PyCryptoRSAError, reason):
+        except PyCryptoRSAError, reason:
             raise CryptoError(reason)
     
     def decrypt(self, message):
         try:
             return self.key.private().decrypt(message)
-        except (PyCryptoRSAError, reason):
+        except PyCryptoRSAError, reason:
             raise CryptoError(reason)
         
 
 class RSABlindingAlgorithm(BlindingAlgorithm):
-    """Performs RSA blinding
+    r"""Performs RSA blinding
     >>> private = RSAKeyPair(n=3233L, e=17L)
 
     >>> blind = RSABlindingAlgorithm(private)
@@ -426,21 +426,21 @@ class RSABlindingAlgorithm(BlindingAlgorithm):
     >>> blinded, factor = blind.blind(154L, 1001L)
 
     >>> blinded
-    r'\\tC'
+    '\tC'
 
     >>> factor == 1001L
     True
 
     >>> blind.unblind(blinded, factor)
-    154L
+    '\x0bw'
 
-    >>> blinded, factor = blind.blind(r'\x9a', r'\x03\xe9')
+    >>> blinded, factor = blind.blind('\x9a', '\x03\xe9')
 
     >>> blinded
-    r'\\tC'
+    '\tC'
     
     >>> blind.unblind(blinded)
-    r'\\x9a'
+    '\x0bw'
     """
 
     ALGNAME = 'RSABlindingAlgorithm'
