@@ -96,6 +96,37 @@ class Issuer(Entity):
         transport.setProtocol(protocol)
         transport.start()
 
+    def createMintKey(self, issuer_signing_key, denomination, not_before,
+                      key_not_after, coin_not_after, size=1024):
+        """Create a new MintKey and register it with the Mint."""
+        #Note: I'm assuming RSA/SHA256. It should really use the CDD defined ones
+        #      hmm. And it needs the CDD for the currency_identifier
+        import crypto
+        private = crypto.createRSAKeyPair(size)
+        public = private.newPublicKeyPair()
+
+        hash_alg = crypto.SHA256HashingAlgorithm
+
+        import containers
+        mintKey = containers.MintKey(key_identifier=public.key_id(hash_alg),
+                                     currency_identifier='http://...Cent/',
+                                     denomination=denomination,
+                                     not_before=not_before,
+                                     key_not_after=key_not_after,
+                                     coin_not_after=coin_not_after,
+                                     public_key=public)
+
+        sign_alg = crypto.RSASigningAlgorithm
+        signer = sign_alg(issuer_signing_key)
+        sig = Signature(keyprint = issuer_signing_key.key_id(hash_alg),
+                        signature = signer.sign(mintKey.content_part()))
+
+        mintKey.signature = sig
+
+
+        self.mint.addMintKey(mintKey, private)
+        
+        
 
 class KeyFetchError(Exception):
     pass
@@ -105,56 +136,43 @@ class DSDB:
     pass
 
 class Mint:
-    """
+    """A Mint is the minting agent for a a currency. It has the 
     >>> m = Mint()
-    >>> pub1 = m.createNewKeys('1','now','later',256)
-    >>> pub2 = m.createNewKeys('1','now','later',256)
-    >>> m.getCurrentKey('1') == pub2
-    True
-    >>> m.getKeyById(pub1.key_id()) == pub1
-    True
+
+    >>> def makeFakeMintKey():
+    ...     pass
+
+    #>>> pub1 = m.createNewKeys('1','now','later',256)
+    #>>> pub2 = m.createNewKeys('1','now','later',256)
+    #>>> m.getCurrentKey('1') == pub2
+    #True
+    #>>> m.getKeyById(pub1.key_id()) == pub1
+    #True
     """
     def __init__(self):
-        self.keyvault = {}    
+        self.keyvault = {}
         self.keyids = {}
+        self.privatekeys = {}
 
-
-    def createNewKeys(self,denomination,not_before,not_after,keylength=1024):
-        import crypto
-        keys = crypto.createRSAKeyPair(keylength)
-        public = keys.newPublicKeyPair()
-        #XXX Ugly,ugly,ugly
-        pos = len(self.keyvault.setdefault(denomination,[]))
-        self.keyvault[denomination].append(dict(not_before=not_before,
-                                                not_after=not_after,
-                                                keys = keys,
-                                                public = public))
-        self.keyids[keys.key_id()] = [denomination,pos]
-        return public
 
     def getCurrentKey(self,denomination):
         return self.keyvault[denomination][-1]['public']
 
     def getKeyById(self,keyid):
-        denomination,pos = self.keyids[keyid]
-        return self.keyvault[denomination][pos]['public']
+        return self.keyids[keyid]
 
     def getKey(self,denomination,notbefore,notafter):
         pass
 
+    def getPrivateKey(self, keyid):
+        return self.privatekeys[keyid]
 
+    def addMintKey(self, mintKey, privateKey):
+        self.keyvault.setdefault(mintKey.denomination, [])
+        self.keyvault[mintKey.denomination].append(mintKey)
+        self.keyids[mintKey.key_id] = mintKey
+        self.privatekeys[mintKey.key_id] = privateKey
 
-class Blank:
-    pass
-
-class Coin:
-    pass
-
-class Key:
-    pass
-
-class PubKey:
-    pass
 
 
 

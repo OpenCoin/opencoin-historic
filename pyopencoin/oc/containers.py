@@ -123,6 +123,8 @@ class Signature(Container):
     <Signature(keyprint='foo',signature='bar')>
     >>> s.toPython()
     [('keyprint', 'foo'), ('signature', 'bar')]
+    >>> s.toJson()
+    '[["keyprint","foo"],["signature","bar"]]'
     '''
     fields = ['keyprint',
               'signature']
@@ -169,13 +171,18 @@ class ContainerWithSignature(Container):
 class CurrencyDescriptionDocument(ContainerWithSignature):
     """
     Lets test a bit
+    >>> import crypto
+    >>> ics = crypto.CryptoContainer(signing=crypto.RSASigningAlgorithm,
+    ...                              blinding=crypto.RSABlindingAlgorithm,
+    ...                              hashing=crypto.SHA256HashingAlgorithm)
+    
     >>> cdd = CDD(standard_version = 'http://opencoin.org/OpenCoinProtocol/1.0',
     ...           currency_identifier = 'http://opencent.net/OpenCent', 
     ...           short_currency_identifier = 'OC', 
     ...           issuer_service_location = 'opencoin://issuer.opencent.net:8002', 
     ...           denominations = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000], 
-    ...           issuer_cipher_suite = ['sha256', 'rsa', 'rsa'], 
-    ...           issuer_public_master_key = 'foobar')
+    ...           issuer_cipher_suite = ics, 
+    ...           issuer_public_master_key = crypto.RSAKeyPair(e=17L,n=3233L))
 
     >>> data = cdd.toPython()
     >>> cdd2 = CDD().fromPython(data)
@@ -184,56 +191,66 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
   
     >>> j = cdd.toJson()
     >>> j
-    '[["standard_version","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["short_currency_identifier","OC"],["issuer_service_location","opencoin://issuer.opencent.net:8002"],["denominations",[1,2,5,10,20,50,100,200,500,1000]],["issuer_cipher_suite",["sha256","rsa","rsa"]],["issuer_public_master_key","foobar"]]'
+    '[["standard_version","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["short_currency_identifier","OC"],["issuer_service_location","opencoin://issuer.opencent.net:8002"],["denominations",[1,2,5,10,20,50,100,200,500,1000]],["issuer_cipher_suite",["sha256","rsa","rsa"]],["issuer_public_master_key","DKE=,EQ=="]]'
  
     >>> cdd3 = CDD().fromJson(j)
     >>> cdd3 == cdd
     True
 
-    And now, lets play with a signed CDD
-    >>> import crypto
+    >>> sig = Signature(keyprint=21, signature=23)
+    >>> cdd3.signature = sig
+
+    >>> cdd3.toJson() #the format expected is questionable.
+    '[["standard_version","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["short_currency_identifier","OC"],["issuer_service_location","opencoin://issuer.opencent.net:8002"],["denominations",[1,2,5,10,20,50,100,200,500,1000]],["issuer_cipher_suite",["sha256","rsa","rsa"]],["issuer_public_master_key","DKE=,EQ=="],["signature",["keyprint","foo"],["signature","bar"]]]'
+    
+    
+    And now, lets play with a really signed CDD
     >>> private_key = crypto.createRSAKeyPair(1024)
     >>> public_key = private_key.newPublicKeyPair()
 
     >>> public_key.hasPrivate()
     False
 
-    >>> cdd4 = CDD(standard_version = 'http://opencoin.org/OpenCoinProtocol/1.0',
+    >>> test_cdd = CDD(standard_version = 'http://opencoin.org/OpenCoinProtocol/1.0',
     ...            currency_identifier = 'http://opencent.net/OpenCent',
     ...            short_currency_identifier = 'OC',
     ...            issuer_service_location = 'opencoin://issuer.opencent.net:8002',
     ...            denominations = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000],
-    ...            issuer_cipher_suite = ['SHA256HashingAlgorithm', 'RSASigningAlgorithm', 'RSABlindingAlgorithm'],
-    ...            issuer_public_master_key = public_key.toJson())
+    ...            issuer_cipher_suite = ics,
+    ...            issuer_public_master_key = public_key)
     
     >>> hasher = crypto.SHA256HashingAlgorithm()
     >>> signer = crypto.RSASigningAlgorithm(private_key)
 
-    >>> keyprint = hasher.update(cdd4.issuer_public_master_key).digest()
-    >>> signature = signer.sign(hasher.reset(cdd4.content_part()).digest())
+    >>> keyprint = hasher.update(str(test_cdd.issuer_public_master_key)).digest()
+    >>> signature = signer.sign(hasher.reset(test_cdd.content_part()).digest())
 
-    >>> cdd4.signature =  Signature(keyprint=keyprint, signature=signature)
+    >>> test_cdd.signature =  Signature(keyprint=keyprint, signature=signature)
 
-    >>> j4 = cdd4.toJson(1)
+    >>> test_j = test_cdd.toJson()
     
-    >>> cdd5 = CDD().fromJson(j4)
-    >>> cdd5 == cdd4
+    >>> test_cdd2 = CDD().fromJson(test_j)
+    >>> test_cdd2 == test_cdd
     True
 
-    >>> cdd5.signature == cdd4.signature
+    # >>> test_cdd2.toJson()
+
+    # would this ever fail and test_cdd2 == test_cdd?
+    >>> test_cdd2.signature == test_cdd.signature
     True
 
 
     We always use the original jsontext to represent ourself!
-    >>> cdd5.short_currency_identifier = 'Foobar'
-    >>> cdd5.toJson(1) == j4
+    >>> test_cdd2.short_currency_identifier = 'Foobar'
+    >>> test_cdd2.toJson() == test_j
     True
 
-    >>> # cdd4.verify_self()
-    #True
+    >>> test_cdd.verify_self()
+    True
 
     """
 
+    from crypto import encodeCryptoContainer, decodeCryptoContainer, decodeRSAKeyPair
     
     fields = ['standard_version', 
               'currency_identifier', 
@@ -243,20 +260,25 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
               'issuer_cipher_suite', 
               'issuer_public_master_key']
 
+    codecs = { \
+              'issuer_cipher_suite':{'encode':encodeCryptoContainer,'decode':decodeCryptoContainer}, \
+              'issuer_public_master_key':{'encode':str, \
+                                          'decode':decodeRSAKeyPair}, \
+              # 'signature':{'encode':Signature.,'decode':Signature.decode} \
+              }
+
 
     def __init__(self,**kwargs):
         ContainerWithSignature.__init__(self, **kwargs)
-        self.adSignatures = kwargs.get('adSignatures',[])
+        self.signature = kwargs.get('signature',None)
+        self.keytype = kwargs.get('keytype', None)
 
     def verify_self(self):
         """Verifies the self-signed certificate."""
         import crypto        
         ics = self.issuer_cipher_suite
-        signing = getattr(crypto,ics[1])
-        hashing = getattr(crypto,ics[0])
-        print 'XXX'
-        return self.verifySignature(signing,
-                                    hashing,
+        return self.verifySignature(ics.signing,
+                                    ics.hashing,
                                     self.issuer_public_master_key)
 
 
@@ -274,8 +296,15 @@ class MintKey(ContainerWithSignature):
               'coin_not_after',
               'public_key']
 
-    codecs = {'key_identifier':{'encode':base64.encode,'decode':base64.decode},}
+    from crypto import decodeRSAKeyPair
 
+    codecs = {'key_identifier':{'encode':base64.encode,'decode':base64.decode},
+              'public_key':{'encode':str,'decode':decodeRSAKeyPair}}
+
+    def __init__(self, **kwargs):
+        ContainerWithSignature.__init__(self, **kwargs)
+        self.signature = kwargs.get('signature', None)
+        self.keytype = kwargs.get('keytype', None)
 
     def verify_with_CDD(self, currency_description_document):
         """verify_with_CDD verifies the mint key against the CDD ensuring valid values 
@@ -309,35 +338,6 @@ class MintKey(ContainerWithSignature):
 
         return can_mint and can_redeem
 
-
-
-class DSDBKey(ContainerWithSignature):
-    
-    fields=['key_identifier', 
-            'not_before', 
-            'not_after', 
-            'cipher', 
-            'public_key']
-
-    codecs = {'key_identifier':{'encode':base64.encode,'decode':base64.decode},}
-
-    def verify_with_CDD(self, currency_description_document):
-        """verify_with_CDD verifies the signatures of the dsdb key against the CDD."""
-
-        cdd = currency_description_document
-
-        for s in self.signatures:
-            if s.keyprint == cdd.signature.keyprint: # we have the same signer
-                return self.verifyAdSignatures(cdd.issuer_cipher_suite.signing, 
-                                               cdd.issuer_cipher_suite.hashing, 
-                                               cdd.issuer_public_master_key, 
-                                               s)
-        return False #if we get here, no valid signatures were found
-        
-    def verify_time(self, time):
-        """Whether the time is between self.not_before and self.not_after"""
-
-        return time > self.not_before and time < self.not_after
 
 
 class CurrencyBase:
@@ -460,54 +460,6 @@ class CurrencyCoin(CurrencyBase):
 
         return True
 
-
-    def check_similar_to_obfuscated_blank(self, blank):
-        """check_similar_to_obfuscated_blank verifies that the coin and the blank both 
-           refer to a specific minting of a coin without verifying the serials."""
-
-        if self.standard_identifier != blank.standard_identifier:
-            return False
-
-        if self.currency_identifier != blank.currency_identifier:
-            return False
-
-        if self.denomination != blank.denomination:
-            return False
-
-        if self.key_identifier != blank.key_identifier:
-            return False
-
-        return True # We have performed allt he cbecks we can
-
-    def check_obfuscated_blank_serial(self, blank, dsdb_certificate):
-        """Attempts to ensure the the blank and the dsdb_key have the same serial. 
-           This may require additional information if we use something like ElGamal."""
-
-        enc = dsdb_certificate.cipher(dsdb_certificate.public_key, self.serial)
-        obfuscated_serial = enc.encrypt()
-        return obfuscated_serial == blank.serial
-
-    def newObfuscatedBlank(self, dsdb_certificate):
-        """Returns an CurrencyObfuscatedBlank for a certian DSDB."""
-        enc = dsdb_certificate.cipher(dsdb_certificate.public_key)
-        enc.update(self.serial)
-        obfuscatedserial = enc.encrypt()
-        return CurrencyObfuscatedBlank(self.standard_identifier, 
-                                       self.currency_identifier, 
-                                       self.denomination,
-                                       self.key_identifier, 
-                                       obfuscatedserial)
-
-
-class CurrencyObfuscatedBlank(CurrencyBase):
-
-    fields = ['standard_identifier', 
-              'currency_identifier', 
-              'denomination', 
-              'key_identifier', 
-              'serial']
-
-    content_id = 'Currency'   
 
 if __name__ == "__main__":
     import doctest

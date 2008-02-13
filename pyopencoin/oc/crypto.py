@@ -33,9 +33,8 @@ from Crypto.Util import number
 import base64
 
 class CryptoContainer:
-    def __init__(self, signing=None, encryption=None, blinding=None, hashing=None):
+    def __init__(self, signing=None, blinding=None, hashing=None):
         self.signing = signing
-        self.encryption = encryption
         self.blinding = blinding
         self.hashing = hashing
 
@@ -45,8 +44,6 @@ class CryptoContainer:
             raise CryptoError('Tried to add something to the container that was not a class!')
         if self.hashing and not isinstance(self.hashing, types.ClassType):
             raise CryptoError('Tried to add something to the container that was not a class!')
-        if self.encryption and not isinstance(self.encryption, types.ClassType):
-            raise CryptoError('Tried to add something to the container that was not a class!')
         if self.blinding and not isinstance(self.blinding, types.ClassType):
             raise CryptoError('Tried to add something to the container that was not a class!')
 
@@ -54,17 +51,31 @@ class CryptoContainer:
         include = []
         if self.signing:
             include.append(str(self.signing))
-        if self.encryption:
-            include.append(str(self.encryption))
         if self.blinding:
             include.append(str(self.blinding))
         if self.hashing:
             include.append(str(self.hashing))
 
-        # the order is always SIGN-ALG, ENCRYPTION-ALG, BLINDING-ALG, HASH-ALG
+        # the order is always SIGN-ALG, BLINDING-ALG, HASH-ALG
 
         return '[' + ', '.join(include) + ']'
 
+def decodeCryptoContainer(container):
+    # raise NotImplementedError, str(container)
+    return CryptoContainer(signing=RSASigningAlgorithm,
+                           blinding=RSABlindingAlgorithm,
+                           hashing=SHA256HashingAlgorithm)
+
+def encodeCryptoContainer(container):
+    include = []
+    if container.signing:
+        include.append(str(container.signing))
+    if container.blinding:
+        include.append(str(container.blinding))
+    if container.hashing:
+        include.append(str(container.hashing))
+
+    return include
     
 class SigningAlgorithm:
     def __init__(self, key):
@@ -272,6 +283,24 @@ class RSAKeyPair(KeyPair):
 
         return self.key
 
+    def keytype(self):
+        def encode(key):
+            return str(key)
+        def decode(key):
+            import base64
+            l = key.split(',')
+            try:
+                n = base64.b64decode(l[0])
+            except TypeError:
+                raise TypeError(l[0])
+            e = base64.b64decode(l[1])
+            return RSAKeyPair(n=n, e=e)
+        class RSAKeyType:
+            pass
+        RSAKeyType.encode = encode
+        RSAKeyType.decode = decode
+
+
     def size(self):
         return self.key.size()
 
@@ -294,8 +323,8 @@ class RSAKeyPair(KeyPair):
         import json
         return json.write(dict(public=str(self),private=self.stringPrivate()))
 
-    def key_id(self):
-        return SHA256HashingAlgorithm().update(str(self)).digest()
+    def key_id(self, digestAlgorithm):
+        return digestAlgorithm().update(str(self)).digest()
 
     def newPublicKeyPair(self):
         return RSAKeyPair(self.key.publickey())
@@ -303,6 +332,13 @@ class RSAKeyPair(KeyPair):
     def __eq__(self,other):
         return self.toPython() == other.toPython()
 
+def decodeRSAKeyPair(key):
+    import base64
+
+    l = key.split(',')
+    n = number.bytes_to_long(base64.b64decode(l[0]))
+    e = number.bytes_to_long(base64.b64decode(l[1]))
+    return RSAKeyPair(n=n, e=e)
 
 def createRSAKeyPair(N):
     """Creates an RSA keypair of size N."""
@@ -359,13 +395,13 @@ class RSAEncryptionAlgorithm(EncryptionAlgorithm):
     def encrypt(self, message):
         try:
             return self.key.public().encrypt(message, '')[0]
-        except PyCryptoRSAError, reason:
+        except (PyCryptoRSAError, reason):
             raise CryptoError(reason)
     
     def decrypt(self, message):
         try:
             return self.key.private().decrypt(message)
-        except PyCryptoRSAError, reason:
+        except (PyCryptoRSAError, reason):
             raise CryptoError(reason)
         
 
@@ -382,7 +418,7 @@ class RSABlindingAlgorithm(BlindingAlgorithm):
     >>> blinded, factor = blind.blind(154L, 1001L)
 
     >>> blinded
-    '\\tC'
+    r'\\tC'
 
     >>> factor == 1001L
     True
@@ -390,13 +426,13 @@ class RSABlindingAlgorithm(BlindingAlgorithm):
     >>> blind.unblind(blinded, factor)
     154L
 
-    >>> blinded, factor = blind.blind('\x9a', '\x03\xe9')
+    >>> blinded, factor = blind.blind(r'\x9a', r'\x03\xe9')
 
     >>> blinded
-    '\\tC'
+    r'\\tC'
     
     >>> blind.unblind(blinded)
-    '\\x9a'
+    r'\\x9a'
     """
     def __init__(self, key, blinding_factor=None):
         BlindingAlgorithm.__init__(self, key)
