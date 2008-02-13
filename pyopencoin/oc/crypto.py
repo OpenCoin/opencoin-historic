@@ -198,7 +198,7 @@ class RSAKeyPair(KeyPair):
     ''
 
     >>> simple_public_key.toJson()
-    '{"public":"DKE=,EQ==",\\n"private":""}'
+    '{"public":"DKE=,EQ==",\n"private":""}'
 
 
     Now, compare the public key and private key together knowing the internals of the key
@@ -229,13 +229,12 @@ class RSAKeyPair(KeyPair):
 
     >>> print simple_private_key
     DKE=,EQ==
-
+    
     >>> simple_private_key.stringPrivate()
-    'CsE=,PQ==,NQ=='
+    'DKE=,EQ==,CsE='
 
     >>> simple_private_key.toJson()
-    '{"public":"DKE=,EQ==",\\n"private":"CsE=,PQ==,NQ=="}'
-
+    '{"public":"DKE=,EQ==",\n"private":"DKE=,EQ==,CsE="}'
 
     Test the other generation methods for private keys
     >>> key_2 = RSAKeyPair(n=3233L, e=17L, d=2753L, p=61L, q=53L)
@@ -320,7 +319,7 @@ class RSAKeyPair(KeyPair):
     def stringPrivate(self):
         if self.hasPrivate():
             key = self.key
-            return ','.join([base64.b64encode(number.long_to_bytes(i)) for i in [key.d,key.p,key.q]])
+            return ','.join([base64.b64encode(number.long_to_bytes(i)) for i in [key.n,key.e,key.d]])
         else: 
             return ''
    
