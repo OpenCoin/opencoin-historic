@@ -161,17 +161,10 @@ class ContainerWithSignature(Container):
 
     def verifySignature(self, signature_algorithm, hashing_algorithm, key):
 
-        return self._verifyASignature(signature_algorithm, 
-                                      hashing_algorithm, 
-                                      self.signature, 
-                                      key, 
-                                      self.content_part())
-
-    def _verifyASignature(self, signature_algorithm, hashing_algorithm, signature, key, content_part):
-
+        content_part = self.content_part()
         hasher = hashing_algorithm(content_part)
-        signer = signature_algorithm(key, hasher.digest())
-        return signer.verify(signature.signature)
+        signer = signature_algorithm(key)
+        return signer.verify(hasher.digest(), self.signature.signature)
 
 class CurrencyDescriptionDocument(ContainerWithSignature):
     """
