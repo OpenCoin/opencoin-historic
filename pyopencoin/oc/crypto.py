@@ -60,6 +60,9 @@ class CryptoContainer:
 
         return '[' + ', '.join(include) + ']'
 
+    def __repr__(self):
+        return str(self)
+
     def __eq__(self, other):
         if not isinstance(other, CryptoContainer):
             raise NotImplementedError

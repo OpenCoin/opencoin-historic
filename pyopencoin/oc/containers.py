@@ -113,7 +113,8 @@ class Container(object):
         return self.fromPython(json.read(text))
 
     def __eq__(self,other):
-        return self.__dict__==other.__dict__
+        #return self.__dict__== other.__dict__
+        return self.toJson() == other.toJson()
 
 
 class Signature(Container):
@@ -203,8 +204,8 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
     >>> sig = Signature(keyprint=21, signature=23)
     >>> cdd3.signature = sig
 
-    >>> cdd3.toJson() #the format expected is questionable.
-    '[["standard_version","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["short_currency_identifier","OC"],["issuer_service_location","opencoin://issuer.opencent.net:8002"],["denominations",[1,2,5,10,20,50,100,200,500,1000]],["issuer_cipher_suite",["RSASigningAlgorithm","RSABlindingAlgorithm","SHA256HashingAlgorithm"]],["issuer_public_master_key","DKE=,EQ=="],["signature",["keyprint","foo"],["signature","bar"]]]'
+    >>> cdd3.toJson(1) #the format expected is questionable.
+    '[["standard_version","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["short_currency_identifier","OC"],["issuer_service_location","opencoin://issuer.opencent.net:8002"],["denominations",[1,2,5,10,20,50,100,200,500,1000]],["issuer_cipher_suite",["RSASigningAlgorithm","RSABlindingAlgorithm","SHA256HashingAlgorithm"]],["issuer_public_master_key","DKE=,EQ=="],["signature",[["keyprint",21],["signature",23]]]]'
     
     
     And now, lets play with a really signed CDD
@@ -230,13 +231,12 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
 
     >>> test_cdd.signature =  Signature(keyprint=keyprint, signature=signature)
 
-    >>> test_j = test_cdd.toJson()
+    >>> test_j = test_cdd.toJson(1)
     
     >>> test_cdd2 = CDD().fromJson(test_j)
     >>> test_cdd2 == test_cdd
     True
 
-    # >>> test_cdd2.toJson()
 
     # would this ever fail and test_cdd2 == test_cdd?
     >>> test_cdd2.signature == test_cdd.signature
@@ -245,7 +245,7 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
 
     We always use the original jsontext to represent ourself!
     >>> test_cdd2.short_currency_identifier = 'Foobar'
-    >>> test_cdd2.toJson() == test_j
+    >>> test_cdd2.toJson(1) == test_j
     True
 
     >>> test_cdd.verify_self()
