@@ -66,6 +66,9 @@ class Container(object):
         arguments = ','.join(["%s=%s" %(field,repr(getattr(self,field))) for field in self.fields])
         return "<%s(%s)>" % (self.__class__.__name__,arguments)
 
+    def __str__(self):
+        return self.toJson()
+
     def encodeField(self,fieldname):
         '''returns the value of field in whatever string represnation'''
 
@@ -301,7 +304,7 @@ class MintKey(ContainerWithSignature):
 
     from crypto import decodeRSAKeyPair
 
-    codecs = {'key_identifier':{'encode':base64.encode,'decode':base64.decode},
+    codecs = {'key_identifier':{'encode':base64.b64encode,'decode':base64.b64decode},
               'public_key':{'encode':str,'decode':decodeRSAKeyPair}}
 
     def __init__(self, **kwargs):
@@ -341,7 +344,11 @@ class MintKey(ContainerWithSignature):
 
         return can_mint and can_redeem
 
-
+    def key_id(self, digestAlgorithm=None):
+        if not digestAlgorithm:
+            import crypto
+            digestAlgorithm = crypto.SHA256HashingAlgorithm
+        return digestAlgorithm().update(str(self)).digest()
 
 class CurrencyBase:
 

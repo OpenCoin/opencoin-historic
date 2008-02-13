@@ -256,19 +256,20 @@ class giveMintingKeyProtocol(Protocol):
     """An issuer hands out a key. The other side of fetchMintingKeyProtocol.
     >>> from entities import Issuer
     >>> issuer = Issuer()
-    >>> pub1 = issuer.mint.createNewKeys('1','now','later')
+    >>> issuer.createKeys(1024)
+    >>> pub1 = issuer.createSignedMintKey('1','now','later','much later')
     >>> gmp = giveMintingKeyProtocol(issuer)
     
     >>> gmp.state(Message('HANDSHAKE',{'protocol': 'opencoin 1.0'}))
     <Message('HANDSHAKE_ACCEPT',None)>
 
     >>> m = gmp.state(Message('MINTING_KEY_FETCH_DENOMINATION','1'))
-    >>> m == Message('MINTING_KEY_PASS',str(pub1))
+    >>> m == Message('MINTING_KEY_PASS',pub1.toPython())
     True
 
     >>> gmp.newState(gmp.giveKey)
-    >>> m = gmp.state(Message('MINTING_KEY_FETCH_KEYID',pub1.key_id()))
-    >>> m == Message('MINTING_KEY_PASS',str(pub1))
+    >>> m = gmp.state(Message('MINTING_KEY_FETCH_KEYID',pub1.key_identifier))
+    >>> m == Message('MINTING_KEY_PASS',pub1.toPython())
     True
 
     >>> gmp.newState(gmp.giveKey)

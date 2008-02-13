@@ -74,15 +74,20 @@ class Issuer(Entity):
         self.mint = Mint()
         self.keys = None
 
+        #Signed minting keys
+        self.signedKeys = {}
+        self.keyids = {}
+
+
     def getKeyByDenomination(self,denomination):
         try:
-            return self.mint.getCurrentKey(denomination)
-        except KeyError:            
+            return self.signedKeys.get(denomination,[])[-1]
+        except (KeyError, IndexError):            
             raise 'KeyFetchError'
     
     def getKeyById(self,keyid):
         try:
-            return self.mint.getKeyById(keyid)
+            return self.keyids[keyid]
         except KeyError:            
             raise 'KeyFetchError'
 
@@ -96,19 +101,24 @@ class Issuer(Entity):
         transport.setProtocol(protocol)
         transport.start()
 
-    def createMintKey(self, issuer_signing_key, denomination, not_before,
-                      key_not_after, coin_not_after, size=1024):
-        """Create a new MintKey and register it with the Mint."""
+    def createSignedMintKey(self,denomination, not_before, key_not_after, coin_not_after, signing_key=None, size=1024):
+        """Have the Mint create a new key and sign the public key"""
+
         #Note: I'm assuming RSA/SHA256. It should really use the CDD defined ones
         #      hmm. And it needs the CDD for the currency_identifier
+        
+       
+        if not signing_key:
+            signing_key = self.keys
+
+        public = self.mint.createNewKey(denomination, not_before,key_not_after, size)
+
         import crypto
-        private = crypto.createRSAKeyPair(size)
-        public = private.newPublicKeyPair()
-
         hash_alg = crypto.SHA256HashingAlgorithm
-
+        keyid=public.key_id(hash_alg)
+        
         import containers
-        mintKey = containers.MintKey(key_identifier=public.key_id(hash_alg),
+        mintKey = containers.MintKey(key_identifier=keyid,
                                      currency_identifier='http://...Cent/',
                                      denomination=denomination,
                                      not_before=not_before,
@@ -117,16 +127,18 @@ class Issuer(Entity):
                                      public_key=public)
 
         sign_alg = crypto.RSASigningAlgorithm
-        signer = sign_alg(issuer_signing_key)
-        sig = Signature(keyprint = issuer_signing_key.key_id(hash_alg),
-                        signature = signer.sign(mintKey.content_part()))
+        signer = sign_alg(signing_key)
+        hashed_content = hash_alg(mintKey.content_part()).digest()
+        sig = containers.Signature(keyprint = signing_key.key_id(hash_alg),
+                                   signature = signer.sign(hashed_content))
 
         mintKey.signature = sig
-
-
-        self.mint.addMintKey(mintKey, private)
         
         
+        self.signedKeys.setdefault(denomination, []).append(mintKey)
+        self.signedKeys[mintKey.denomination].append(mintKey)
+        self.keyids[keyid] = mintKey
+        return mintKey
 
 class KeyFetchError(Exception):
     pass
@@ -155,24 +167,21 @@ class Mint:
         self.privatekeys = {}
 
 
-    def getCurrentKey(self,denomination):
-        return self.keyvault[denomination][-1]['public']
-
-    def getKeyById(self,keyid):
-        return self.keyids[keyid]
-
     def getKey(self,denomination,notbefore,notafter):
         pass
 
-    def getPrivateKey(self, keyid):
-        return self.privatekeys[keyid]
+    # The private key should never ever leave the mint. Never.
+    # def getPrivateKey(self, keyid):
+    #    return self.privatekeys[keyid]
 
-    def addMintKey(self, mintKey, privateKey):
-        self.keyvault.setdefault(mintKey.denomination, [])
-        self.keyvault[mintKey.denomination].append(mintKey)
-        self.keyids[mintKey.key_id] = mintKey
-        self.privatekeys[mintKey.key_id] = privateKey
 
+    def createNewKey(self,denomination, not_before, key_not_after, size=1024):
+        import crypto
+        private = crypto.createRSAKeyPair(size)
+        public = private.newPublicKeyPair()
+        hash_alg = crypto.SHA256HashingAlgorithm 
+        self.privatekeys[private.key_id(hash_alg)] = private
+        return public
 
 
 
