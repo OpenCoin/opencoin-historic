@@ -210,6 +210,12 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
     >>> cdd3.toJson(1) #the format expected is questionable.
     '[["standard_version","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["short_currency_identifier","OC"],["issuer_service_location","opencoin://issuer.opencent.net:8002"],["denominations",[1,2,5,10,20,50,100,200,500,1000]],["issuer_cipher_suite",["RSASigningAlgorithm","RSABlindingAlgorithm","SHA256HashingAlgorithm"]],["issuer_public_master_key","DKE=,EQ=="],["signature",[["keyprint",21],["signature",23]]]]'
     
+    Make sure the signature copies.
+    >>> cdd4 = CDD().fromJson(cdd3.toJson(1))
+    >>> cdd3 == cdd4
+    True
+    >>> cdd4.toJson(1)
+    '[["standard_version","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["short_currency_identifier","OC"],["issuer_service_location","opencoin://issuer.opencent.net:8002"],["denominations",[1,2,5,10,20,50,100,200,500,1000]],["issuer_cipher_suite",["RSASigningAlgorithm","RSABlindingAlgorithm","SHA256HashingAlgorithm"]],["issuer_public_master_key","DKE=,EQ=="],["signature",[["keyprint",21],["signature",23]]]]'
     
     And now, lets play with a really signed CDD
     >>> private_key = crypto.createRSAKeyPair(1024)
