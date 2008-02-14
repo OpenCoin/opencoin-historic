@@ -368,8 +368,12 @@ class CurrencyBase(Container):
         self.setValue()
 
     def __add__(self,other):
-        if type(self) == type(other):
-            return self.value + other.value
+        val = self.value
+        if type(other) == type(self):
+            return val + other.value
+        elif type(other) == int:
+            return val + other
+            
 
     __radd__ = __add__ 
 
@@ -419,6 +423,8 @@ class CurrencyBlank(CurrencyBase):
     >>> import copy
     >>> c = copy.copy(b)
     >>> b + c
+    2
+    >>> sum([b,c])
     2
     """
 
