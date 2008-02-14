@@ -212,16 +212,24 @@ class ServerTestTransport(Transport):
     def __init__(self,callback,**kwargs):
         self.callback = callback
         self.kwargs = kwargs
+        self.log = []
 
     def start(self):
         clienttransport = ClientTestTransport(self)
-        self.callback(clienttransport,**self.kwargs)
+        kwargs = self.kwargs
+        self.callback(clienttransport,**kwargs)
 
     def write(self,message):
-        print 'Server', message
-        if message.type != 'finished':
-            self.other.newMessage(message)
+        if message:
+            l = 'Server %s' % message 
+            print l
+            self.log.append(l)
+            if message.type != 'finished':
+                #print 'transport'
+                self.other.newMessage(message)
 
+    def printlog(self):
+        print '\n'.join(self.log)
 
 class ClientTestTransport(Transport):
     
@@ -232,9 +240,13 @@ class ClientTestTransport(Transport):
             other.other = self
 
     def write(self,message):
-        print 'Client', message
-        if message.type != 'finished':
-            self.other.newMessage(message)
+        if message:
+            l = 'Client %s' %message
+            print l
+            self.other.log.append(l)
+            if message.type != 'finished':
+                #print 'transport'
+                self.other.newMessage(message)
 
 
 class ServerTestTransport2(Transport):

@@ -44,6 +44,12 @@ class Wallet(Entity):
         transport.setProtocol(protocol)
         transport.start()
 
+    def sendCoins(self,transport,amount,target):
+        protocol = protocols.CoinSpendSender([1,2],target)
+        transport.setProtocol(protocol)
+        transport.start()
+        protocol.newMessage(Message(None))
+
     def listen(self,transport):
         """
         >>> import transports
@@ -55,7 +61,8 @@ class Wallet(Entity):
         >>> stt.send('sendMoney',[1,2])
         <Message('Receipt',None)>
         """
-        protocol = protocols.answerHandshakeProtocol(sendMoney=protocols.WalletRecipientProtocol(self))
+        protocol = protocols.answerHandshakeProtocol(sendMoney=protocols.WalletRecipientProtocol(self),
+                                                     SUM_ANNOUNCE=protocols.CoinSpendRecipient())
         transport.setProtocol(protocol)
         transport.start()
 
@@ -96,11 +103,6 @@ class Issuer(Entity):
         keys = crypto.createRSAKeyPair(keylength)
         self.keys = keys
      
-    def giveMintingKey(self,transport):
-        protocol = protocols.giveMintingKeyProtocol(self)
-        transport.setProtocol(protocol)
-        transport.start()
-
     def createSignedMintKey(self,denomination, not_before, key_not_after, coin_not_after, signing_key=None, size=1024):
         """Have the Mint create a new key and sign the public key"""
 
@@ -139,6 +141,12 @@ class Issuer(Entity):
         self.signedKeys[mintKey.denomination].append(mintKey)
         self.keyids[keyid] = mintKey
         return mintKey
+
+    def giveMintingKey(self,transport):
+        protocol = protocols.giveMintingKeyProtocol(self)
+        transport.setProtocol(protocol)
+        transport.start()
+
 
 class KeyFetchError(Exception):
     pass

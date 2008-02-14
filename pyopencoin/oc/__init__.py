@@ -56,18 +56,38 @@ This alltogether should allow something along the line of:
     Ok, we are done
     
 """
-
 def _test():
 
-    import doctest
-    doctest.testmod()
-    import protocols, messages, entities, transports, containers
-    doctest.testmod(protocols)
-    doctest.testmod(messages)
-    doctest.testmod(entities)
-    doctest.testmod(transports)
-    doctest.testmod(containers)
-    doctest.testfile("tests.txt",optionflags=doctest.ELLIPSIS)
+    """You can use python __init__.py [-v] module[.class] to run
+    only selected tests""" 
+
+    import doctest,sys
+    import protocols, messages, entities, transports, containers,tests
+
+    if len(sys.argv) > 1 and sys.argv[-1] != '-v':
+        name = sys.argv[-1]
+        gb = globals()
+        gb.update(locals())
+        verbose = '-v' in sys.argv 
+        if '.' in name:
+            m,c = name.split('.')
+            mod = gb[m]            
+            obj = getattr(mod,c)
+            gb = mod.__dict__
+            doctest.run_docstring_examples(obj,gb,verbose,name,optionflags=doctest.ELLIPSIS)
+        else:
+            obj = gb[name]
+            doctest.testmod(obj,optionflags=doctest.ELLIPSIS)
+    else:        
+        #doctest.testmod()
+        doctest.testmod(optionflags=doctest.ELLIPSIS)
+        doctest.testmod(protocols,optionflags=doctest.ELLIPSIS)
+        doctest.testmod(messages,optionflags=doctest.ELLIPSIS)
+        doctest.testmod(entities,optionflags=doctest.ELLIPSIS)
+        doctest.testmod(transports,optionflags=doctest.ELLIPSIS)
+        doctest.testmod(containers,optionflags=doctest.ELLIPSIS)
+        doctest.testmod(tests,optionflags=doctest.ELLIPSIS)
 
 if __name__ == "__main__":
     _test()
+

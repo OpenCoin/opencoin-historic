@@ -40,12 +40,12 @@ class Protocol:
        
         pass
 
-    def goodby(self,message):
-        return Message('GOODBY')
+    def goodbye(self,message):
+        self.state = self.finish
+        return Message('GOODBYE')
 
     def finish(self,message):
-        'always the last state. There can be other final states'
-        
+        'always the last state. There can be other final states'        
         return Message('finished')
                     
     def newMessage(self,message):
@@ -55,9 +55,12 @@ class Protocol:
         self.transport.write(out)
         return out
 
-
     def newState(self,method):
         self.state = method
+
+    def initiateHandshake(self,message):    
+        self.newState(self.firstStep)
+        return Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})
 
 
 class answerHandshakeProtocol(Protocol):
@@ -74,7 +77,7 @@ class answerHandshakeProtocol(Protocol):
                 self.newState(self.dispatch)
                 return Message('HANDSHAKE_ACCEPT')
             else:
-                self.newState(self.goodby)
+                self.newState(self.goodbye)
                 return Message('HANDSHAKE_REJECT','did not like the protocol version')
         else:
             return Message('PROTOCOL_ERROR','please do a handshake')
@@ -84,72 +87,102 @@ class answerHandshakeProtocol(Protocol):
         self.result = message
         nextprotocol = self.mapping[message.type]
         self.transport.setProtocol(nextprotocol)
-        return nextprotocol.newMessage(message)
+        m = nextprotocol.newMessage(message)
+        #print 'here ', m
+        #return m
 
-class WalletSenderProtocol(Protocol):
+############################### Spending coins (w2w) ########################################
+
+
+class CoinSpendSender(Protocol):
     """
-    This is just a fake protocol, just showing how it works
-
-    >>> sp = WalletSenderProtocol(None)
-   
-    It starts with sending some money
-    >>> sp.state(Message(None))
-    <Message('sendMoney',[1, 2])>
-    
-    >>> sp.state(Message('Foo'))
-    <Message('Please send a receipt',None)>
-
-    Lets give it a receipt
-    >>> sp.state(Message('Receipt'))
-    <Message('Goodbye',None)>
-
-    >>> sp.state(Message('Bla'))
+    >>> css = CoinSpendSender([1,2],'foobar')
+    >>> css.state(Message(None))
+    <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
+    >>> css.state(Message('HANDSHAKE_ACCEPT'))
+    <Message('SUM_ANNOUNCE',['...', 3, 'foobar'])>
+    >>> css.state(Message('SUM_ACCEPT'))
+    <Message('COIN_SPEND',['...', [1, 2], 'foobar'])>
+    >>> css.state(Message('COIN_ACCEPT'))
+    <Message('GOODBYE',None)>
+    >>> css.state(Message('Really?'))
     <Message('finished',None)>
-
-    >>> sp.state(Message('Bla'))
-    <Message('finished',None)>
-
     """
+    def __init__(self,coins,target):
 
-    def __init__(self,wallet):
-        'we would need a wallet for this to work'
-
-        self.wallet = wallet
-        Protocol.__init__(self)
-
-    def start(self,message):
-        'always set the new state before returning'
+        self.coins = coins
+        self.amount = sum(coins)
+        self.target = target
         
-        self.state = self.waitForReceipt
-        return Message('sendMoney',[1,2])
+        import crypto,base64
+        id = crypto.Random().getRandomString(128) #XXX is that a good enough id?
+        self.transaction_id = base64.b64encode(id)
 
-    def waitForReceipt(self,message):
-        'after sending we need a receipt'
+        Protocol.__init__(self)
+        self.state = self.initiateHandshake
 
-        if message.type == 'Receipt':
-            self.state=self.finish
-            return Message('Goodbye')
-        else:
-            return Message('Please send a receipt')
+    def firstStep(self,message):       
+        self.state = self.spendCoin
+        return Message('SUM_ANNOUNCE',[self.transaction_id,
+                                       self.amount,
+                                       self.target])
 
-class WalletRecipientProtocol(Protocol):
 
-    def __init__(self,wallet=None):
-        self.wallet = wallet
+    def spendCoin(self,message):
+        if message.type == 'SUM_ACCEPT':
+            self.state = self.goodbye            
+            return Message('COIN_SPEND',[self.transaction_id,
+                                         self.coins,
+                                         self.target])
+
+    def goodbye(self,message):
+        if message.type == 'COIN_ACCEPT':
+            self.state = self.finish
+            return Message('GOODBYE')
+
+
+class CoinSpendRecipient(Protocol):
+    """
+    >>> csr = CoinSpendRecipient()
+    >>> csr.state(Message('SUM_ANNOUNCE',['123',12,'a book']))
+    <Message('SUM_ACCEPT',None)>
+    >>> csr.state(Message('COIN_SPEND',['123', [1, 2], 'foobar']))
+    <Message('COIN_ACCEPT',None)>
+    >>> csr.state(Message('Goodbye',None))
+    <Message('GOODBYE',None)>
+    >>> csr.state(Message('foobar'))
+    <Message('finished',None)>
+    """
+    
+    def __init__(self,issuer_transport = None):
+        self.issuer_transport = issuer_transport
         Protocol.__init__(self)
 
     def start(self,message):
-        if message.type == 'sendMoney':
-            if self.wallet:
-                self.wallet.coins.extend(message.data)
-            self.state=self.Goodbye
-            return Message('Receipt')
-        else:
-            return Message('Please send me money, mama')
+        if message.type == 'SUM_ANNOUNCE':
+            #get some feedback from interface somehow
+            if 1:
+                self.transaction_id = message.data[0]
+                self.sum = message.data[1]
+                self.target = message.data[2]
 
-    def Goodbye(self,message):
-        self.state = self.finish
-        return Message('Goodbye')
+                self.state = self.handleCoins
+                return Message('SUM_ACCEPT')
+            else:                
+                self.state=self.goodbye
+            return Message('SUM_REJECT')
+        else:
+            self.state = self.goodbye
+            return Message('Expected something else')
+
+    def handleCoins(self,message):
+        if message.type == 'COIN_SPEND':
+            self.state = self.goodbye
+            return Message('COIN_ACCEPT')
+
+
+############################### Minting key exchange ########################################
+
 
 
 class fetchMintingKeyProtocol(Protocol):
@@ -256,7 +289,7 @@ class giveMintingKeyProtocol(Protocol):
     """An issuer hands out a key. The other side of fetchMintingKeyProtocol.
     >>> from entities import Issuer
     >>> issuer = Issuer()
-    >>> issuer.createKeys(1024)
+    >>> issuer.createKeys(512)
     >>> pub1 = issuer.createSignedMintKey('1','now','later','much later')
     >>> gmp = giveMintingKeyProtocol(issuer)
     
@@ -300,7 +333,7 @@ class giveMintingKeyProtocol(Protocol):
                 self.newState(self.giveKey)
                 return Message('HANDSHAKE_ACCEPT')
             else:
-                self.newState(self.goodby)
+                self.newState(self.goodbye)
                 return Message('HANDSHAKE_REJECT','did not like the protocol version')
         else:
             return Message('PROTOCOL_ERROR','please do a handshake')
@@ -308,7 +341,7 @@ class giveMintingKeyProtocol(Protocol):
 
     def giveKey(self,message):
     
-        self.newState(self.goodby)
+        self.newState(self.goodbye)
 
         error = None
         if message.type == 'MINTING_KEY_FETCH_DENOMINATION':
@@ -331,7 +364,79 @@ class giveMintingKeyProtocol(Protocol):
         else:
             return Message('MINTING_KEY_FAILURE',error)
 
+############################### For testing ########################################
+
+class WalletSenderProtocol(Protocol):
+    """
+    This is just a fake protocol, just showing how it works
+
+    >>> sp = WalletSenderProtocol(None)
+   
+    It starts with sending some money
+    >>> sp.state(Message(None))
+    <Message('sendMoney',[1, 2])>
+    
+    >>> sp.state(Message('Foo'))
+    <Message('Please send a receipt',None)>
+
+    Lets give it a receipt
+    >>> sp.state(Message('Receipt'))
+    <Message('Goodbye',None)>
+
+    >>> sp.state(Message('Bla'))
+    <Message('finished',None)>
+
+    >>> sp.state(Message('Bla'))
+    <Message('finished',None)>
+
+    """
+
+    def __init__(self,wallet):
+        'we would need a wallet for this to work'
+
+        self.wallet = wallet
+        Protocol.__init__(self)
+
+    def start(self,message):
+        'always set the new state before returning'
+        
+        self.state = self.waitForReceipt
+        return Message('sendMoney',[1,2])
+
+    def waitForReceipt(self,message):
+        'after sending we need a receipt'
+
+        if message.type == 'Receipt':
+            self.state=self.finish
+            return Message('Goodbye')
+        else:
+            return Message('Please send a receipt')
+
+class WalletRecipientProtocol(Protocol):
+
+    def __init__(self,wallet=None):
+        self.wallet = wallet
+        Protocol.__init__(self)
+
+    def start(self,message):
+        if message.type == 'sendMoney':
+            if self.wallet:
+                self.wallet.coins.extend(message.data)
+            self.state=self.Goodbye
+            return Message('Receipt')
+        else:
+            return Message('Please send me money, mama')
+
+    def Goodbye(self,message):
+        self.state = self.finish
+        return Message('Goodbye')
 
 if __name__ == "__main__":
-    import doctest
-    doctest.testmod()
+    import doctest,sys
+    if len(sys.argv) > 1 and sys.argv[-1] != '-v':
+        name = sys.argv[-1]
+        gb = globals()
+        verbose = '-v' in sys.argv 
+        doctest.run_docstring_examples(gb[name],gb,verbose,name)
+    else:        
+        doctest.testmod(optionflags=doctest.ELLIPSIS)
