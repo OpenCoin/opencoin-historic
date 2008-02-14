@@ -143,10 +143,12 @@ class CoinSpendSender(Protocol):
 
 class CoinSpendRecipient(Protocol):
     """
-    >>> csr = CoinSpendRecipient()
-    >>> csr.state(Message('SUM_ANNOUNCE',['123',12,'a book']))
+    >>> import entities
+    >>> w = entities.Wallet()
+    >>> csr = CoinSpendRecipient(w)
+    >>> csr.state(Message('SUM_ANNOUNCE',['123',3,'a book']))
     <Message('SUM_ACCEPT',None)>
-    >>> csr.state(Message('COIN_SPEND',['123', [1, 2], 'foobar']))
+    >>> csr.state(Message('COIN_SPEND',['123', [1, 2], 'a book']))
     <Message('COIN_ACCEPT',None)>
     >>> csr.state(Message('Goodbye',None))
     <Message('GOODBYE',None)>
@@ -154,32 +156,112 @@ class CoinSpendRecipient(Protocol):
     <Message('finished',None)>
     """
     
-    def __init__(self,issuer_transport = None):
+    def __init__(self,wallet,issuer_transport = None):
+        self.wallet = wallet
         self.issuer_transport = issuer_transport
         Protocol.__init__(self)
 
     def start(self,message):
         if message.type == 'SUM_ANNOUNCE':
+            self.transaction_id = message.data[0]
+            self.sum = message.data[1]
+            self.target = message.data[2]
             #get some feedback from interface somehow
-            if 1:
-                self.transaction_id = message.data[0]
-                self.sum = message.data[1]
-                self.target = message.data[2]
-
+            action = self.wallet.confirmReceiveCoins('the other wallet id',self.sum,self.target)
+            if action == 'reject':
+                self.state = self.goodby                
+                return Message('SUM_REJECT')
+            else:
+                self.action = action
                 self.state = self.handleCoins
                 return Message('SUM_ACCEPT')
-            else:                
-                self.state=self.goodbye
-            return Message('SUM_REJECT')
         else:
             self.state = self.goodbye
             return Message('Expected something else')
 
     def handleCoins(self,message):
         if message.type == 'COIN_SPEND':
-            self.state = self.goodbye
-            return Message('COIN_ACCEPT')
+            
+            #be conservative
+            result = Message('COIN_REJECT','default')
+            
+            transaction_id,coins,target  = message.data
+            
+            if transaction_id != self.transaction_id:
+                result = Message('COIN_REJECT','transaction_id')
+            
+            elif sum(coins) != self.sum:
+                result = Message('COIN_REJECT','wrong sum')
+            
+            elif target != self.target:
+                result = Message('COIN_REJECT','wrong target')
+            
+            elif self.action in ['redeem','exchange','trust']:
+                out = self.wallet.handleIncomingCoins(coins,self.action,target)
+                if out:
+                    result = Message('COIN_ACCEPT')
+        self.state = self.goodbye
+        return result
 
+
+############################### Transfer tokens  ########################################
+
+class TransferTokenSender(Protocol):
+    """
+    >>> tts = TransferTokenSender('my account',[],[1,2],type='redeem')
+    >>> tts.state(Message(None))
+    <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
+    >>> tts.state(Message('HANDSHAKE_ACCEPT'))
+    <Message('TRANSFER_TOKEN_REQUEST',['...', 'my account', [], [1, 2], ['type', 'redeem']])>
+    >>> tts.state(Message('TRANSFER_TOKEN_ACCEPT',3))
+    <Message('GOODBYE',None)>
+
+    """
+
+    
+    def __init__(self,target,blanks,coins,**kwargs):
+        import crypto,base64
+        id = crypto.Random().getRandomString(128) #XXX is that a good enough id?
+        self.transaction_id = base64.b64encode(id)
+
+        self.target = target
+        self.blanks = blanks
+        self.coins = coins
+        self.kwargs = kwargs
+
+        Protocol.__init__(self)
+        self.state = self.initiateHandshake
+   
+    def firstStep(self,message):
+        data = [self.transaction_id,
+                self.target,
+                self.blanks,
+                self.coins]
+        for item in self.kwargs.items():
+            data.append(list(item))                
+        self.state = self.goodbye
+        return Message('TRANSFER_TOKEN_REQUEST',data)
+
+    def goodbye(self,message):
+        if message.type == 'TRANSFER_TOKEN_ACCEPT':
+            self.result = 1
+        else:
+            self.result = 0
+        self.state = self.finish
+        return Message('GOODBYE')
+
+
+class TransferTokenRecipient(Protocol):
+    """
+    >>> ttr = TransferTokenRecipient()
+    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['...', 'my account', [], [1, 2], ['type', 'redeem']]))
+    <Message('TRANSFER_TOKEN_ACCEPT',3)>
+    """
+    def start(self,message):
+        transaction_id,target,blanks,coins = message.data[:4]
+
+        self.state = self.goodbye
+        return Message('TRANSFER_TOKEN_ACCEPT',sum(coins))
 
 ############################### Minting key exchange ########################################
 

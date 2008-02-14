@@ -184,8 +184,66 @@ class SimpleTestTransport(Transport):
         self.newMessage(Message(type,data))
         return self.read()
 
+class ClientTest(Transport):
+    """
+    >>> from entities import Wallet
+    >>> client = Wallet()
+    >>> server = Wallet()
+    >>> t = ClientTest(server.receiveMoney,clientnick='walletA',servernick='walletB')
+    >>> client.sendMoney(t)
+    walletA <Message('sendMoney',[1, 2])>
+    walletB <Message('Receipt',None)>
+    walletA <Message('Goodbye',None)>
+    walletB <Message('Goodbye',None)>
+    walletA <Message('finished',None)>
+    """
+        
+    def __init__(self,callback,clientnick=None,servernick=None,**kwargs):
+        self.callback = callback
+        self.kwargs = kwargs
+        self.nick=clientnick or 'Client'
+        self.servernick = servernick or 'Server'
+        self.log = []
+
+    def start(self):
+        servertransport = ServerTest(self)
+        servertransport.nick = self.servernick
+        kwargs = self.kwargs
+        self.callback(servertransport,**kwargs)
+
+    def write(self,message):
+        if message:
+            l = '%s %s' % (self.nick,message)
+            print l
+            self.log.append(l)
+            if message.type != 'finished':
+                #print 'transport'
+                self.other.newMessage(message)
+
+    def printlog(self):
+        print '\n'.join(self.log)
+
+class ServerTest(Transport):
+    
+    def __init__(self,other=None):
+        if other:
+            #Lets connect the two
+            self.other = other
+            other.other = self
+
+    def write(self,message):
+        if message:
+            l = '%s %s' % (self.nick,message)
+            print l
+            self.other.log.append(l)
+            if message.type != 'finished':
+                #print 'transport'
+                self.other.newMessage(message)    
 
 
+
+
+######################### old stuff #############################################
 
 class ServerTestTransport(Transport):
     """ 

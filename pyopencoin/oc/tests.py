@@ -1,6 +1,6 @@
 """
 >>> from entities import Wallet, Issuer
->>> from transports import ServerTestTransport
+>>> from transports import ServerTestTransport, ClientTest
 >>> walletA = Wallet()
 >>> walletB = Wallet()
 >>> issuer = Issuer()
@@ -8,8 +8,8 @@
 
 Lets test without having any keys in the mint
 
->>> t = ServerTestTransport(walletA.fetchMintingKey,denomination='1')
->>> issuer.giveMintingKey(t)
+>>> t = ClientTest(issuer.giveMintingKey)
+>>> walletA.fetchMintingKey(t,denomination='1')
 Client <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
 Server <Message('HANDSHAKE_ACCEPT',None)>
 Client <Message('MINTING_KEY_FETCH_DENOMINATION','1')>
@@ -21,8 +21,8 @@ Client <Message('finished',None)>
 Now, lets have a key
 
 >>> pub1 = issuer.createSignedMintKey('1','now','later','much later')
->>> t = ServerTestTransport(walletA.fetchMintingKey,denomination='1')
->>> issuer.giveMintingKey(t)
+>>> t = ClientTest(issuer.giveMintingKey)
+>>> walletA.fetchMintingKey(t,denomination='1')
 Client <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
 Server <Message('HANDSHAKE_ACCEPT',None)>
 Client <Message('MINTING_KEY_FETCH_DENOMINATION','1')>
@@ -31,20 +31,42 @@ Client <Message('GOODBYE',None)>
 Server <Message('GOODBYE',None)>
 Client <Message('finished',None)>
 
+Test the transfer token protocol
 
-Test the coin spend protocol
-
->>> t = ServerTestTransport(walletA.sendCoins,amount=10,target='a book')
->>> walletB.listen(t)
+>>> t = ClientTest(issuer.listen)
+>>> walletB.transferTokens(t,'myaccount',[],[1,2],type='redeem')
 Client <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
 Server <Message('HANDSHAKE_ACCEPT',None)>
-Client <Message('SUM_ANNOUNCE',['...', 3, 'a book'])>
-Server <Message('SUM_ACCEPT',None)>
-Client <Message('COIN_SPEND',['...', [1, 2], 'a book'])>
-Server <Message('COIN_ACCEPT',None)>
+Client <Message('TRANSFER_TOKEN_REQUEST',['...', 'myaccount', [], [1, 2], ['type', 'redeem']])>
+Server <Message('TRANSFER_TOKEN_ACCEPT',3)>
 Client <Message('GOODBYE',None)>
 Server <Message('GOODBYE',None)>
 Client <Message('finished',None)>
+
+
+Test the coin spend protocol
+
+>>> t = ClientTest(walletB.listen,clientnick='walletA',servernick='walletB')
+>>> t2 = ClientTest(issuer.listen,clientnick='walletB',servernick='issuer')
+>>> walletB.issuer_transport = t2
+>>> walletA.sendCoins(t,amount=10,target='a book')
+walletA <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
+walletB <Message('HANDSHAKE_ACCEPT',None)>
+walletA <Message('SUM_ANNOUNCE',['...', 3, 'a book'])>
+walletB <Message('SUM_ACCEPT',None)>
+walletA <Message('COIN_SPEND',['...', [1, 2], 'a book'])>
+walletB <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
+issuer <Message('HANDSHAKE_ACCEPT',None)>
+walletB <Message('TRANSFER_TOKEN_REQUEST',['...', 'my account', [], [1, 2], ['type', 'redeem']])>
+issuer <Message('TRANSFER_TOKEN_ACCEPT',3)>
+walletB <Message('GOODBYE',None)>
+issuer <Message('GOODBYE',None)>
+walletB <Message('finished',None)>
+walletB <Message('COIN_ACCEPT',None)>
+walletA <Message('GOODBYE',None)>
+walletB <Message('GOODBYE',None)>
+walletA <Message('finished',None)>
+
 """
 
 

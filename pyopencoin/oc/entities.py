@@ -62,9 +62,31 @@ class Wallet(Entity):
         <Message('Receipt',None)>
         """
         protocol = protocols.answerHandshakeProtocol(sendMoney=protocols.WalletRecipientProtocol(self),
-                                                     SUM_ANNOUNCE=protocols.CoinSpendRecipient())
+                                                     SUM_ANNOUNCE=protocols.CoinSpendRecipient(self))
         transport.setProtocol(protocol)
         transport.start()
+
+
+    def confirmReceiveCoins(self,walletid,sum,target):
+        return 'trust'
+
+
+    def transferTokens(self,transport,target,blanks,coins,type):
+        protocol = protocols.TransferTokenSender(target,blanks,coins,type=type)
+        transport.setProtocol(protocol)
+        transport.start()
+        protocol.newMessage(Message(None))
+
+
+    def handleIncomingCoins(self,coins,action,reason):
+        transport = self.getIssuerTransport()
+        if 1: #redeem
+            if transport:
+                self.transferTokens(transport,'my account',[],coins,'redeem')
+        return 1
+
+    def getIssuerTransport(self):
+        return getattr(self,'issuer_transport',0)
 
 class Issuer(Entity):
     """An isser
@@ -147,7 +169,20 @@ class Issuer(Entity):
         transport.setProtocol(protocol)
         transport.start()
 
-
+    def listen(self,transport):
+        """
+        >>> import transports
+        >>> w = Wallet()
+        >>> stt = transports.SimpleTestTransport()
+        >>> w.listen(stt)
+        >>> stt.send('HANDSHAKE',{'protocol': 'opencoin 1.0'})
+        <Message('HANDSHAKE_ACCEPT',None)>
+        >>> stt.send('sendMoney',[1,2])
+        <Message('Receipt',None)>
+        """
+        protocol = protocols.answerHandshakeProtocol(TRANSFER_TOKEN_REQUEST=protocols.TransferTokenRecipient(),)
+        transport.setProtocol(protocol)
+        transport.start()
 class KeyFetchError(Exception):
     pass
 
