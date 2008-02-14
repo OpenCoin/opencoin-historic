@@ -350,7 +350,7 @@ class MintKey(ContainerWithSignature):
             digestAlgorithm = crypto.SHA256HashingAlgorithm
         return digestAlgorithm().update(str(self)).digest()
 
-class CurrencyBase:
+class CurrencyBase(Container):
 
     fields = ['standard_identifier', 
               'currency_identifier', 
@@ -360,6 +360,28 @@ class CurrencyBase:
 
     codecs = {'key_identifier':{'encode':base64.encode,'decode':base64.decode},
               'serial':{'encode':base64.encode,'decode':base64.decode},}
+
+
+    def __init__(self, **kwargs):
+        Container.__init__(self, **kwargs)
+        self.value = 0
+        self.setValue()
+
+    def __add__(self,other):
+        if type(self) == type(other):
+            return self.value + other.value
+
+    __radd__ = __add__ 
+
+    def setValue(self,value=None):
+        if value:
+            self.value = value
+        else:
+            try:
+                self.value = int(self.denomination)
+            except:
+                pass  
+
 
     def validate_with_CDD_and_MintingKey(self, currency_description_document, minting_key):
         """Validates the currency with the cdd and minting key. Also verifies minting_key (for my safety)."""
@@ -386,15 +408,21 @@ class CurrencyBase:
     
 
 class CurrencyBlank(CurrencyBase):
+    """
+    >>> b = CurrencyBlank(standard_version = 'http://opencoin.org/OpenCoinProtocol/1.0',
+    ...                   currency_identifier = 'http://opencent.net/OpenCent',
+    ...                   denomination = '1',
+    ...                   key_identifier = 'keyid')
+    >>> b.generateSerial()
+    >>> b.value
+    1
+    >>> import copy
+    >>> c = copy.copy(b)
+    >>> b + c
+    2
+    """
 
-    fields = ['standard_identifier', 
-              'currency_identifier', 
-              'denomination', 
-              'key_identifier', 
-              'serial', 
-              #'blind_factor'
-              ]
-    
+
     def generateSerial(self):
     
         import crypto
@@ -443,16 +471,12 @@ class CurrencyBlank(CurrencyBase):
         
         return coin
         
-class CurrencyCoin(CurrencyBase):
-
-    fields = ['standard_identifier', 
-              'currency_identifier', 
-              'denomination', 
-              'key_identifier', 
-              'serial']
+class CurrencyCoin(CurrencyBase,ContainerWithSignature):
 
     content_id = 'Currency'              
-       
+
+     
+
     def validate_with_CDD_and_MintingKey(self, currency_description_document, minting_key):
 
         if not CurrencyBase.validate_with_CDD_and_MintingKey(self, currency_description_document, minting_key):
