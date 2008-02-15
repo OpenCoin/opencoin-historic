@@ -1,6 +1,5 @@
 """A Crypto library.
-    >>> private = createRSAKeyPair(1024)
-    >>> public = private.newPublicKeyPair()
+    >>> private, public = createRSAKeyPair(1024)
 
     >>> public.hasPrivate()
     False
@@ -350,13 +349,19 @@ def decodeRSAKeyPair(key):
     e = number.bytes_to_long(base64.b64decode(l[1]))
     return RSAKeyPair(n=n, e=e)
 
-def createRSAKeyPair(N):
-    """Creates an RSA keypair of size N."""
+def createRSAKeyPair(N, public=True):
+    """Creates an RSA keypair of size N.
+    Returns a tuple of (private, public) keypairs if public is true.
+    """
     from Crypto.PublicKey import RSA
 
     _r.verifyEntropy(N)
     rsaKey = RSA.generate(N, _r.get_bytes)
-    return RSAKeyPair(key=rsaKey)
+    private = RSAKeyPair(key=rsaKey)
+    if public:
+        return (private, private.newPublicKeyPair())
+    else:
+        return private
 
 
 class RSAEncryptionAlgorithm(EncryptionAlgorithm):

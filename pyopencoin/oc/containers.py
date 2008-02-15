@@ -1,7 +1,7 @@
 import base64,json
 
 class Container(object):
-    """A generic container, handles serializing
+    r"""A generic container, handles serializing
     
     >>> c = Container(foo='foo',bar='bar')
     
@@ -45,7 +45,7 @@ class Container(object):
     Lets look at the json now
     >>> j2 = c.toJson()
     >>> j2 
-    '[["foo","foo"],["bar","YmFy\\\\n"]]'
+    '[["foo","foo"],["bar","YmFy\\n"]]'
     
     >>> c.fromJson(j2)
     <Container(foo='foo',bar='bar')>
@@ -275,8 +275,7 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
     
     
     And now, lets play with a really signed CDD
-    >>> private_key = crypto.createRSAKeyPair(1024)
-    >>> public_key = private_key.newPublicKeyPair()
+    >>> private_key, public_key = crypto.createRSAKeyPair(1024)
 
     >>> public_key.hasPrivate()
     False
@@ -321,12 +320,8 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
               'issuer_cipher_suite', 
               'issuer_public_master_key']
 
-    codecs = { \
-              'issuer_cipher_suite':{'encode':encodeCryptoContainer,'decode':decodeCryptoContainer}, \
-              'issuer_public_master_key':{'encode':str, \
-                                          'decode':decodeRSAKeyPair}, \
-              # 'signature':{'encode':Signature.,'decode':Signature.decode} \
-              }
+    codecs = {'issuer_cipher_suite':{'encode':encodeCryptoContainer,'decode':decodeCryptoContainer},
+              'issuer_public_master_key':{'encode':str, 'decode':decodeRSAKeyPair}}
 
 
     def __init__(self,**kwargs):

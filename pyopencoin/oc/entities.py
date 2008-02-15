@@ -122,7 +122,7 @@ class Issuer(Entity):
 
     def createKeys(self,keylength=1024):
         import crypto
-        keys = crypto.createRSAKeyPair(keylength)
+        keys = crypto.createRSAKeyPair(keylength, public=False)
         self.keys = keys
      
     def createSignedMintKey(self,denomination, not_before, key_not_after, coin_not_after, signing_key=None, size=1024):
@@ -135,11 +135,13 @@ class Issuer(Entity):
         if not signing_key:
             signing_key = self.keys
 
-        public = self.mint.createNewKey(denomination, not_before,key_not_after, size)
-
         import crypto
         hash_alg = crypto.SHA256HashingAlgorithm
-        keyid=public.key_id(hash_alg)
+        key_alg = crypto.createRSAKeyPair
+
+        public = self.mint.createNewKey(hash_alg, key_alg, size)
+
+        keyid = public.key_id(hash_alg)
         
         import containers
         mintKey = containers.MintKey(key_identifier=keyid,
@@ -282,6 +284,13 @@ class DSDB:
     (True,)
     >>> dsdb.lock(8, (tokens[6],), 1)
     (False, 'id already locked')
+
+    Check to make sure that we can lock different key_id's and same serial
+    >>> tokens[7].key_identifier = '2'
+    >>> tokens[7].key_identifier
+    '2'
+    >>> dsdb.spend(9, (tokens[7], tokens[8]))
+    (True,)
     """
 
     def __init__(self, database={}, locks={}):
@@ -329,7 +338,10 @@ class DSDB:
                 else:
                     raise NotImplementedError('Impossible string')
 
-            self.database[token.key_identifier][token.serial] = ('Locked', lock_time, id)
+            lock = self.database[token.key_identifier].setdefault(
+                                        token.serial, ('Locked', lock_time, id))
+            if lock != ('Locked', lock_time, id):
+                raise Exception('Possible race condition detected.')
             self.locks[id][1].append(token)
 
         if reason:
@@ -395,12 +407,6 @@ class Mint:
     >>> def makeFakeMintKey():
     ...     pass
 
-    #>>> pub1 = m.createNewKeys('1','now','later',256)
-    #>>> pub2 = m.createNewKeys('1','now','later',256)
-    #>>> m.getCurrentKey('1') == pub2
-    #True
-    #>>> m.getKeyById(pub1.key_id()) == pub1
-    #True
     """
     def __init__(self):
         self.keyvault = {}
@@ -411,16 +417,8 @@ class Mint:
     def getKey(self,denomination,notbefore,notafter):
         pass
 
-    # The private key should never ever leave the mint. Never.
-    # def getPrivateKey(self, keyid):
-    #    return self.privatekeys[keyid]
-
-
-    def createNewKey(self,denomination, not_before, key_not_after, size=1024):
-        import crypto
-        private = crypto.createRSAKeyPair(size)
-        public = private.newPublicKeyPair()
-        hash_alg = crypto.SHA256HashingAlgorithm 
+    def createNewKey(self, hash_alg, key_generator, size=1024):
+        private, public = key_generator(size)
         self.privatekeys[private.key_id(hash_alg)] = private
         return public
 
