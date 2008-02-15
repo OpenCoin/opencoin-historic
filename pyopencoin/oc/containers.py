@@ -279,22 +279,8 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
 
     >>> public_key.hasPrivate()
     False
-
-    >>> test_cdd = CDD(standard_version = 'http://opencoin.org/OpenCoinProtocol/1.0',
-    ...            currency_identifier = 'http://opencent.net/OpenCent',
-    ...            short_currency_identifier = 'OC',
-    ...            issuer_service_location = 'opencoin://issuer.opencent.net:8002',
-    ...            denominations = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000],
-    ...            issuer_cipher_suite = ics,
-    ...            issuer_public_master_key = public_key)
     
-    >>> hasher = crypto.SHA256HashingAlgorithm()
-    >>> signer = crypto.RSASigningAlgorithm(private_key)
-
-    >>> keyprint = hasher.update(str(test_cdd.issuer_public_master_key)).digest()
-    >>> signature = signer.sign(hasher.reset(test_cdd.content_part()).digest())
-
-    >>> test_cdd.signature =  Signature(keyprint=keyprint, signature=signature)
+    >>> from tests import CDD as test_cdd
 
     >>> test_j = test_cdd.toJson(1)
     
@@ -308,6 +294,9 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
     >>> test_cdd.verify_self()
     True
 
+    >>> test_cdd2.signature.keyprint = "Foo"
+    >>> test_cdd2.verify_self()
+    False
     """
 
     from crypto import encodeCryptoContainer, decodeCryptoContainer, decodeRSAKeyPair
@@ -333,6 +322,8 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
         """Verifies the self-signed certificate."""
         import crypto        
         ics = self.issuer_cipher_suite
+        if ics.hashing(str(self.issuer_public_master_key)).digest() != self.signature.keyprint:
+            return False
         return self.verifySignature(ics.signing,
                                     ics.hashing,
                                     self.issuer_public_master_key)
