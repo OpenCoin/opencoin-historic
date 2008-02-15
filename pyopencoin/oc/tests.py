@@ -20,7 +20,8 @@ Client <Message('finished',None)>
 
 Now, lets have a key
 
->>> pub1 = issuer.createSignedMintKey('1','now','later','much later')
+>>> now = 0; later = 1; much_later = 2
+>>> pub1 = issuer.createSignedMintKey('1', now, later, much_later)
 >>> t = ClientTest(issuer.giveMintingKey)
 >>> walletA.fetchMintingKey(t,denomination='1')
 Client <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>

@@ -372,7 +372,8 @@ class giveMintingKeyProtocol(Protocol):
     >>> from entities import Issuer
     >>> issuer = Issuer()
     >>> issuer.createKeys(512)
-    >>> pub1 = issuer.createSignedMintKey('1','now','later','much later')
+    >>> now = 0; later = 1; much_later = 2
+    >>> pub1 = issuer.createSignedMintKey('1', now, later, much_later)
     >>> gmp = giveMintingKeyProtocol(issuer)
     
     >>> gmp.state(Message('HANDSHAKE',{'protocol': 'opencoin 1.0'}))

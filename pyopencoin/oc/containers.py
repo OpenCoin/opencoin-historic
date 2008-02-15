@@ -120,6 +120,20 @@ class Container(object):
         return self.toJson() == other.toJson()
 
 
+def encodeTime(seconds):
+    #FIXME: this breaks if we are greater than whatever the epoc is (usually 2038)
+    import time
+    # we have to be careful here. Each field must be atleast 2 characters long.
+    instant = ['%02d' % k for k in time.gmtime(seconds)[:6]]
+    return '-'.join(instant[:3]) + 'T' + ':'.join(instant[3:6]) + 'Z'
+
+def decodeTime(s):
+    #FIXME: this breaks if we are greater than whatever the epoc is (usually 2038)
+    import time, calendar
+    # FIXME: this probably supports reading incorrectly formatted times.
+    struct = time.strptime(s, '%Y-%m-%dT%H:%M:%SZ')
+    return calendar.timegm(struct)
+
 class Signature(Container):
     """The signature container (a combination of the keyprint and signature fields.
     
@@ -249,14 +263,14 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
     >>> j
     '[["standard_version","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["short_currency_identifier","OC"],["issuer_service_location","opencoin://issuer.opencent.net:8002"],["denominations",[1,2,5,10,20,50,100,200,500,1000]],["issuer_cipher_suite",["RSASigningAlgorithm","RSABlindingAlgorithm","SHA256HashingAlgorithm"]],["issuer_public_master_key","DKE=,EQ=="]]'
  
-    >>> cdd3 = CDD().fromJson(j)
-    >>> cdd3 == cdd
+    >>> cdd2 = CDD().fromJson(j)
+    >>> cdd2 == cdd
     True
 
     >>> sig = Signature(keyprint=']', signature='V')
-    >>> cdd3.signature = sig
+    >>> cdd2.signature = sig
 
-    >>> cdd3.toJson(1)
+    >>> cdd2.toJson(1)
     '[["standard_version","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["short_currency_identifier","OC"],["issuer_service_location","opencoin://issuer.opencent.net:8002"],["denominations",[1,2,5,10,20,50,100,200,500,1000]],["issuer_cipher_suite",["RSASigningAlgorithm","RSABlindingAlgorithm","SHA256HashingAlgorithm"]],["issuer_public_master_key","DKE=,EQ=="],["signature",[["keyprint","XQ=="],["signature","Vg=="]]]]'
     
     
@@ -346,7 +360,10 @@ class MintKey(ContainerWithSignature):
     from crypto import decodeRSAKeyPair
 
     codecs = {'key_identifier':{'encode':base64.b64encode,'decode':base64.b64decode},
-              'public_key':{'encode':str,'decode':decodeRSAKeyPair}}
+              'public_key':{'encode':str,'decode':decodeRSAKeyPair},
+              'not_before':{'encode':encodeTime,'decode':decodeTime},
+              'key_not_after':{'encode':encodeTime,'decode':decodeTime},
+              'coin_not_after':{'encode':encodeTime,'decode':decodeTime}}
 
     def __init__(self, **kwargs):
         ContainerWithSignature.__init__(self, **kwargs)
@@ -566,6 +583,7 @@ class CurrencyCoin(CurrencyBase,ContainerWithSignature):
 
         return True
 
+    
 
 if __name__ == "__main__":
     import doctest
