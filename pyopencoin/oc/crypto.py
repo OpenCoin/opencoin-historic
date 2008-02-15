@@ -263,18 +263,24 @@ class RSAKeyPair(KeyPair):
     True
     
     """ 
-    def __init__(self, key=None, p=None, q=None, e=None, d=None, n=None, u=None):
+    def __init__(self, key=None, p=None, q=None, e=None, d=None, n=None, u=None, input=None):
         self.key = key
 
-        if not key: # we weren't passed in a key. Have to figure it out ourselves. yay!
-            #this function builds just the parts of the tuple contstruct uses
-            li = [n, e]
-            if d:
-                li.append(d)
-            if p and q:
-                li.extend((p, q))
-            if u:
-                li.append(u)
+        if not self.key: 
+            li = []
+            if input:
+                li = input
+                if type(input[0]) == type(''):
+                    li = [number.bytes_to_long(i) for i in li]
+            else:
+                #this function builds just the parts of the tuple contstruct uses
+                li.extend([n, e])
+                if d:
+                    li.append(d)
+                if p and q:
+                    li.extend((p, q))
+                if u:
+                    li.append(u)
                 
             from Crypto.PublicKey import RSA
             self.key = RSA.construct(tuple(li))
@@ -321,7 +327,10 @@ class RSAKeyPair(KeyPair):
     def stringPrivate(self):
         if self.hasPrivate():
             key = self.key
-            return ','.join([base64.b64encode(number.long_to_bytes(i)) for i in [key.n,key.e,key.d]])
+            try:
+                return ','.join([base64.b64encode(number.long_to_bytes(i)) for i in [key.n,key.e,key.d,key.p,key.q]])
+            except AttributeError:
+                return ','.join([base64.b64encode(number.long_to_bytes(i)) for i in [key.n,key.e,key.d]])
         else: 
             return ''
    
