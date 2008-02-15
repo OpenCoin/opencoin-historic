@@ -121,22 +121,78 @@ class Container(object):
 
 
 class Signature(Container):
-    '''
-    >>> s = Signature(keyprint='foo',signature='bar')
-    >>> s
-    <Signature(keyprint='foo',signature='bar')>
-    >>> s.toPython()
-    [('keyprint', 'foo'), ('signature', 'bar')]
+    """The signature container (a combination of the keyprint and signature fields.
+    
+    >>> s = Signature(keyprint='0',signature='*')
     >>> s.toJson()
-    '[["keyprint","foo"],["signature","bar"]]'
-    '''
+    '[["keyprint","MA=="],["signature","Kg=="]]'
+    >>> s == Signature().fromJson(s.toJson())
+    True
+    """
     fields = ['keyprint',
               'signature']
+
+    codecs = {'keyprint':{'encode':base64.b64encode, 'decode':base64.b64decode},
+              'signature':{'encode':base64.b64encode, 'decode':base64.b64decode}}
     
 
 class ContainerWithSignature(Container):
-    
+    """A container with an optional signature field.
 
+    To activate the Json-ing of the signature, supply an argument which is true to
+    the function.
+
+    >>> class TestContainer(ContainerWithSignature):
+    ...     fields = ['string', 'number']
+    ...     codecs = {'number':{'encode':base64.b64encode, 'decode':base64.b64decode}}
+
+    >>> signature = Signature(keyprint='0', signature='*')
+
+    >>> test1 = TestContainer(string='hello', number='@')
+    >>> test1_j = test1.toJson()
+    >>> test1_j
+    '[["string","hello"],["number","QA=="]]'
+
+    >>> test1.toPython()
+    [('string', 'hello'), ('number', 'QA==')]
+
+    >>> test2 = TestContainer().fromPython(test1.toPython())
+    >>> test2 == test1
+    True
+
+    >>> test3 = TestContainer().fromJson(test1_j)
+    >>> test3 == test1
+    True
+
+    Check to make sure toJson fails if we force it to use the signature and we don't
+    have it
+    >>> test4_j = test1.toJson(1)
+    Traceback (most recent call last):
+    ...
+    AttributeError: 'NoneType' object has no attribute 'toPython'
+
+    >>> test1.content_part() == test1_j
+    True
+
+    >>> test5 = TestContainer(string='hello', number='@', signature=signature)
+    >>> test5_j = test5.toJson(1)
+    >>> test5_j
+    '[["string","hello"],["number","QA=="],["signature",[["keyprint","MA=="],["signature","Kg=="]]]]'
+
+    This test is quirky and non-sensical with signatures
+    #>>> test5.toPython()
+    #>>> TestContainer().fromPython(test5.toPython()) <- this will be without signature :/
+
+    >>> test6 = TestContainer().fromJson(test1.toJson())
+    >>> test6.signature = signature
+    >>> test6 == test5
+    True
+
+    >>> test5.content_part() == test1_j
+    True
+    
+    TODO: Add verify_signature checking
+    """
     def __init__(self, **kwargs):
         Container.__init__(self,**kwargs)
         self.jsontext = None
@@ -173,7 +229,8 @@ class ContainerWithSignature(Container):
         return signer.verify(hasher.digest(), self.signature.signature)
 
 class CurrencyDescriptionDocument(ContainerWithSignature):
-    """
+    """The CurrencyDescriptionDocument container
+
     Lets test a bit
     >>> import crypto
     >>> ics = crypto.CryptoContainer(signing=crypto.RSASigningAlgorithm,
@@ -188,14 +245,6 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
     ...           issuer_cipher_suite = ics, 
     ...           issuer_public_master_key = crypto.RSAKeyPair(e=17L,n=3233L))
 
-    >>> data = cdd.toPython()
-    >>> cdd2 = CDD().fromPython(data)
-    >>> cdd2 == cdd
-    True
-
-    >>> cdd2.toJson() == cdd.toJson()
-    True
-
     >>> j = cdd.toJson()
     >>> j
     '[["standard_version","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["short_currency_identifier","OC"],["issuer_service_location","opencoin://issuer.opencent.net:8002"],["denominations",[1,2,5,10,20,50,100,200,500,1000]],["issuer_cipher_suite",["RSASigningAlgorithm","RSABlindingAlgorithm","SHA256HashingAlgorithm"]],["issuer_public_master_key","DKE=,EQ=="]]'
@@ -204,18 +253,12 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
     >>> cdd3 == cdd
     True
 
-    >>> sig = Signature(keyprint=21, signature=23)
+    >>> sig = Signature(keyprint=']', signature='V')
     >>> cdd3.signature = sig
 
-    >>> cdd3.toJson(1) #the format expected is questionable.
-    '[["standard_version","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["short_currency_identifier","OC"],["issuer_service_location","opencoin://issuer.opencent.net:8002"],["denominations",[1,2,5,10,20,50,100,200,500,1000]],["issuer_cipher_suite",["RSASigningAlgorithm","RSABlindingAlgorithm","SHA256HashingAlgorithm"]],["issuer_public_master_key","DKE=,EQ=="],["signature",[["keyprint",21],["signature",23]]]]'
+    >>> cdd3.toJson(1)
+    '[["standard_version","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["short_currency_identifier","OC"],["issuer_service_location","opencoin://issuer.opencent.net:8002"],["denominations",[1,2,5,10,20,50,100,200,500,1000]],["issuer_cipher_suite",["RSASigningAlgorithm","RSABlindingAlgorithm","SHA256HashingAlgorithm"]],["issuer_public_master_key","DKE=,EQ=="],["signature",[["keyprint","XQ=="],["signature","Vg=="]]]]'
     
-    Make sure the signature copies.
-    >>> cdd4 = CDD().fromJson(cdd3.toJson(1))
-    >>> cdd3 == cdd4
-    True
-    >>> cdd4.toJson(1)
-    '[["standard_version","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["short_currency_identifier","OC"],["issuer_service_location","opencoin://issuer.opencent.net:8002"],["denominations",[1,2,5,10,20,50,100,200,500,1000]],["issuer_cipher_suite",["RSASigningAlgorithm","RSABlindingAlgorithm","SHA256HashingAlgorithm"]],["issuer_public_master_key","DKE=,EQ=="],["signature",[["keyprint",21],["signature",23]]]]'
     
     And now, lets play with a really signed CDD
     >>> private_key = crypto.createRSAKeyPair(1024)
@@ -246,15 +289,7 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
     >>> test_cdd2 == test_cdd
     True
 
-
-    # would this ever fail and test_cdd2 == test_cdd?
     >>> test_cdd2.signature == test_cdd.signature
-    True
-
-
-    We always use the original jsontext to represent ourself!
-    >>> test_cdd2.short_currency_identifier = 'Foobar'
-    >>> test_cdd2.toJson(1) == test_j
     True
 
     >>> test_cdd.verify_self()
@@ -357,15 +392,47 @@ class MintKey(ContainerWithSignature):
         return digestAlgorithm().update(str(self)).digest()
 
 class CurrencyBase(Container):
+    """The base class for the currency types.
+    
+    Test the adding of currencies
+    >>> b = CurrencyBase(standard_version = 'http://opencoin.org/OpenCoinProtocol/1.0',
+    ...                 currency_identifier = 'http://opencent.net/OpenCent',
+    ...                 denomination = '1',
+    ...                 key_identifier = 'keyid',
+    ...                 serial = '1')
+    >>> b.value
+    1
+    >>> import copy
+    >>> c = copy.copy(b)
+    >>> b + c
+    2
+    >>> sum([b,c])
+    2
 
+    Test proper encoding/decoding of key_identifier and serial
+    >>> b = CurrencyBase(standard_version = 'http://opencoin.org/OpenCoinProtocol/1.0',
+    ...                 currency_identifier = 'http://opencent.net/OpenCent',
+    ...                 denomination = '1',
+    ...                 key_identifier = 'a',
+    ...                 serial = 'b')
+
+    >>> j = b.toJson()
+    >>> j
+    '[["standard_identifier",null],["currency_identifier","http://opencent.net/OpenCent"],["denomination","1"],["key_identifier","YQ=="],["serial","Yg=="]]'
+
+    >>> b == CurrencyBase().fromJson(j)
+    True
+    
+    """
+    
     fields = ['standard_identifier', 
               'currency_identifier', 
               'denomination', 
               'key_identifier', 
               'serial']
 
-    codecs = {'key_identifier':{'encode':base64.encode,'decode':base64.decode},
-              'serial':{'encode':base64.encode,'decode':base64.decode},}
+    codecs = {'key_identifier':{'encode':base64.b64encode,'decode':base64.b64decode},
+              'serial':{'encode':base64.b64encode,'decode':base64.b64decode},}
 
 
     def __init__(self, **kwargs):
@@ -375,7 +442,7 @@ class CurrencyBase(Container):
 
     def __add__(self,other):
         val = self.value
-        if type(other) == type(self):
+        if type(other) == type(self) and self.sameCurrency(other):
             return val + other.value
         elif type(other) == int:
             return val + other
@@ -392,25 +459,35 @@ class CurrencyBase(Container):
             except:
                 pass  
 
+    def sameCurrency(self, other):
+        """Verifies the two objects are the same currency."""
+        if self.standard_identifier != other.standard_identifier:
+            return False
 
-    def validate_with_CDD_and_MintingKey(self, currency_description_document, minting_key):
-        """Validates the currency with the cdd and minting key. Also verifies minting_key (for my safety)."""
+        if self.currency_identifier != other.currency_identifier:
+            return False
+
+        return True
+
+
+    def validate_with_CDD_and_MintKey(self, currency_description_document, mint_key):
+        """Validates the currency with the cdd and mint key. Also verifies mint_key (for my safety)."""
 
         cdd = currency_description_document
 
-        if not minting_key.verify_with_CDD(cdd):
+        if not mint_key.verify_with_CDD(cdd):
             return False
 
         if self.standard_identifier != cdd.standard_version:
             return False
 
-        if self.currency_identifier != minting_key.currency_identifier:
+        if self.currency_identifier != mint_key.currency_identifier:
             return False
 
-        if self.denomination != minting_key.denomination:
+        if self.denomination != mint_key.denomination:
             return False
 
-        if self.key_identifier != minting_key.key_identifier:
+        if self.key_identifier != mint_key.key_identifier:
             return False
 
         return True # Everything checks out
@@ -418,21 +495,6 @@ class CurrencyBase(Container):
     
 
 class CurrencyBlank(CurrencyBase):
-    """
-    >>> b = CurrencyBlank(standard_version = 'http://opencoin.org/OpenCoinProtocol/1.0',
-    ...                   currency_identifier = 'http://opencent.net/OpenCent',
-    ...                   denomination = '1',
-    ...                   key_identifier = 'keyid')
-    >>> b.generateSerial()
-    >>> b.value
-    1
-    >>> import copy
-    >>> c = copy.copy(b)
-    >>> b + c
-    2
-    >>> sum([b,c])
-    2
-    """
 
 
     def generateSerial(self):
@@ -443,13 +505,13 @@ class CurrencyBlank(CurrencyBase):
         
         self.serial = crypto._r.getRandomString(128)
 
-    def blind_blank(self, cdds, minting_keys_key_id):
+    def blind_blank(self, cdds, mint_keys_key_id):
         """Returns the blinded value of the hash of the coin for signing."""
 
         if self.blind_factor:
             raise MessageError('CurrenyBlank already has a blind factor')
 
-        self.blinding = cdds[self.currency_identifier].issuer_cipher_suite.blinding(minting_keys_key_id[self.key_identifier].public_key)
+        self.blinding = cdds[self.currency_identifier].issuer_cipher_suite.blinding(mint_keys_key_id[self.key_identifier].public_key)
         hashing = cdds[self.currency_identifier].issuer_cipher_suite.hashing()
 
         hashing.update(self.content_part())
@@ -464,9 +526,9 @@ class CurrencyBlank(CurrencyBase):
         self.blinding.reset(signature)
         return self.blinding.unblind()
 
-    def newCoin(self, signature, currency_description_document=None, minting_key=None):
+    def newCoin(self, signature, currency_description_document=None, mint_key=None):
         """Returns a coin using the unblinded signature.
-        Performs tests if currency_description_document and minting_key are provided.
+        Performs tests if currency_description_document and mint_key are provided.
         """
         coin = CurrencyCoin(self.standard_identifier, 
                             self.currency_identifier, 
@@ -476,9 +538,9 @@ class CurrencyBlank(CurrencyBase):
         
         
         # if only one is provided, we have an error. Purposefully use an 'or' for the test to get an exception later
-        if currency_description_document or minting_key:
-            if not coin.validate_with_CDD_and_MintingKey(currency_description_document, 
-                                                         minting_key):
+        if currency_description_document or mint_key:
+            if not coin.validate_with_CDD_and_MintKey(currency_description_document, 
+                                                         mint_key):
                 raise Exception('New coin does not validate!')
         
         return coin
@@ -487,14 +549,12 @@ class CurrencyCoin(CurrencyBase,ContainerWithSignature):
 
     content_id = 'Currency'              
 
-     
+    def validate_with_CDD_and_MintKey(self, currency_description_document, mint_key):
 
-    def validate_with_CDD_and_MintingKey(self, currency_description_document, minting_key):
-
-        if not CurrencyBase.validate_with_CDD_and_MintingKey(self, currency_description_document, minting_key):
+        if not CurrencyBase.validate_with_CDD_and_MintKey(self, currency_description_document, mint_key):
             return False
 
-        key = minting_key.public_key
+        key = mint_key.public_key
         signer = currency_description_document.issuer_cipher_suite.signing(key)
         hasher = currency_description_document.issuer_cipher_suite.hashing()
 
