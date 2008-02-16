@@ -297,10 +297,6 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
 
     >>> test_cdd.verify_self()
     True
-
-    >>> test_cdd2.signature.keyprint = "Foo"
-    >>> test_cdd2.verify_self()
-    False
     """
 
     from crypto import encodeCryptoContainer, decodeCryptoContainer, decodeRSAKeyPair
@@ -380,6 +376,11 @@ class MintKey(ContainerWithSignature):
     >>> mintKey.toJson(1)
     '[["key_identifier","..."],["currency_identifier","http://opencent.net/OpenCent"],["denomination",1],["not_before","2008-01-01T00:00:00Z"],["key_not_after","2008-02-01T00:00:00Z"],["coin_not_after","2008-04-01T00:00:00Z"],["public_key","..."],["signature",[["keyprint","hxz5pRwS+RFp88qQliXYm3R5uNighktwxqEh4RMOuuk="],["signature","..."]]]]'
 
+    Well, we are going to test that verify_with_CDD works now. We've already
+    built helper a helper function, addSignatureAndVerify. The reason
+    we have it is because if we modify the fields, the signature checking will
+    fail. So we have to have an incorrect field and a correct signature, to make
+    sure we are testing only one error condition at a time.
     >>> mintKey2 = copy.deepcopy(mintKey)
     >>> mintKey2.signature.signature = "foo"
     >>> mintKey2.verify_with_CDD(CDD)
@@ -410,11 +411,20 @@ class MintKey(ContainerWithSignature):
     >>> addSignatureAndVerify(mintKey7, CDD, CDD_private)
     False
 
+    >>> mintKey8 = copy.deepcopy(mintKey)
+    >>> mintKey8.signature = None
+    >>> mintKey8.verify_with_CDD(CDD)
+    False
+
     Just to make sure we didn't mess up something on the way...
     >>> mintKey.verify_with_CDD(CDD)
     True
 
     Okay. We'll test verify_time now. It returns (can_mint, can_redeem)
+    The tuple input to timegm is (year, month, day, hour, minute, second).
+    The h/m/s is the same as on a normal clock. h/m/s is in 24 hour time
+    with the day starting at 0:0:0 and the end of the day 24:0:0. I think
+    that day1 24:0:0 is the same as day2 0:0:0.
     >>> mintKey.verify_time(timegm((2007,12,1,0,0,0)))
     (False, False)
 
@@ -456,9 +466,16 @@ class MintKey(ContainerWithSignature):
 
     def verify_with_CDD(self, currency_description_document):
         """verify_with_CDD verifies the mint key against the CDD ensuring valid values 
-           matching the CDD and the signature validity."""
+        matching the CDD and the signature validity.i
+           
+        It assumes the CDD is valid. If not, some tests here willl pass (notably the
+        signature keyprint check)
+        """
 
         cdd = currency_description_document
+
+        if not self.signature:
+            return False # if we have no signature, we are not valid (or verifiable)
 
         if self.signature.keyprint != cdd.signature.keyprint:
             return False # if they aren't the same master key, it isn't valid
@@ -472,14 +489,11 @@ class MintKey(ContainerWithSignature):
         if self.key_identifier != cdd.issuer_cipher_suite.hashing(str(self.public_key)).digest():
             return False # the key identifier is not valid
 
-        if self.signature:
-            signing, hashing = cdd.issuer_cipher_suite.signing, cdd.issuer_cipher_suite.hashing
-            return self.verifySignature(signing, hashing, cdd.issuer_public_master_key)
-        else:
-            return False # if we have no signature, we are not valid (or verifiable)
+        signing, hashing = cdd.issuer_cipher_suite.signing, cdd.issuer_cipher_suite.hashing
+        return self.verifySignature(signing, hashing, cdd.issuer_public_master_key)
         
     def verify_time(self, time):
-        """Whether the container is currently valid. Returns a tuple of (can_mint, can_redeem)."""
+        """Whether the container is valid at time. Returns a tuple of (can_mint, can_redeem)."""
 
         can_mint = time >= self.not_before and time <= self.key_not_after
         can_redeem = time >= self.not_before and time <= self.coin_not_after
@@ -591,46 +605,71 @@ class CurrencyBase(Container):
     
 
 class CurrencyBlank(CurrencyBase):
+    """CurrencyBlank is a blank without signature. It can blind and unblind.
 
+    >>> blank = CurrencyBlank(standard_identifier='http://OpenCoin/1.0/',
+    ...                       currency_identifier='http://OpenCent',
+    ...                       denomination=1,
+    ...                       key_identifier='cent')
 
-    def generateSerial(self):
-    
+    >>> blank.toJson()
+    Traceback (most recent call last):
+    ...
+    TypeError: b2a_base64...
+
+    >>> blank.serial = '123'
+
+    >>> blank.toJson()
+    '[["standard_identifier","http://OpenCoin/1.0/"],["currency_identifier","http://OpenCent"],["denomination",1],["key_identifier","Y2VudA=="],["serial","MTIz"]]'
+
+    >>> blank.serial = None
+    >>> blank.generateSerial()
+    >>> blank.serial
+    '...'
+
+    >>> blank.generateSerial()
+    Traceback (most recent call last):
+    ...
+    Exception: Cannot generate a new serial when the serial is set.
+    """
+    def __init__(self, **kwargs):
+        CurrencyBase.__init__(self, **kwargs)
+        self.blind_factor = kwargs.get('blind_factor', None)
+
+    def generateSerial(self): 
         import crypto
         if self.serial:
-            raise MessageError('gah! trying to make another serial.')
+            raise Exception('Cannot generate a new serial when the serial is set.')
         
         self.serial = crypto._r.getRandomString(128)
 
-    def blind_blank(self, cdds, mint_keys_key_id):
+    def blind_blank(self, cdd, mint_key):
         """Returns the blinded value of the hash of the coin for signing."""
 
         if self.blind_factor:
-            raise MessageError('CurrenyBlank already has a blind factor')
+            raise Exception('CurrencyBlank already has a blind factor')
 
-        self.blinding = cdds[self.currency_identifier].issuer_cipher_suite.blinding(mint_keys_key_id[self.key_identifier].public_key)
-        hashing = cdds[self.currency_identifier].issuer_cipher_suite.hashing()
+        self.blinding = cdd.issuer_cipher_suite.blinding(mint_key.public_key)
+        hashing = cdd.issuer_cipher_suite.hashing(self.content_part())
 
-        hashing.update(self.content_part())
-        self.blinding.update(hashing.digest())
-        
-        self.blind_value, self.blind_factor = self.blinding.blind()
+        self.blind_value, self.blind_factor = self.blinding.blind(hashing.digest())
         return self.blind_value
 
     def unblind_signature(self, signature):
         """Returns the unblinded value of the blinded signature."""
 
-        self.blinding.reset(signature)
-        return self.blinding.unblind()
+        return self.blinding.unblind(signature)
 
     def newCoin(self, signature, currency_description_document=None, mint_key=None):
         """Returns a coin using the unblinded signature.
         Performs tests if currency_description_document and mint_key are provided.
         """
-        coin = CurrencyCoin(self.standard_identifier, 
-                            self.currency_identifier, 
-                            self.denomination, 
-                            self.key_identifier,
-                            self.serial, signature)
+        coin = CurrencyCoin(standard_identifier = self.standard_identifier, 
+                            currency_identifier = self.currency_identifier, 
+                            denomination = self.denomination, 
+                            key_identifier = self.key_identifier,
+                            serial = self.serial,
+                            signature = signature)
         
         
         # if only one is provided, we have an error. Purposefully use an 'or' for the test to get an exception later
@@ -652,12 +691,9 @@ class CurrencyCoin(CurrencyBase,ContainerWithSignature):
 
         key = mint_key.public_key
         signer = currency_description_document.issuer_cipher_suite.signing(key)
-        hasher = currency_description_document.issuer_cipher_suite.hashing()
+        hasher = currency_description_document.issuer_cipher_suite.hashing(self.content_part())
 
-        hasher.update(self.content_part())
-        signer.update(hasher.digest())
-        
-        if not signer.verify(self.signature):
+        if not signer.verify(hasher.digest(), self.signature):
             return False
 
         return True

@@ -109,6 +109,74 @@ def generateCDD():
 
 CDD_private, CDD = generateCDD()
 
+def makeKeys512():
+    """A helper function to generate specific rsa 512 bit keys.
+
+    Used to generate keys we can use other places and have repeatable effects.
+    Do not remove/change any of these. It will become messy.
+
+    >>> import crypto, base64
+    >>> hash_alg = crypto.SHA256HashingAlgorithm
+    >>> keys = makeKeys512()
+    
+    >>> base64.b64encode(hash_alg(keys[0].stringPrivate()).digest())
+    'S/z7RqJEz3PpvbGtA0UYLJ6HVLegvBiVgg8WEkU551w='
+    
+    >>> base64.b64encode(hash_alg(keys[1].stringPrivate()).digest())
+    'YyGbBpAfgTMy8duw4B1lbeSmiGTvww/VkAjTOLqY+JA='
+    
+    >>> base64.b64encode(hash_alg(keys[2].stringPrivate()).digest())
+    'EzEkB1Ji0fmeNbbBYLDSLh8PFKvTa7PfICJi5idh8jM='
+    
+    >>> base64.b64encode(hash_alg(keys[3].stringPrivate()).digest())
+    '66Qd4kVWAaWj8fQMDDsGjA0+M6lMD77XIsV/QYO0KDE='
+    
+    >>> base64.b64encode(hash_alg(keys[4].stringPrivate()).digest())
+    'g8HYpCtirVSjxjrY2myXbI1VGL95/H8fIE4lmorloGk='
+    """
+    import crypto, base64
+    
+    def makeKey(keystring):
+        return crypto.RSAKeyPair(input=[base64.b64decode(i) for i in keystring.split(',')])
+    
+    keys = []
+    s = 'rYVRng96lTEuiWcM3J6G1o3DqGtw4qbLH/PqSQ/FVe1JpCBG07QJ2QDVwnvgtFZc' + \
+        'Iq0rGpB3TMukY4VGAtTp9w==,AQAB,UVV/Z0Y8IDhYZuFdvv+zllgG0SfjVun1pj' + \
+        'mPpMV2qwpw2b7QpveBESZZhc8hct6JhGwdPv2RP38W9MEsKwb3AQ==,sIGnsjB85' + \
+        'BQJFVev7kQXBYxHcWQrDzrzjyzAwp6NhYE=,+6ttoqGqAEEgbkE9aCrUH4k5mg1g' + \
+        'IR3qqbyasAIXW3c='
+    keys.append(makeKey(s))
+
+    s = 'zBuIJ/ACheE6HpkB3BnwlsBs3tz21netK32qyne011ViCFX+IbAf/AzxqU8eZW9b' + \
+        '1HBtgdFEdYplWaD2/ghZkQ==,AQAB,x5t1QHl8PinRiPLh2rqTixqMXjeCPqOzew' + \
+        'De8jq3ZI2e56BWc0QpoHmFVYOPLC7aTuNLAMXRG1xy/3qBjN9GsQ==,0KaRUW+hT' + \
+        '14heMy/ysBRq3cZGCXLXxlF8cIyvXpVPBM=,+m0I++1ewqqXzyQyg27uBPzt6M+t' + \
+        'cIgaJqFk7AMpQEs='
+    keys.append(makeKey(s))
+
+    s = 'qQMxi5ZWvGNOSoWD2oQG/rcOYyu54JMPpShgClph5O+3MiEoKxUrxt6HKZ9XUfXO' + \
+        '1nkAVM/p3D3AAKm8EghAWQ==,AQAB,Tc9mk/kW3Yxqkux9E7EM91+XhBixbq7F2S' + \
+        'eJb7rErvzdu93lb133GoSutTgw04fZxLtCJmH5zCksYB0AxeoNwQ==,wcUPKrytT' + \
+        'rxmjiySKK5C5gSmlH3zntNLKrQBEmgcwDU=,30qxhmW49MKN4vrjhaB4DHNLOAA7' + \
+        'FR9BC4f42j1CDBU='
+    keys.append(makeKey(s))
+
+    keys.append(makeKey('iKRbuOcx0ZaonCW2174PGJ7NndVz2SsrviRFBI7iH1Ef2DAY' +
+        '+mMQOkrZouSoERGx+qzfxxomsbdNAWWn9DE5qQ==,AQAB,KDCPedcmZAr4FNVS7i' +
+        'nMruUmfSHnLRzxhL+OPUT5ZVQ8GLPUrwb5xu64iN1wA+GX3Ye4MBZnKTxBTztyqs' +
+        'IeMQ==,o9YCYd6frBAkNn6GTi5Xdq+KWISbgSz2ATpQfYCw/ZM=,1YInKagsCHLs' +
+        'Qxngi0XH1aCrI1Z82bCyEar4dENO0VM='))
+
+    keys.append(makeKey('0LacqxKYf46SeT4fLOe4Ovar2ubneiQzUltTZ19r/RyyYBYi' +
+        '+0FQlLApSQeYKIq1GBmPRZRC0PqrcJdO5d1P/Q==,AQAB,H7GbWN8aCUS9OWwVj9' +
+        'wgPdP3hOZLgGC+6mKz556151mN4hDtscN4v0WoO7MVC19sPr9h8v7VQrCxabVE1k' +
+        'BcAQ==,2HW624HBCsiylu4ivxbzH2jNt2wh4FosOjmqxa1qJbU=,9tahqi751CGj' +
+        'p7jaihYBKeYl9dVPmZN2q81jhM7z7ik='))
+
+    return keys
+
+keys512 = makeKeys512() 
+
 if __name__ == "__main__":
     import doctest
     doctest.testmod(optionflags=doctest.ELLIPSIS)
