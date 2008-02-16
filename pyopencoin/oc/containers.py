@@ -240,6 +240,10 @@ class ContainerWithSignature(Container):
         content_part = self.content_part()
         hasher = hashing_algorithm(content_part)
         signer = signature_algorithm(key)
+        
+        if hashing_algorithm(str(key)).digest() != self.signature.keyprint:
+            return False
+        
         return signer.verify(hasher.digest(), self.signature.signature)
 
 class CurrencyDescriptionDocument(ContainerWithSignature):
@@ -315,25 +319,102 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
 
     def __init__(self,**kwargs):
         ContainerWithSignature.__init__(self, **kwargs)
-        self.signature = kwargs.get('signature',None)
         self.keytype = kwargs.get('keytype', None)
 
     def verify_self(self):
         """Verifies the self-signed certificate."""
         import crypto        
         ics = self.issuer_cipher_suite
-        if ics.hashing(str(self.issuer_public_master_key)).digest() != self.signature.keyprint:
-            return False
         return self.verifySignature(ics.signing,
                                     ics.hashing,
                                     self.issuer_public_master_key)
-
 
 
 CDD = CurrencyDescriptionDocument
 
 
 class MintKey(ContainerWithSignature):
+    """The MintKey container.
+
+    The MintKey container holds everything (almost?) everything required to verify a
+    Token.
+
+    TODO: Some test go here. Things to test
+
+    >>> from calendar import timegm
+    >>> from tests import CDD, CDD_private
+    >>> import crypto, copy
+    >>> private, public = crypto.createRSAKeyPair(512)
+    >>> key_id = public.key_id(CDD.issuer_cipher_suite.hashing)
+
+    >>> mintKey = MintKey(key_identifier=key_id,
+    ...                   currency_identifier='http://opencent.net/OpenCent',
+    ...                   denomination=1,
+    ...                   not_before=timegm((2008,1,1,0,0,0)),
+    ...                   key_not_after=timegm((2008,2,1,0,0,0)),
+    ...                   coin_not_after=timegm((2008,4,1,0,0,0)),
+    ...                   public_key=public)
+                          
+    >>> hash_alg = CDD.issuer_cipher_suite.hashing
+    >>> sign_alg = CDD.issuer_cipher_suite.signing
+    
+    >>> def addSignature(mintKey, hash_alg, sign_alg, signing_key, keyprint):
+    ...     hasher = hash_alg(mintKey.content_part())
+    ...     signer = sign_alg(signing_key)
+    ...     signature = Signature(keyprint=keyprint,
+    ...                           signature=signer.sign(hasher.digest()))
+    ...     mintKey.signature = signature
+    ...     return mintKey
+    
+    >>> def addSignatureAndVerify(mintKey, CDD, signing_key):
+    ...     ics = CDD.issuer_cipher_suite
+    ...     mintKey = addSignature(mintKey, ics.hashing, ics.signing,
+    ...                     signing_key, mintKey.key_identifier)
+    ...     return mintKey.verify_with_CDD(CDD)
+
+    >>> mintKey = addSignature(mintKey, hash_alg, sign_alg, CDD_private, CDD.signature.keyprint) 
+
+    >>> mintKey.verify_with_CDD(CDD)
+    True
+
+    >>> mintKey.toJson(1)
+    '[["key_identifier","..."],["currency_identifier","http://opencent.net/OpenCent"],["denomination",1],["not_before","2008-01-01T00:00:00Z"],["key_not_after","2008-02-01T00:00:00Z"],["coin_not_after","2008-04-01T00:00:00Z"],["public_key","..."],["signature",[["keyprint","hxz5pRwS+RFp88qQliXYm3R5uNighktwxqEh4RMOuuk="],["signature","..."]]]]'
+
+    >>> mintKey2 = copy.deepcopy(mintKey)
+    >>> mintKey2.signature.signature = "foo"
+    >>> mintKey2.verify_with_CDD(CDD)
+    False
+
+    >>> mintKey3 = copy.deepcopy(mintKey)
+    >>> mintKey3.signature.keyprint = "foo"
+    >>> mintKey3.verify_with_CDD(CDD)
+    False
+
+    >>> mintKey4 = copy.deepcopy(mintKey)
+    >>> mintKey4.key_identifier = "foo"
+    >>> addSignatureAndVerify(mintKey2, CDD, CDD_private)
+    False
+
+    >>> mintKey5 = copy.deepcopy(mintKey)
+    >>> mintKey5.public_key = "foo"
+    >>> addSignatureAndVerify(mintKey2, CDD, CDD_private)
+    False
+
+    >>> mintKey6 = copy.deepcopy(mintKey)
+    >>> mintKey6.currency_identifier = "foo"
+    >>> addSignatureAndVerify(mintKey6, CDD, CDD_private)
+    False
+
+    >>> mintKey7 = copy.deepcopy(mintKey)
+    >>> mintKey7.denomination = "1.4"
+    >>> addSignatureAndVerify(mintKey7, CDD, CDD_private)
+    False
+
+
+    Just to make sure we didn't mess up something on the way...
+    >>> mintKey.verify_with_CDD(CDD)
+    True
+    """
 
     fields = ['key_identifier', 
               'currency_identifier', 
@@ -353,7 +434,6 @@ class MintKey(ContainerWithSignature):
 
     def __init__(self, **kwargs):
         ContainerWithSignature.__init__(self, **kwargs)
-        self.signature = kwargs.get('signature', None)
         self.keytype = kwargs.get('keytype', None)
 
     def verify_with_CDD(self, currency_description_document):
