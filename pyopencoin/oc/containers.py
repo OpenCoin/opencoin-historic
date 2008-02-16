@@ -410,10 +410,28 @@ class MintKey(ContainerWithSignature):
     >>> addSignatureAndVerify(mintKey7, CDD, CDD_private)
     False
 
-
     Just to make sure we didn't mess up something on the way...
     >>> mintKey.verify_with_CDD(CDD)
     True
+
+    Okay. We'll test verify_time now. It returns (can_mint, can_redeem)
+    >>> mintKey.verify_time(timegm((2007,12,1,0,0,0)))
+    (False, False)
+
+    >>> mintKey.verify_time(timegm((2008,1,1,0,0,0)))
+    (True, True)
+
+    >>> mintKey.verify_time(timegm((2008,2,1,0,0,0)))
+    (True, True)
+
+    >>> mintKey.verify_time(timegm((2008,2,1,0,0,1)))
+    (False, True)
+
+    >>> mintKey.verify_time(timegm((2008,4,1,0,0,0)))
+    (False, True)
+
+    >>> mintKey.verify_time(timegm((2008,4,1,0,0,1)))
+    (False, False)
     """
 
     fields = ['key_identifier', 
@@ -463,16 +481,11 @@ class MintKey(ContainerWithSignature):
     def verify_time(self, time):
         """Whether the container is currently valid. Returns a tuple of (can_mint, can_redeem)."""
 
-        can_mint = time > self.not_before and time < self.key_not_after
-        can_redeem = time > self.not_before and time < self.coin_not_after
+        can_mint = time >= self.not_before and time <= self.key_not_after
+        can_redeem = time >= self.not_before and time <= self.coin_not_after
 
-        return can_mint and can_redeem
+        return (can_mint, can_redeem)
 
-    def key_id(self, digestAlgorithm=None):
-        if not digestAlgorithm:
-            import crypto
-            digestAlgorithm = crypto.SHA256HashingAlgorithm
-        return digestAlgorithm().update(str(self)).digest()
 
 class CurrencyBase(Container):
     """The base class for the currency types.
