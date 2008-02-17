@@ -639,7 +639,7 @@ class CurrencyBlank(CurrencyBase):
 
     >>> blank.serial = None
     >>> blank.generateSerial()
-    >>> blank.serial # This test will fail randomly due to a ' character in the random generation, so the printing will be in "s
+    >>> base64.b64encode(blank.serial)
     '...'
 
     >>> blank.generateSerial()
