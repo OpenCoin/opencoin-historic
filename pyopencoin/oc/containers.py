@@ -104,12 +104,12 @@ class Container(object):
     def content_part(self):
         '''returns a human readable representation of the content'''
 
-        return self.toJson()
+        return self.toJson(False)
 
         content = ';'.join(['"%s"="%s"' % t for t in self.toPython()])
         return "%s={%s}" % (self.content_id,content)
 
-    def toJson(self):
+    def toJson(self, extranames=False):
         return json.write(self.toPython())
 
     def fromJson(self,text):
@@ -117,7 +117,7 @@ class Container(object):
 
     def __eq__(self,other):
         #return self.__dict__== other.__dict__
-        return self.toJson() == other.toJson()
+        return self.content_part() == other.content_part()
 
 
 def encodeTime(seconds):
@@ -163,7 +163,7 @@ class ContainerWithSignature(Container):
     >>> signature = Signature(keyprint='0', signature='*')
 
     >>> test1 = TestContainer(string='hello', number='@')
-    >>> test1_j = test1.toJson()
+    >>> test1_j = test1.content_part()
     >>> test1_j
     '[["string","hello"],["number","QA=="]]'
 
@@ -180,7 +180,7 @@ class ContainerWithSignature(Container):
 
     Check to make sure toJson fails if we force it to use the signature and we don't
     have it
-    >>> test4_j = test1.toJson(1)
+    >>> test4_j = test1.toJson()
     Traceback (most recent call last):
     ...
     AttributeError: 'NoneType' object has no attribute 'toPython'
@@ -189,7 +189,7 @@ class ContainerWithSignature(Container):
     True
 
     >>> test5 = TestContainer(string='hello', number='@', signature=signature)
-    >>> test5_j = test5.toJson(1)
+    >>> test5_j = test5.toJson()
     >>> test5_j
     '[["string","hello"],["number","QA=="],["signature",[["keyprint","MA=="],["signature","Kg=="]]]]'
 
@@ -197,7 +197,7 @@ class ContainerWithSignature(Container):
     #>>> test5.toPython()
     #>>> TestContainer().fromPython(test5.toPython()) <- this will be without signature :/
 
-    >>> test6 = TestContainer().fromJson(test1.toJson())
+    >>> test6 = TestContainer().fromJson(test1.content_part())
     >>> test6.signature = signature
     >>> test6 == test5
     True
@@ -213,8 +213,8 @@ class ContainerWithSignature(Container):
         self.signature = kwargs.get('signature')
 
 
-    def toJson(self,signature=0):
-        if signature:
+    def toJson(self,extranames=True):
+        if extranames:
             if self.jsontext:
                 return self.jsontext
             else:
@@ -263,7 +263,7 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
     ...           issuer_cipher_suite = ics, 
     ...           issuer_public_master_key = crypto.RSAKeyPair(e=17L,n=3233L))
 
-    >>> j = cdd.toJson()
+    >>> j = cdd.content_part()
     >>> j
     '[["standard_version","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["short_currency_identifier","OC"],["issuer_service_location","opencoin://issuer.opencent.net:8002"],["denominations",[1,2,5,10,20,50,100,200,500,1000]],["issuer_cipher_suite",["RSASigningAlgorithm","RSABlindingAlgorithm","SHA256HashingAlgorithm"]],["issuer_public_master_key","DKE=,EQ=="]]'
  
@@ -274,7 +274,7 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
     >>> sig = Signature(keyprint=']', signature='V')
     >>> cdd2.signature = sig
 
-    >>> cdd2.toJson(1)
+    >>> cdd2.toJson()
     '[["standard_version","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["short_currency_identifier","OC"],["issuer_service_location","opencoin://issuer.opencent.net:8002"],["denominations",[1,2,5,10,20,50,100,200,500,1000]],["issuer_cipher_suite",["RSASigningAlgorithm","RSABlindingAlgorithm","SHA256HashingAlgorithm"]],["issuer_public_master_key","DKE=,EQ=="],["signature",[["keyprint","XQ=="],["signature","Vg=="]]]]'
     
     
@@ -286,7 +286,7 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
     
     >>> from tests import CDD as test_cdd
 
-    >>> test_j = test_cdd.toJson(1)
+    >>> test_j = test_cdd.toJson()
     
     >>> test_cdd2 = CDD().fromJson(test_j)
     >>> test_cdd2 == test_cdd
@@ -373,7 +373,7 @@ class MintKey(ContainerWithSignature):
     >>> mintKey.verify_with_CDD(CDD)
     True
 
-    >>> mintKey.toJson(1)
+    >>> mintKey.toJson()
     '[["key_identifier","..."],["currency_identifier","http://opencent.net/OpenCent"],["denomination",1],["not_before","2008-01-01T00:00:00Z"],["key_not_after","2008-02-01T00:00:00Z"],["coin_not_after","2008-04-01T00:00:00Z"],["public_key","..."],["signature",[["keyprint","hxz5pRwS+RFp88qQliXYm3R5uNighktwxqEh4RMOuuk="],["signature","..."]]]]'
 
     Well, we are going to test that verify_with_CDD works now. We've already
@@ -639,7 +639,7 @@ class CurrencyBlank(CurrencyBase):
 
     >>> blank.serial = None
     >>> blank.generateSerial()
-    >>> blank.serial
+    >>> blank.serial # This test will fail randomly due to a ' character in the random generation, so the printing will be in "s
     '...'
 
     >>> blank.generateSerial()
@@ -806,8 +806,8 @@ class CurrencyCoin(CurrencyBase):
         self.signature = kwargs.get('signature')
 
     # base64 encoding and decoding is hardcoded here in to/fromJson
-    def toJson(self,signature=0):
-        if signature:
+    def toJson(self,extranames=0):
+        if extranames:
             if self.jsontext:
                 return self.jsontext
             else:

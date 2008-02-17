@@ -6,6 +6,7 @@ explainations of each field
 
 protocol-containers.txt
 =======================
+Show json representation
 
 algorithms.txt
 ==============
@@ -20,7 +21,7 @@ Add hello/versioning/protocol handshaking
 Add generic error message
 Renamings (Coin-->Token, ...)
 RFC style
-Licence - GNU FDL?
+Licence - GNU FDL?  (oierw thinks public domain or a CC license)
 
 
 protocol-over-https.txt
