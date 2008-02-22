@@ -74,7 +74,7 @@ Blank =
     standard identifier     = http://opencoin.org/OpenCoinProtocol/1.0
     currency identifier     = http://opencent.net/OpenCent 
     denomination            = denomination
-    key identifier          = key_id(signing key)
+    key identifier          = base64(hash((pP))
     serial                  = base64(128bit random number)
 }
 
@@ -84,7 +84,7 @@ Coin =
     standard identifier     = http://opencoin.org/OpenCoinProtocol/1.0
     currency identifier     = http://opencent.net/OpenCent 
     denomination            = denomination
-    key identifier          = key_id(signing key)
+    key identifier          = base64(hash(pP))
     serial                  = base64(128bit random number)
     
     signature               = base64(sig(pP, content part))
