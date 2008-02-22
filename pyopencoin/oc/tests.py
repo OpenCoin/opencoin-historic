@@ -177,6 +177,15 @@ def makeKeys512():
 
 keys512 = makeKeys512() 
 
+def addSignature(cont, hash_alg, sign_alg, signing_key, keyprint):
+    from containers import Signature
+    hasher = hash_alg(cont.content_part())
+    signer = sign_alg(signing_key)
+    signature = Signature(keyprint=keyprint,
+                          signature=signer.sign(hasher.digest()))
+    cont.signature = signature
+    return cont
+
 if __name__ == "__main__":
     import doctest
     doctest.testmod(optionflags=doctest.ELLIPSIS)

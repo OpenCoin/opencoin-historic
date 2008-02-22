@@ -338,7 +338,7 @@ class MintKey(ContainerWithSignature):
     TODO: Some test go here. Things to test
 
     >>> from calendar import timegm
-    >>> from tests import CDD, CDD_private
+    >>> from tests import CDD, CDD_private, addSignature
     >>> import crypto, copy
     >>> private, public = crypto.createRSAKeyPair(512)
     >>> key_id = public.key_id(CDD.issuer_cipher_suite.hashing)
@@ -353,14 +353,6 @@ class MintKey(ContainerWithSignature):
                           
     >>> hash_alg = CDD.issuer_cipher_suite.hashing
     >>> sign_alg = CDD.issuer_cipher_suite.signing
-    
-    >>> def addSignature(mintKey, hash_alg, sign_alg, signing_key, keyprint):
-    ...     hasher = hash_alg(mintKey.content_part())
-    ...     signer = sign_alg(signing_key)
-    ...     signature = Signature(keyprint=keyprint,
-    ...                           signature=signer.sign(hasher.digest()))
-    ...     mintKey.signature = signature
-    ...     return mintKey
     
     >>> def addSignatureAndVerify(mintKey, CDD, signing_key):
     ...     ics = CDD.issuer_cipher_suite
@@ -649,25 +641,15 @@ class CurrencyBlank(CurrencyBase):
     
     
     Snippet of code from MintKey doctest. Figure out how to use it here
-    >>> def addSignature(mintKey, hash_alg, sign_alg, signing_key, keyprint):
-    ...     hasher = hash_alg(mintKey.content_part())
-    ...     signer = sign_alg(signing_key)
-    ...     signature = Signature(keyprint=keyprint,
-    ...                           signature=signer.sign(hasher.digest()))
-    ...     mintKey.signature = signature
-    ...     return mintKey
-    
+    >>> from calendar import timegm
+    >>> from tests import CDD, CDD_private, keys512, addSignature
+    >>> import crypto, copy
+
     >>> def addSignatureAndVerify(mintKey, CDD, signing_key):
     ...     ics = CDD.issuer_cipher_suite
     ...     mintKey = addSignature(mintKey, ics.hashing, ics.signing,
     ...                     signing_key, mintKey.key_identifier)
     ...     return mintKey.verify_with_CDD(CDD)
-
-    >>> from tests import CDD, CDD_private
-
-    >>> from calendar import timegm
-    >>> from tests import CDD, CDD_private, keys512
-    >>> import crypto, copy
     
     >>> private1 = keys512[0]
     >>> public1 = private1.newPublicKeyPair()
@@ -696,18 +678,16 @@ class CurrencyBlank(CurrencyBase):
     ...                   key_not_after=timegm((2008,2,1,0,0,0)),
     ...                   coin_not_after=timegm((2008,4,1,0,0,0)),
     ...                   public_key=public5)
-    >>> mintKey5 = addSignature(mintKey1, hash_alg, sign_alg, CDD_private, CDD.signature.keyprint) 
+    >>> mintKey5 = addSignature(mintKey5, hash_alg, sign_alg, CDD_private, CDD.signature.keyprint) 
 
     >>> mintKey5.verify_with_CDD(CDD)
     True
     
-    Note: I can't think of a reason I ended up with two mint keys. *shrug*
-
     FIXME XXX A blank references a standard identifier, and a CDD uses a standard version!
     >>> blank = CurrencyBlank(standard_identifier=CDD.standard_version,
     ...                       currency_identifier=CDD.currency_identifier,
     ...                       denomination=1,
-    ...                       key_identifier=mintKey5.key_identifier,
+    ...                       key_identifier=mintKey1.key_identifier,
     ...                       serial='abcdefghijklmnopqrstuvwxyz')
 
     >>> blank.toJson()
@@ -737,6 +717,22 @@ class CurrencyBlank(CurrencyBase):
     >>> coin.validate_with_CDD_and_MintKey(CDD, mintKey1)
     True
 
+    >>> coin2 = blank.newCoin(clear_sig, CDD, mintKey1)
+    
+    >>> coin3 = blank.newCoin(clear_sig, CDD, mintKey5)
+    Traceback (most recent call last):
+        ...
+    Exception: New coin does not validate!
+
+    >>> coin4 = blank.newCoin(clear_sig, CDD)
+    Traceback (most recent call last):
+        ...
+    AttributeError: ...
+
+    >>> coin5 = blank.newCoin(clear_sig, mint_key=mintKey1)
+    Traceback (most recent call last):
+        ...
+    AttributeError: ...
     """
     def __init__(self, **kwargs):
         CurrencyBase.__init__(self, **kwargs)
@@ -835,8 +831,6 @@ class CurrencyCoin(CurrencyBase):
         signer = currency_description_document.issuer_cipher_suite.signing(key)
         hasher = currency_description_document.issuer_cipher_suite.hashing(self.content_part())
 
-        # FIXME: This is broken because CurrencyCoin doesn't do the right thing with the signature.
-        # When fixed, add this part back in! (oierw 2/16/08)
         if not signer.verify(hasher.digest(), self.signature):
             return False
 
