@@ -656,6 +656,7 @@ class CurrencyBlank(CurrencyBase):
                           
     >>> hash_alg = CDD.issuer_cipher_suite.hashing
     >>> sign_alg = CDD.issuer_cipher_suite.signing
+    >>> blind_alg = CDD.issuer_cipher_suite.blinding
     
     >>> mintKey1 = MintKey(key_identifier=public1.key_id(hash_alg),
     ...                   currency_identifier='http://opencent.net/OpenCent',
@@ -717,8 +718,16 @@ class CurrencyBlank(CurrencyBase):
     >>> coin.validate_with_CDD_and_MintKey(CDD, mintKey1)
     True
 
+    >>> coin.toJson()
+    '[["standard_identifier","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["denomination",1],["key_identifier","sj17RxE1hfO06+oTgBs9Z7xLut/3NN+nHJbXSJYTks0="],["serial","YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXo="],["signature","cK8f0bus8nP73pbNP/8Hm+7WojucymlijU1ERmR2Z0WMs44PVpqxnj81ZuBy8ojEA8xepFaEQScSENcoHz26dQ=="]]'
+
     >>> coin2 = blank.newCoin(clear_sig, CDD, mintKey1)
     
+    Test newCoin failures... newCoin performs a check if given a CDD
+    or a MintKey. if it does not validate, it will raise an Exception.
+    If we only give a MintKey or a CDD, it attempts to perform the
+    validation, although it will fail. This is to prevent any accidents
+    in arguments where the coin will not be checked when we want it to.
     >>> coin3 = blank.newCoin(clear_sig, CDD, mintKey5)
     Traceback (most recent call last):
         ...
@@ -733,7 +742,43 @@ class CurrencyBlank(CurrencyBase):
     Traceback (most recent call last):
         ...
     AttributeError: ...
+
+    Test other blank functions.
+    >>> blank2 = CurrencyBlank(standard_identifier=CDD.standard_version,
+    ...                       currency_identifier=CDD.currency_identifier,
+    ...                       denomination=1,
+    ...                       key_identifier=mintKey1.key_identifier,
+    ...                       serial='abcdefghijklmnopqrstuvwxyz')
+    >>> blank2.setBlind(blind_alg, mintKey1.public_key, 'blind factor')
+    >>> base64.b64encode(blank2.unblind_signature(blind_sig))
+    'cK8f0bus8nP73pbNP/8Hm+7WojucymlijU1ERmR2Z0WMs44PVpqxnj81ZuBy8ojEA8xepFaEQScSENcoHz26dQ=='
+
+    >>> blank3 = CurrencyBlank(standard_identifier=CDD.standard_version,
+    ...                       currency_identifier=CDD.currency_identifier,
+    ...                       denomination=1,
+    ...                       key_identifier=mintKey1.key_identifier,
+    ...                       serial='abcdefghijklmnopqrstuvwxyz',
+    ...                       blind_factor='blind factor')
+    >>> blank3.setBlind(blind_alg, mintKey1.public_key)
+    >>> base64.b64encode(blank3.unblind_signature(blind_sig))
+    'cK8f0bus8nP73pbNP/8Hm+7WojucymlijU1ERmR2Z0WMs44PVpqxnj81ZuBy8ojEA8xepFaEQScSENcoHz26dQ=='
+
+    And this is the normal and standard way to make a blank and blind
+    >>> blank4 = CurrencyBlank(standard_identifier=CDD.standard_version,
+    ...                       currency_identifier=CDD.currency_identifier,
+    ...                       denomination=1,
+    ...                       key_identifier=mintKey1.key_identifier)
+    >>> blank4.generateSerial()
+    >>> blind_value4 = blank4.blind_blank(CDD, mintKey1)
+    >>> base64.b64encode(blind_value4)
+    '...'
+
+    The blind_factor can be used to recreate a blank
+    >>> from Crypto.Util import number
+    >>> base64.b64encode(number.long_to_bytes(blank4.blind_factor))
+    '...'
     """
+
     def __init__(self, **kwargs):
         CurrencyBase.__init__(self, **kwargs)
         self.blind_factor = kwargs.get('blind_factor', None)
@@ -792,8 +837,59 @@ class CurrencyBlank(CurrencyBase):
         return coin
         
 class CurrencyCoin(CurrencyBase):
-    """Fill me out
+    """The CurrencyCoin. 
 
+    >>> from tests import CDD, CDD_private, keys512, addSignature
+    >>> import copy
+    >>> from calendar import timegm
+
+    >>> private = keys512[0]
+    >>> public = private.newPublicKeyPair()
+                          
+    >>> hash_alg = CDD.issuer_cipher_suite.hashing
+    >>> sign_alg = CDD.issuer_cipher_suite.signing
+    >>> blind_alg = CDD.issuer_cipher_suite.blinding
+    
+    >>> mintKey = MintKey(key_identifier=public.key_id(hash_alg),
+    ...                  currency_identifier='http://opencent.net/OpenCent',
+    ...                  denomination=1,
+    ...                  not_before=timegm((2008,1,1,0,0,0)),
+    ...                  key_not_after=timegm((2008,2,1,0,0,0)),
+    ...                  coin_not_after=timegm((2008,4,1,0,0,0)),
+    ...                  public_key=public)
+    >>> mintKey = addSignature(mintKey, hash_alg, sign_alg, CDD_private, CDD.signature.keyprint) 
+
+    >>> mintKey.verify_with_CDD(CDD)
+    True
+
+    >>> signature = 'cK8f0bus8nP73pbNP/8Hm+7WojucymlijU1ERmR2Z0WMs44PVpqxnj81ZuBy8ojEA8xepFaEQScSENcoHz26dQ=='
+
+    >>> coin = CurrencyCoin(standard_identifier=CDD.standard_version,
+    ...                     currency_identifier=CDD.currency_identifier,
+    ...                     denomination=1,
+    ...                     key_identifier=mintKey.key_identifier,
+    ...                     serial='abcdefghijklmnopqrstuvwxyz',
+    ...                     signature=base64.b64decode(signature))
+
+    >>> coin.toJson()
+    '[["standard_identifier","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["denomination",1],["key_identifier","sj17RxE1hfO06+oTgBs9Z7xLut/3NN+nHJbXSJYTks0="],["serial","YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXo="],["signature","cK8f0bus8nP73pbNP/8Hm+7WojucymlijU1ERmR2Z0WMs44PVpqxnj81ZuBy8ojEA8xepFaEQScSENcoHz26dQ=="]]'
+
+    >>> coin.content_part()
+    '[["standard_identifier","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["denomination",1],["key_identifier","sj17RxE1hfO06+oTgBs9Z7xLut/3NN+nHJbXSJYTks0="],["serial","YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXo="]]'
+
+    >>> coin2 = CurrencyCoin().fromJson(coin.toJson())
+    >>> coin2 == coin
+    True
+
+    >>> coin.validate_with_CDD_and_MintKey(CDD, mintKey)
+    True
+
+    Check that a bad signature will fail
+    >>> coin3 = copy.deepcopy(coin)
+    >>> coin3.signature = 'foobar'
+    >>> coin3.validate_with_CDD_and_MintKey(CDD, mintKey)
+    False
+        
     """
     
     def __init__(self, **kwargs):
@@ -802,7 +898,7 @@ class CurrencyCoin(CurrencyBase):
         self.signature = kwargs.get('signature')
 
     # base64 encoding and decoding is hardcoded here in to/fromJson
-    def toJson(self,extranames=0):
+    def toJson(self,extranames=1):
         if extranames:
             if self.jsontext:
                 return self.jsontext
