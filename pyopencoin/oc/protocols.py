@@ -283,7 +283,7 @@ class TransferTokenRecipient(Protocol):
         try:
             coins = [containers.CurrencyCoin().fromPython(c) for c in coins]
         except:
-            return Message('PROTOCOL_ERROR', 'resend message')
+            return Message('PROTOCOL_ERROR', 'send again')
 
         self.state = self.goodbye
         return Message('TRANSFER_TOKEN_ACCEPT',sum(coins))

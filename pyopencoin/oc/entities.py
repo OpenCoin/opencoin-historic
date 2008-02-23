@@ -408,14 +408,25 @@ class Mint:
     """A Mint is the minting agent for a a currency. It has the 
     >>> m = Mint()
 
-    >>> def makeFakeMintKey():
-    ...     pass
+    >>> import tests, crypto, base64
+    >>> mintKey = tests.mintKeys[0]
+    
+    This bit is a touch of a hack. Never run like this normally
+    >>> m.privatekeys[mintKey.key_identifier] = tests.keys512[0]
+
+    >>> m.addMintKey(mintKey, crypto.RSASigningAlgorithm)
+
+    >>> base64.b64encode(m.signNow(mintKey.key_identifier, 'abcdefghijklmnop'))
+    'Mq4dqFpKZEvbl+4HeXh0rGrqBk6Fm2bnUjNiVgirDvOuQf4Ty6ZkvpqB95jMyiwNlhx8A1qZmQv5biLM40emUg=='
+    
+    >>> m.signNow('abcd', 'efg')
+    False
 
     """
     def __init__(self):
-        self.keyvault = {}
         self.keyids = {}
         self.privatekeys = {}
+        self.sign_algs = {}
 
 
     def getKey(self,denomination,notbefore,notafter):
@@ -426,7 +437,25 @@ class Mint:
         self.privatekeys[private.key_id(hash_alg)] = private
         return public
 
-
+    def addMintKey(self, mintKey, sign_alg):
+        self.keyids[mintKey.key_identifier] = mintKey
+        self.sign_algs[mintKey.key_identifier] = sign_alg
+        
+    def signNow(self, key_identifier, blind):
+        try:
+            sign_alg = self.sign_algs[key_identifier]
+            signing_key = self.privatekeys[key_identifier]
+            mintKey = self.keyids[key_identifier]
+            
+            signer = sign_alg(self.privatekeys[key_identifier])
+        except KeyError:
+            return False
+        
+        if mintKey.verify_time(mintKey.key_not_after)[0]: # FIXME: Actually check time
+            signature = signer.sign(blind)
+            return signature
+        else:
+            return False
 
 if __name__ == "__main__":
     import doctest

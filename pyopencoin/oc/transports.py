@@ -20,7 +20,7 @@ class Transport:
         protocol.setTransport(self)
 
     def write(self,message):
-        " The protocol will write into this"
+        "The protocol will write into this"
 
     def newMessage(self,message):
         """Once data has been read (by whatever means) this method is called to 
@@ -44,7 +44,7 @@ class SocketServerTransport(Transport):
         self.debug = 0
 
     def start(self):
-        """This is a prove that I have no  understanding of sockets. Whats
+        """This is a prove that I have no understanding of sockets. Whats
         a socket, whats a conn, when is it open, when closed?"""
 
         import socket
