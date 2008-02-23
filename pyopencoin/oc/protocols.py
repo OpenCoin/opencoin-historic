@@ -17,7 +17,7 @@ state (sounds a bit ackward, its easy, check the states code)
 """
 
 from messages import Message
-    
+import containers    
 
 class Protocol:
     """A protocol ties messages and actions togehter, it is basically one side
@@ -220,8 +220,9 @@ class TransferTokenSender(Protocol):
 
     
     def __init__(self,target,blanks,coins,**kwargs):
-        import crypto,base64
-        id = crypto.Random().getRandomString(128) #XXX is that a good enough id?
+        import base64
+        from crypto import _r as Random
+        id = Random.getRandomString(128) #XXX is that a good enough id?
         self.transaction_id = base64.b64encode(id)
 
         self.target = target
@@ -263,7 +264,7 @@ class TransferTokenRecipient(Protocol):
         self.state = self.goodbye
         return Message('TRANSFER_TOKEN_ACCEPT',sum(coins))
 
-############################### Minting key exchange ########################################
+############################### Mint key exchange ########################################
 
 
 
@@ -277,33 +278,35 @@ class fetchMintingKeyProtocol(Protocol):
 
     Lets fetch by denomination
 
-    >>> fmp = fetchMintingKeyProtocol(denomination=2)
+    >>> fmp = fetchMintingKeyProtocol(denomination=1)
     >>> fmp.state(Message(None))
     <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
 
     >>> fmp.state(Message('HANDSHAKE_ACCEPT'))
-    <Message('MINTING_KEY_FETCH_DENOMINATION',2)>
+    <Message('MINTING_KEY_FETCH_DENOMINATION',1)>
 
-    >>> fmp.state(Message('MINTING_KEY_PASS','foobar'))
+    >>> from tests import mintKeys
+    >>> mintKey = mintKeys[0]
+    >>> fmp.state(Message('MINTING_KEY_PASS',mintKey.toPython()))
     <Message('GOODBYE',None)>
 
 
     And now by keyid
 
-    >>> fmp = fetchMintingKeyProtocol(keyid='abc')
+    >>> fmp = fetchMintingKeyProtocol(keyid='sj17RxE1hfO06+oTgBs9Z7xLut/3NN+nHJbXSJYTks0=')
     >>> fmp.state(Message(None))
     <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
 
     >>> fmp.state(Message('HANDSHAKE_ACCEPT'))
-    <Message('MINTING_KEY_FETCH_KEYID','abc')>
+    <Message('MINTING_KEY_FETCH_KEYID','sj17RxE1hfO06+oTgBs9Z7xLut/3NN+nHJbXSJYTks0=')>
 
-    >>> fmp.state(Message('MINTING_KEY_PASS','foobar'))
+    >>> fmp.state(Message('MINTING_KEY_PASS',mintKey.toPython()))
     <Message('GOODBYE',None)>
 
 
     Lets have some problems a failures (we set the state
-    to getKey to resuse the fmp object and save a couple
-    of line)
+    to getKey to reuse the fmp object and save a couple
+    of lines)
 
     >>> fmp.newState(fmp.getKey)
     >>> fmp.state(Message('MINTING_KEY_FAILURE',))
@@ -313,6 +316,10 @@ class fetchMintingKeyProtocol(Protocol):
     
     >>> fmp.newState(fmp.getKey)
     >>> fmp.state(Message('FOOBAR'))
+    <Message('PROTOCOL_ERROR','send again')>
+
+    >>> fmp.newState(fmp.getKey)
+    >>> fmp.state(Message('MINTING_KEY_PASS', ["foo"]))
     <Message('PROTOCOL_ERROR','send again')>
     
     """
@@ -353,9 +360,14 @@ class fetchMintingKeyProtocol(Protocol):
         """Gets the actual key"""
 
         if message.type == 'MINTING_KEY_PASS':
-            self.keycert = message.data
+            try:
+                self.keycert = containers.MintKey().fromPython(message.data)
+            except Exception, reason:
+                return Message('PROTOCOL_ERROR','send again')
+            
             self.newState(self.finish)
             return Message('GOODBYE')
+                
 
         elif message.type == 'MINTING_KEY_FAILURE':
             self.reason = message.data
