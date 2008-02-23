@@ -502,14 +502,20 @@ class CurrencyBase(Container):
     ...                 denomination = '1',
     ...                 key_identifier = 'keyid',
     ...                 serial = '1')
-    >>> b.value
-    1
+
+    #>>> b.value
+    #1
     >>> import copy
     >>> c = copy.copy(b)
     >>> b + c
     2
     >>> sum([b,c])
     2
+
+    Test that going from a python copy works
+    >>> d = CurrencyBase().fromPython(b.toPython())
+    >>> b + c + d
+    3
 
     Test proper encoding/decoding of key_identifier and serial
     >>> b = CurrencyBase(standard_version = 'http://opencoin.org/OpenCoinProtocol/1.0',
@@ -540,16 +546,11 @@ class CurrencyBase(Container):
 
     def __init__(self, **kwargs):
         Container.__init__(self, **kwargs)
-        self.value = 0
-        self.setValue()
 
     def __add__(self,other):
-        val = self.value
-        if val == 0:
-            self.setValue()
-            val = self.value
+        val = self.getValue()
         if type(other) == type(self) and self.sameCurrency(other):
-            return val + other.value
+            return val + other.getValue()
         elif type(other) == int:
             return val + other
         else:
@@ -558,14 +559,11 @@ class CurrencyBase(Container):
 
     __radd__ = __add__ 
 
-    def setValue(self,value=None):
-        if value:
-            self.value = value
-        else:
-            try:
-                self.value = int(self.denomination)
-            except:
-                pass  
+    def getValue(self):
+        try:
+            return int(self.denomination)
+        except:
+            pass  
 
     def sameCurrency(self, other):
         """Verifies the two objects are the same currency."""
@@ -782,8 +780,6 @@ class CurrencyBlank(CurrencyBase):
     >>> base64.b64encode(number.long_to_bytes(blank4.blind_factor))
     '...'
 
-    >>> sum((blank, blank2))
-    2
     """
 
     def __init__(self, **kwargs):
@@ -887,9 +883,6 @@ class CurrencyCoin(CurrencyBase):
     >>> coin3.validate_with_CDD_and_MintKey(CDD, mintKey)
     False
 
-    >>> sum((coin, coin3))
-    2
-        
     """
     
     def __init__(self, **kwargs):

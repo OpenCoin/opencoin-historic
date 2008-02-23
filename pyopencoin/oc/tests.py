@@ -38,18 +38,20 @@ Client <Message('finished',None)>
 Test the transfer token protocol
 
 >>> t = ClientTest(issuer.listen)
->>> walletB.transferTokens(t,'myaccount',[],[1,2],type='redeem')
+>>> from tests import coins
+>>> coin1 = coins[0][0] # denomination of 1
+>>> coin2 = coins[1][0] # denomination of 2
+>>> walletB.transferTokens(t,'myaccount',[],[coin1, coin2],type='redeem')
 Client <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
 Server <Message('HANDSHAKE_ACCEPT',None)>
-Client <Message('TRANSFER_TOKEN_REQUEST',['...', 'myaccount', [], [1, 2], ['type', 'redeem']])>
+Client <Message('TRANSFER_TOKEN_REQUEST',['...', 'myaccount', [], [[(...)], [(...)]], ['type', 'redeem']])>
 Server <Message('TRANSFER_TOKEN_ACCEPT',3)>
 Client <Message('GOODBYE',None)>
 Server <Message('GOODBYE',None)>
 Client <Message('finished',None)>
 
 
-Test the coin spend protocol. FIXME: We glob too much during the TRANSFER_TOKEN_REQUEST.
-It should be changed to test for '[[(...)], [(...)]],' where we glob for '[..., ...],'
+Test the coin spend protocol.
 
 >>> t = ClientTest(walletB.listen,clientnick='walletA',servernick='walletB')
 >>> t2 = ClientTest(issuer.listen,clientnick='walletB',servernick='issuer')
@@ -62,7 +64,7 @@ walletB <Message('SUM_ACCEPT',None)>
 walletA <Message('COIN_SPEND',['...', [[(...)], [(...)]], 'a book'])>
 walletB <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
 issuer <Message('HANDSHAKE_ACCEPT',None)>
-walletB <Message('TRANSFER_TOKEN_REQUEST',['...', 'my account', [], [..., ...], ['type', 'redeem']])>
+walletB <Message('TRANSFER_TOKEN_REQUEST',['...', 'my account', [], [[(...)], [(...)]], ['type', 'redeem']])>
 issuer <Message('TRANSFER_TOKEN_ACCEPT',3)>
 walletB <Message('GOODBYE',None)>
 issuer <Message('GOODBYE',None)>

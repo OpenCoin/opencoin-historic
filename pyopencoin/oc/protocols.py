@@ -221,11 +221,15 @@ class CoinSpendRecipient(Protocol):
 
 class TransferTokenSender(Protocol):
     """
-    >>> tts = TransferTokenSender('my account',[],[1,2],type='redeem')
+    >>> from tests import coins
+    >>> coin1 = coins[0][0] # denomination of 1
+    >>> coin2 = coins[1][0] # denomination of 2
+
+    >>> tts = TransferTokenSender('my account',[],[coin1, coin2],type='redeem')
     >>> tts.state(Message(None))
     <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
     >>> tts.state(Message('HANDSHAKE_ACCEPT'))
-    <Message('TRANSFER_TOKEN_REQUEST',['...', 'my account', [], [1, 2], ['type', 'redeem']])>
+    <Message('TRANSFER_TOKEN_REQUEST',['...', 'my account', [], [[(...)], [(...)]], ['type', 'redeem']])>
     >>> tts.state(Message('TRANSFER_TOKEN_ACCEPT',3))
     <Message('GOODBYE',None)>
 
@@ -240,7 +244,7 @@ class TransferTokenSender(Protocol):
 
         self.target = target
         self.blanks = blanks
-        self.coins = coins
+        self.coins = [c.toPython() for c in coins]
         self.kwargs = kwargs
 
         Protocol.__init__(self)
@@ -268,11 +272,18 @@ class TransferTokenSender(Protocol):
 class TransferTokenRecipient(Protocol):
     """
     >>> ttr = TransferTokenRecipient()
-    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['...', 'my account', [], [1, 2], ['type', 'redeem']]))
+    >>> from tests import coins
+    >>> coin1 = coins[0][0].toPython() # denomination of 1
+    >>> coin2 = coins[1][0].toPython() # denomination of 2
+    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['...', 'my account', [], [coin1, coin2], ['type', 'redeem']]))
     <Message('TRANSFER_TOKEN_ACCEPT',3)>
     """
     def start(self,message):
         transaction_id,target,blanks,coins = message.data[:4]
+        try:
+            coins = [containers.CurrencyCoin().fromPython(c) for c in coins]
+        except:
+            return Message('PROTOCOL_ERROR', 'resend message')
 
         self.state = self.goodbye
         return Message('TRANSFER_TOKEN_ACCEPT',sum(coins))
