@@ -536,7 +536,6 @@ class CurrencyBase(Container):
     # signature codec is in place for CurrencyCoin
     codecs = {'key_identifier':{'encode':base64.b64encode,'decode':base64.b64decode},
               'serial':{'encode':base64.b64encode,'decode':base64.b64decode},}
-              #'signature':{'encode':base64.b64encode,'decode':base64.b64decode}}
 
 
     def __init__(self, **kwargs):
@@ -546,10 +545,15 @@ class CurrencyBase(Container):
 
     def __add__(self,other):
         val = self.value
+        if val == 0:
+            self.setValue()
+            val = self.value
         if type(other) == type(self) and self.sameCurrency(other):
             return val + other.value
         elif type(other) == int:
             return val + other
+        else:
+            raise NotImplementedError
             
 
     __radd__ = __add__ 
@@ -777,6 +781,9 @@ class CurrencyBlank(CurrencyBase):
     >>> from Crypto.Util import number
     >>> base64.b64encode(number.long_to_bytes(blank4.blind_factor))
     '...'
+
+    >>> sum((blank, blank2))
+    2
     """
 
     def __init__(self, **kwargs):
@@ -839,7 +846,7 @@ class CurrencyBlank(CurrencyBase):
 class CurrencyCoin(CurrencyBase):
     """The CurrencyCoin. 
 
-    >>> from tests import CDD, CDD_private, keys512, addSignature
+    >>> from tests import CDD, CDD_private, keys512, addSignature, mintKeys
     >>> import copy
     >>> from calendar import timegm
 
@@ -850,17 +857,7 @@ class CurrencyCoin(CurrencyBase):
     >>> sign_alg = CDD.issuer_cipher_suite.signing
     >>> blind_alg = CDD.issuer_cipher_suite.blinding
     
-    >>> mintKey = MintKey(key_identifier=public.key_id(hash_alg),
-    ...                  currency_identifier='http://opencent.net/OpenCent',
-    ...                  denomination=1,
-    ...                  not_before=timegm((2008,1,1,0,0,0)),
-    ...                  key_not_after=timegm((2008,2,1,0,0,0)),
-    ...                  coin_not_after=timegm((2008,4,1,0,0,0)),
-    ...                  public_key=public)
-    >>> mintKey = addSignature(mintKey, hash_alg, sign_alg, CDD_private, CDD.signature.keyprint) 
-
-    >>> mintKey.verify_with_CDD(CDD)
-    True
+    >>> mintKey = mintKeys[0]
 
     >>> signature = 'cK8f0bus8nP73pbNP/8Hm+7WojucymlijU1ERmR2Z0WMs44PVpqxnj81ZuBy8ojEA8xepFaEQScSENcoHz26dQ=='
 
@@ -889,6 +886,9 @@ class CurrencyCoin(CurrencyBase):
     >>> coin3.signature = 'foobar'
     >>> coin3.validate_with_CDD_and_MintKey(CDD, mintKey)
     False
+
+    >>> sum((coin, coin3))
+    2
         
     """
     
@@ -932,7 +932,7 @@ class CurrencyCoin(CurrencyBase):
 
         return True
 
-    
+ 
 
 if __name__ == "__main__":
     import doctest

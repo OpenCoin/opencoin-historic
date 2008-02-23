@@ -45,7 +45,11 @@ class Wallet(Entity):
         transport.start()
 
     def sendCoins(self,transport,amount,target):
-        protocol = protocols.CoinSpendSender([1,2],target)
+        #FIXME: Doing a broken thing and using something from tests!
+        from tests import coins
+        coin1 = coins[0][0] # denomination of 1
+        coin2 = coins[1][0] # denomination of 2
+        protocol = protocols.CoinSpendSender([coin1, coin2],target)
         transport.setProtocol(protocol)
         transport.start()
         protocol.newMessage(Message(None))

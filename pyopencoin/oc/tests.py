@@ -48,7 +48,8 @@ Server <Message('GOODBYE',None)>
 Client <Message('finished',None)>
 
 
-Test the coin spend protocol
+Test the coin spend protocol. FIXME: We glob too much during the TRANSFER_TOKEN_REQUEST.
+It should be changed to test for '[[(...)], [(...)]],' where we glob for '[..., ...],'
 
 >>> t = ClientTest(walletB.listen,clientnick='walletA',servernick='walletB')
 >>> t2 = ClientTest(issuer.listen,clientnick='walletB',servernick='issuer')
@@ -58,10 +59,10 @@ walletA <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
 walletB <Message('HANDSHAKE_ACCEPT',None)>
 walletA <Message('SUM_ANNOUNCE',['...', 3, 'a book'])>
 walletB <Message('SUM_ACCEPT',None)>
-walletA <Message('COIN_SPEND',['...', [1, 2], 'a book'])>
+walletA <Message('COIN_SPEND',['...', [[(...)], [(...)]], 'a book'])>
 walletB <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
 issuer <Message('HANDSHAKE_ACCEPT',None)>
-walletB <Message('TRANSFER_TOKEN_REQUEST',['...', 'my account', [], [1, 2], ['type', 'redeem']])>
+walletB <Message('TRANSFER_TOKEN_REQUEST',['...', 'my account', [], [..., ...], ['type', 'redeem']])>
 issuer <Message('TRANSFER_TOKEN_ACCEPT',3)>
 walletB <Message('GOODBYE',None)>
 issuer <Message('GOODBYE',None)>
@@ -207,10 +208,66 @@ def makeMintKeys():
                       public_key=public0)
     mintKey0 = addSignature(mintKey0, hash_alg, sign_alg, CDD_private, CDD.signature.keyprint) 
 
-    return (mintKey0,)
+    private1 = keys512[1]
+    public1 = private1.newPublicKeyPair()
+                                                  
+    mintKey1 = MintKey(key_identifier=public1.key_id(hash_alg),
+                      currency_identifier='http://opencent.net/OpenCent',
+                      denomination=2,
+                      not_before=timegm((2008,1,1,0,0,0)),
+                      key_not_after=timegm((2008,2,1,0,0,0)),
+                      coin_not_after=timegm((2008,4,1,0,0,0)),
+                      public_key=public1)
+    mintKey1 = addSignature(mintKey1, hash_alg, sign_alg, CDD_private, CDD.signature.keyprint) 
+
+    return (mintKey0, mintKey1)
 
 mintKeys = makeMintKeys()
-                                                                          
+
+def makeCoins():
+    from containers import CurrencyCoin
+
+    hash_alg = CDD.issuer_cipher_suite.hashing
+    sign_alg = CDD.issuer_cipher_suite.signing
+                                                  
+    private0 = keys512[0]
+    mintKey0 = mintKeys[0]
+    
+    coin0_0 = CurrencyCoin(standard_identifier=CDD.standard_version,
+                           currency_identifier=CDD.currency_identifier,
+                           denomination=1,
+                           key_identifier=mintKey0.key_identifier,
+                           serial='abcdefghijklmnopqrstuvwxyz')
+    coin0_0.signature = sign_alg(private0).sign(hash_alg(coin0_0.content_part()).digest())
+    if not coin0_0.validate_with_CDD_and_MintKey(CDD, mintKey0):
+        raise Exception
+
+    coin0_1 = CurrencyCoin(standard_identifier=CDD.standard_version,
+                           currency_identifier=CDD.currency_identifier,
+                           denomination=1,
+                           key_identifier=mintKey0.key_identifier,
+                           serial='xxxxxxxxxxxxxxxxxxxxxxxxxx')
+    coin0_1.signature = sign_alg(private0).sign(hash_alg(coin0_1.content_part()).digest())
+    if not coin0_1.validate_with_CDD_and_MintKey(CDD, mintKey0):
+        raise Exception
+
+    private1 = keys512[1]
+    mintKey1 = mintKeys[1]
+
+    coin1_0 = CurrencyCoin(standard_identifier=CDD.standard_version,
+                           currency_identifier=CDD.currency_identifier,
+                           denomination=2,
+                           key_identifier=mintKey1.key_identifier,
+                           serial='abcdefghijklmnopqrstuvwxyz')
+    coin1_0.signature = sign_alg(private1).sign(hash_alg(coin1_0.content_part()).digest())
+    if not coin1_0.validate_with_CDD_and_MintKey(CDD, mintKey1):
+        raise Exception
+
+
+    return ((coin0_0, coin0_1), (coin1_0,))
+
+coins = makeCoins()
+    
 if __name__ == "__main__":
     import doctest
     doctest.testmod(optionflags=doctest.ELLIPSIS)

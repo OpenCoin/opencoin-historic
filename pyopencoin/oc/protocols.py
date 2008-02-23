@@ -96,13 +96,16 @@ class answerHandshakeProtocol(Protocol):
 
 class CoinSpendSender(Protocol):
     """
-    >>> css = CoinSpendSender([1,2],'foobar')
+    >>> from tests import coins
+    >>> coin1 = coins[0][0]
+    >>> coin2 = coins[1][0]
+    >>> css = CoinSpendSender([coin1,coin2],'foobar')
     >>> css.state(Message(None))
     <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
     >>> css.state(Message('HANDSHAKE_ACCEPT'))
     <Message('SUM_ANNOUNCE',['...', 3, 'foobar'])>
     >>> css.state(Message('SUM_ACCEPT'))
-    <Message('COIN_SPEND',['...', [1, 2], 'foobar'])>
+    <Message('COIN_SPEND',['...', [[(...)], [(...)]], 'foobar'])>
     >>> css.state(Message('COIN_ACCEPT'))
     <Message('GOODBYE',None)>
     >>> css.state(Message('Really?'))
@@ -131,8 +134,9 @@ class CoinSpendSender(Protocol):
     def spendCoin(self,message):
         if message.type == 'SUM_ACCEPT':
             self.state = self.goodbye            
+            jsonCoins = [c.toPython() for c in self.coins]
             return Message('COIN_SPEND',[self.transaction_id,
-                                         self.coins,
+                                         jsonCoins,
                                          self.target])
 
     def goodbye(self,message):
@@ -144,16 +148,21 @@ class CoinSpendSender(Protocol):
 class CoinSpendRecipient(Protocol):
     """
     >>> import entities
+    >>> from tests import coins
+    >>> coin1 = coins[0][0].toPython() # Denomination of 1
+    >>> coin2 = coins[1][0].toPython() # Denomination of 2
     >>> w = entities.Wallet()
     >>> csr = CoinSpendRecipient(w)
     >>> csr.state(Message('SUM_ANNOUNCE',['123',3,'a book']))
     <Message('SUM_ACCEPT',None)>
-    >>> csr.state(Message('COIN_SPEND',['123', [1, 2], 'a book']))
+    >>> csr.state(Message('COIN_SPEND',['123', [coin1, coin2], 'a book']))
     <Message('COIN_ACCEPT',None)>
     >>> csr.state(Message('Goodbye',None))
     <Message('GOODBYE',None)>
     >>> csr.state(Message('foobar'))
     <Message('finished',None)>
+
+    TODO: Add PROTOCOL_ERROR checking
     """
     
     def __init__(self,wallet,issuer_transport = None):
@@ -186,6 +195,10 @@ class CoinSpendRecipient(Protocol):
             result = Message('COIN_REJECT','default')
             
             transaction_id,coins,target  = message.data
+            try:
+                coins = [containers.CurrencyCoin().fromPython(c) for c in coins]
+            except:
+                return Message('PROTOCOL_ERROR', 'send again')
             
             if transaction_id != self.transaction_id:
                 result = Message('COIN_REJECT','transaction_id')
@@ -413,6 +426,7 @@ class giveMintingKeyProtocol(Protocol):
     >>> gmp.state(Message('bla','blub'))
     <Message('MINTING_KEY_FAILURE','wrong question')>
 
+    TODO: Add PROTOCOL_ERROR checking (when the coins don't undo)
     """
 
     def __init__(self,issuer):
