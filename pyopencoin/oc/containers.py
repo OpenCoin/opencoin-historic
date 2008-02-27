@@ -246,6 +246,8 @@ class ContainerWithSignature(Container):
         
         return signer.verify(hasher.digest(), self.signature.signature)
 
+############################ CDD ####################################
+
 class CurrencyDescriptionDocument(ContainerWithSignature):
     """The CurrencyDescriptionDocument container
 

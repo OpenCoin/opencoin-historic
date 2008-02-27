@@ -6,12 +6,12 @@ walletB = Wallet()
 issuer = tests.makeIssuer()
 t = ClientTest(walletB.listen,
                clientnick='walletA',
-               autocontinue=0,
-               autoprint='json',
+               autocontinue=1,
+               autoprint=0,
                servernick='walletB')
 t2 = ClientTest(issuer.listen,
                 clientnick='walletB',
-                autoprint='json',
+                autoprint=0,
                 servernick='issuer')
 
 walletB.issuer_transport = t2

@@ -197,6 +197,13 @@ class Issuer(Entity):
         transport.setProtocol(protocol)
         transport.start()
 
+
+    def transferToTarget(self,target,coins):
+        return True
+
+    def debitTarget(self,target,blinds):
+        return True
+
 class KeyFetchError(Exception):
     pass
 

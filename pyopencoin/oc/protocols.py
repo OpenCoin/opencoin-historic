@@ -280,7 +280,7 @@ class TransferTokenSender(Protocol):
 
 class TransferTokenRecipient(Protocol):
     """
-    >>> import entities, tests
+    >>> import entities, tests,containers, base64
     >>> issuer = tests.makeIssuer()
 
     >>> ttr = TransferTokenRecipient(issuer)
@@ -298,7 +298,16 @@ class TransferTokenRecipient(Protocol):
     >>> ttr.state = ttr.start 
     >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['123', 'my account', [], [coin1, coin2], ['type', 'redeem']]))
     <Message('PROTOCOL_ERROR','send again')>
-    
+
+    >>> blank1 = containers.CurrencyBlank().fromPython(tests.coinA.toPython(nosig=1))
+    >>> blank2 = containers.CurrencyBlank().fromPython(tests.coinB.toPython(nosig=1))
+    >>> blind1 = blank1.blind_blank(tests.CDD,tests.mint_key1)
+    >>> blind2 = blank2.blind_blank(tests.CDD,tests.mint_key2)
+    >>> blindslist = [[tests.mint_key1.encodeField('key_identifier'),[blind1]],
+    ...               [tests.mint_key2.encodeField('key_identifier'),[blind2]]]
+    >>> ttr.state = ttr.start
+    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['123', 'my account', blindslist, [], ['type', 'mint']]))
+    <Message('PROTOCOL_ERROR','send again')>
     """
 
     def __init__(self,issuer):
@@ -311,7 +320,7 @@ class TransferTokenRecipient(Protocol):
         
         options = {'type':'unknown'}
         if message.data:
-            transaction_id,target,blanks,coins = message.data[:4]
+            transaction_id,target,blindslist,coins = message.data[:4]
             options.update(len(message.data)>4 and message.data[4:] or [])
         if options['type'] == 'redeem':
 
@@ -332,11 +341,13 @@ class TransferTokenRecipient(Protocol):
                 self.issuer.dsdb.lock(transaction_id,coins,10)
             except LockingError, e:
                 return Message('PROTOCOL_ERROR', 'send again')
-
-            # validate target
+            
 
             # XXX transmit funds
             
+            if not self.issuer.transferToTarget(target,coins):
+                return Message('PROTOCOL_ERROR', 'send again')
+
             #register them as spent
             try:
                 self.issuer.dsdb.spend(transaction_id,coins,10)
@@ -345,6 +356,24 @@ class TransferTokenRecipient(Protocol):
 
             self.state = self.goodbye
             return Message('TRANSFER_TOKEN_ACCEPT',sum(coins))
+        elif options['type'] == 'mint':
+
+            #check that we have the keys
+            import base64
+            for keyid,blinds in blindslist:
+                keyid = base64.b64decode(keyid)
+                key = self.issuer.keyids[keyid]
+
+            #check target
+            
+            if not self.issuer.debitTarget(target,blindslist):
+                return Message('PROTOCOL_ERROR', 'send again')
+
+            #XXX jhb: continue work tomorrow
+            return Message('PROTOCOL_ERROR', 'send again')
+            
+            #respond
+            pass 
         else:
             return Message('NOT IMPLEMENTED YET')
 
