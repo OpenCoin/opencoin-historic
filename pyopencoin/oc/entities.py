@@ -15,7 +15,7 @@ class Entity(object):
     def fromJson(self,text):
         return self.fromPython(json.read(text))
 
-
+#################### Wallet ###############################
 
 class Wallet(Entity):
     "Just a testwallet. Does nothing, really"
@@ -44,12 +44,14 @@ class Wallet(Entity):
         transport.setProtocol(protocol)
         transport.start()
 
-    def sendCoins(self,transport,amount,target):
+    def sendCoins(self,transport,amount,target,coins=None):
         #FIXME: Doing a broken thing and using something from tests!
-        from tests import coins
-        coin1 = coins[0][0] # denomination of 1
-        coin2 = coins[1][0] # denomination of 2
-        protocol = protocols.CoinSpendSender([coin1, coin2],target)
+        if not coins:
+            from tests import coins as testcoins
+            coin1 = testcoins[0][0] # denomination of 1
+            coin2 = testcoins[1][0] # denomination of 2
+            coins = [coin1,coin2]
+        protocol = protocols.CoinSpendSender(coins,target)
         transport.setProtocol(protocol)
         transport.start()
         protocol.newMessage(Message(None))
@@ -92,6 +94,8 @@ class Wallet(Entity):
     def getIssuerTransport(self):
         return getattr(self,'issuer_transport',0)
 
+#################### Issuer ###############################
+
 class Issuer(Entity):
     """An isser
 
@@ -106,10 +110,11 @@ class Issuer(Entity):
         self.dsdb = DSDB()
         self.mint = Mint()
         self.keys = None
+        self.cdd  = None
 
         #Signed minting keys
-        self.signedKeys = {}
-        self.keyids = {}
+        self.signedKeys = {} # dict(denomination=[key,key,...])
+        self.keyids = {}     #
 
 
     def getKeyByDenomination(self,denomination):
@@ -128,9 +133,11 @@ class Issuer(Entity):
         import crypto
         keys = crypto.createRSAKeyPair(keylength, public=False)
         self.keys = keys
+
+        
      
     def createSignedMintKey(self,denomination, not_before, key_not_after, coin_not_after, signing_key=None, size=1024):
-        """Have the Mint create a new key and sign the public key"""
+        """Have the Mint create a new key and sign the public key."""
 
         #Note: I'm assuming RSA/SHA256. It should really use the CDD defined ones
         #      hmm. And it needs the CDD for the currency_identifier
@@ -166,7 +173,7 @@ class Issuer(Entity):
         
         
         self.signedKeys.setdefault(denomination, []).append(mintKey)
-        self.signedKeys[mintKey.denomination].append(mintKey)
+        #self.signedKeys[mintKey.denomination].append(mintKey)
         self.keyids[keyid] = mintKey
         return mintKey
 
@@ -186,10 +193,17 @@ class Issuer(Entity):
         >>> stt.send('sendMoney',[1,2])
         <Message('Receipt',None)>
         """
-        protocol = protocols.answerHandshakeProtocol(TRANSFER_TOKEN_REQUEST=protocols.TransferTokenRecipient(),)
+        protocol = protocols.answerHandshakeProtocol(TRANSFER_TOKEN_REQUEST=protocols.TransferTokenRecipient(self),)
         transport.setProtocol(protocol)
         transport.start()
+
 class KeyFetchError(Exception):
+    pass
+
+
+#################### dsdb ###############################
+
+class LockingError(Exception):
     pass
 
 
@@ -232,69 +246,78 @@ class DSDB:
     >>> token = tokens[-1]
     
     >>> dsdb.lock(3, (token,), 1)
-    (True,)
     >>> dsdb.unlock(3)
-    (True,)
     >>> dsdb.lock(3, (token,), 1)
-    (True,)
     >>> dsdb.spend(3, (token,))
-    (True,)
     >>> dsdb.unlock(3)
-    (False, 'Unknown transaction_id')
+    Traceback (most recent call last):
+       ...
+    LockingError: Unknown transaction_id
+
     >>> dsdb.lock(4, (token,), 1)
-    (False, 'Token already spent')
-
-
+    Traceback (most recent call last):
+       ...
+    LockingError: Token already spent
+ 
     Ensure trying to lock the same token twice doesn't work
     >>> dsdb.lock(4, (tokens[0], tokens[0]), 1)
-    (False, 'Token locked')
+    Traceback (most recent call last):
+       ...
+    LockingError: Token locked
+    
     >>> dsdb.spend(4, (tokens[0], tokens[0]))
-    (False, 'Token locked')
+    Traceback (most recent call last):
+       ...
+    LockingError: Token locked
 
     Try to sneak in double token when already locked
     >>> dsdb.lock(4, tokens[:2], 1)
-    (True,)
     >>> dsdb.spend(4, (tokens[0], tokens[0]))
-    (False, 'Unknown token')
+    Traceback (most recent call last):
+       ...
+    LockingError: Unknown token
 
     Try to feed different tokens between the lock and spend
     >>> dsdb.spend(4, (tokens[0], tokens[2]))
-    (False, 'Unknown token')
+    Traceback (most recent call last):
+       ...
+    LockingError: Unknown token
 
     Actually show we can handle multiple tokens for spending
     >>> dsdb.spend(4, (tokens[0], tokens[1]))
-    (True,)
 
     And that the tokens can be in different orders between lock and spend
     >>> dsdb.lock(5, (tokens[2], tokens[3]), 1)
-    (True,)
     >>> dsdb.spend(5, (tokens[3], tokens[2]))
-    (True,)
 
     Respending a single token causes the entire transaction to fail
     >>> dsdb.spend(6, (tokens[4], tokens[3]))
-    (False, 'Token already spent')
+    Traceback (most recent call last):
+       ...
+    LockingError: Token already spent
 
     But doesn't cause other tokens to be affected
     >>> dsdb.spend(6, (tokens[4],))
-    (True,)
 
     We have to have locked tokens to spend if not automatic
     >>> dsdb.spend(7, (tokens[5],), automatic_lock=False)
-    (False, 'Unknown transaction_id')
+    Traceback (most recent call last):
+       ...
+    LockingError: Unknown transaction_id
 
     And we can't relock (FIXME: I just made up this requirement.)
     >>> dsdb.lock(8, (tokens[6],), 1)
-    (True,)
+    
     >>> dsdb.lock(8, (tokens[6],), 1)
-    (False, 'id already locked')
+    Traceback (most recent call last):
+       ...
+    LockingError: id already locked
 
     Check to make sure that we can lock different key_id's and same serial
     >>> tokens[7].key_identifier = '2'
     >>> tokens[7].key_identifier
     '2'
     >>> dsdb.spend(9, (tokens[7], tokens[8]))
-    (True,)
     """
 
     def __init__(self, database={}, locks={}):
@@ -312,7 +335,7 @@ class DSDB:
         """
         
         if self.locks.has_key(id):
-            return (False, 'id already locked')
+            raise LockingError('id already locked')
 
         self.locks[id] = (lock_time, [])
         
@@ -345,21 +368,21 @@ class DSDB:
             lock = self.database[token.key_identifier].setdefault(
                                         token.serial, ('Locked', lock_time, id))
             if lock != ('Locked', lock_time, id):
-                raise Exception('Possible race condition detected.')
+                raise LockingError('Possible race condition detected.')
             self.locks[id][1].append(token)
 
         if reason:
             self.unlock(id)
 
-            return (False, reason)
+            raise LockingError(reason)
 
-        return (True,)
+        return
 
     def unlock(self, id):
         """Unlocks an id from the dsdb."""
         
         if not self.locks.has_key(id):
-            return (False, 'Unknown transaction_id')
+            raise LockingError('Unknown transaction_id')
 
         for token in self.locks[id][1]:
             del self.database[token.key_identifier][token.serial]
@@ -368,7 +391,7 @@ class DSDB:
 
         del self.locks[id]
 
-        return (True,)
+        return
 
     def spend(self, id, tokens, automatic_lock=True):
         """Spend verifies the tokens are locked (or locks them) and marks the tokens as spent.
@@ -378,23 +401,23 @@ class DSDB:
         if not self.locks.has_key(id):
             if automatic_lock:
                 # we can spend without locking, so lock now.
-                ret = self.lock(id, tokens, 1)
-                if ret != (True,):
-                    return (False, ret[1]) 
+                self.lock(id, tokens, 1)
+                #if ret != (True,):
+                #    return (False, ret[1]) 
             else:
-                return (False, 'Unknown transaction_id')
+                raise LockingError('Unknown transaction_id')
 
         if self.locks[id][0] < 0: #FIXME: use real time
             self.unlock(id)
-            return (False, 'Unknown transaction_id')
+            raise LockingError('Unknown transaction_id')
         
         # check to ensure locked tokens are the same as current tokens.
         if len(set(tokens)) != len(self.locks[id][1]): # self.locks[id] is guarenteed to have unique values by lock
-            return (False, 'Unknown token')
+            raise LockingError('Unknown token')
 
         for token in self.locks[id][1]:
             if token not in tokens:
-                return (False, 'Unknown token')
+                raise LockingError('Unknown token')
 
         # we know all the tokens are valid. Change them to locked
         for token in self.locks[id][1]:
@@ -402,7 +425,7 @@ class DSDB:
 
         del self.locks[id]
 
-        return (True,)
+        return
 
 class Mint:
     """A Mint is the minting agent for a a currency. It has the 
@@ -459,4 +482,4 @@ class Mint:
 
 if __name__ == "__main__":
     import doctest
-    doctest.testmod()
+    doctest.testmod(optionflags=doctest.ELLIPSIS)

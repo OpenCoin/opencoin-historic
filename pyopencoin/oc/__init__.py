@@ -79,7 +79,7 @@ def _test():
             obj = gb[name]
             doctest.testmod(obj,optionflags=doctest.ELLIPSIS)
     else:        
-        #doctest.testmod()
+        #doctest.testmod(optionflags=doctest.ELLIPSIS)
         doctest.testmod(optionflags=doctest.ELLIPSIS)
         doctest.testmod(protocols,optionflags=doctest.ELLIPSIS)
         doctest.testmod(messages,optionflags=doctest.ELLIPSIS)

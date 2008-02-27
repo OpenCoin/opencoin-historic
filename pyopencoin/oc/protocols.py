@@ -91,8 +91,12 @@ class answerHandshakeProtocol(Protocol):
         #print 'here ', m
         #return m
 
-############################### Spending coins (w2w) ########################################
 
+
+
+############################### Spending coins (w2w) ##########################
+# Spoken bewteen two wallets to transfer coins / tokens                       #
+###############################################################################
 
 class CoinSpendSender(Protocol):
     """
@@ -217,7 +221,12 @@ class CoinSpendRecipient(Protocol):
         return result
 
 
-############################### Transfer tokens  ########################################
+
+
+############################### Transfer tokens  ##############################
+# This is spoken between a wallet (sender) and the issuer, for minting,       #
+# exchange and redemption                                                     #
+###############################################################################
 
 class TransferTokenSender(Protocol):
     """
@@ -271,26 +280,80 @@ class TransferTokenSender(Protocol):
 
 class TransferTokenRecipient(Protocol):
     """
-    >>> ttr = TransferTokenRecipient()
-    >>> from tests import coins
-    >>> coin1 = coins[0][0].toPython() # denomination of 1
-    >>> coin2 = coins[1][0].toPython() # denomination of 2
-    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['...', 'my account', [], [coin1, coin2], ['type', 'redeem']]))
+    >>> import entities, tests
+    >>> issuer = tests.makeIssuer()
+
+    >>> ttr = TransferTokenRecipient(issuer)
+    >>> coin1 = tests.coins[0][0].toPython() # denomination of 1
+    >>> coin2 = tests.coins[1][0].toPython() # denomination of 2
+
+    This should not be accepted
+    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['123', 'my account', [], ['foobar'], ['type', 'redeem']]))    
+    <Message('PROTOCOL_ERROR','send again')>
+
+    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['123', 'my account', [], [coin1, coin2], ['type', 'redeem']]))
     <Message('TRANSFER_TOKEN_ACCEPT',3)>
+
+    Try to double spend. Should not work.
+    >>> ttr.state = ttr.start 
+    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['123', 'my account', [], [coin1, coin2], ['type', 'redeem']]))
+    <Message('PROTOCOL_ERROR','send again')>
+    
     """
+
+    def __init__(self,issuer):
+        self.issuer = issuer
+        Protocol.__init__(self)
+
     def start(self,message):
-        transaction_id,target,blanks,coins = message.data[:4]
-        try:
-            coins = [containers.CurrencyCoin().fromPython(c) for c in coins]
-        except:
-            return Message('PROTOCOL_ERROR', 'send again')
+        from entities import LockingError
+        #raise `message.data[:4]`
+        
+        options = {'type':'unknown'}
+        if message.data:
+            transaction_id,target,blanks,coins = message.data[:4]
+            options.update(len(message.data)>4 and message.data[4:] or [])
+        if options['type'] == 'redeem':
 
-        self.state = self.goodbye
-        return Message('TRANSFER_TOKEN_ACCEPT',sum(coins))
+            #check if coins are 'well-formed'
+            try:
+                coins = [containers.CurrencyCoin().fromPython(c) for c in coins]
+            except:
+                return Message('PROTOCOL_ERROR', 'send again')
 
-############################### Mint key exchange ########################################
+            #check if they are valid
+            for coin in coins:
+                mintKey = self.issuer.signedKeys[coin.denomination][-1]
+                if not coin.validate_with_CDD_and_MintKey(self.issuer.cdd, mintKey):
+                    return Message('PROTOCOL_ERROR', 'send again')
+
+            #and not double spent
+            try:
+                self.issuer.dsdb.lock(transaction_id,coins,10)
+            except LockingError, e:
+                return Message('PROTOCOL_ERROR', 'send again')
+
+            # validate target
+
+            # XXX transmit funds
+            
+            #register them as spent
+            try:
+                self.issuer.dsdb.spend(transaction_id,coins,10)
+            except:                
+                return Message('PROTOCOL_ERROR', 'send again')
+
+            self.state = self.goodbye
+            return Message('TRANSFER_TOKEN_ACCEPT',sum(coins))
+        else:
+            return Message('NOT IMPLEMENTED YET')
 
 
+
+
+############################### Mint key exchange #############################
+#Between a wallet and the IS, to get the mint key                             #
+###############################################################################
 
 class fetchMintingKeyProtocol(Protocol):
     """

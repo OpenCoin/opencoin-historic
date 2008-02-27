@@ -196,6 +196,14 @@ class ClientTest(Transport):
     walletA <Message('Goodbye',None)>
     walletB <Message('Goodbye',None)>
     walletA <Message('finished',None)>
+    >>> t.printlog()    
+    walletA: ["sendMoney",[1,2]]
+    walletB: ["Receipt",null]
+    walletA: ["Goodbye",null]
+    walletB: ["Goodbye",null]
+    walletA: ["finished",null]
+
+
     """
         
     def __init__(self,callback,clientnick=None,servernick=None,**kwargs):
@@ -215,13 +223,14 @@ class ClientTest(Transport):
         if message:
             l = '%s %s' % (self.nick,message)
             print l
-            self.log.append(l)
+            self.log.append((self.nick,message))
             if message.type != 'finished':
                 #print 'transport'
                 self.other.newMessage(message)
 
     def printlog(self):
-        print '\n'.join(self.log)
+        print '\n'.join(['%s: %s' % (l[0],l[1].toJson()) for l in self.log])
+   
 
 class ServerTest(Transport):
     
@@ -235,7 +244,7 @@ class ServerTest(Transport):
         if message:
             l = '%s %s' % (self.nick,message)
             print l
-            self.other.log.append(l)
+            self.other.log.append((self.nick,message))
             if message.type != 'finished':
                 #print 'transport'
                 self.other.newMessage(message)    
@@ -467,4 +476,4 @@ class TestingTransport(Transport):
 
 if __name__ == "__main__":
     import doctest
-    doctest.testmod()
+    doctest.testmod(optionflags=doctest.ELLIPSIS)

@@ -36,9 +36,8 @@ Server <Message('GOODBYE',None)>
 Client <Message('finished',None)>
 
 Test the transfer token protocol
-
+>>> issuer = makeIssuer()
 >>> t = ClientTest(issuer.listen)
->>> from tests import coins
 >>> coin1 = coins[0][0] # denomination of 1
 >>> coin2 = coins[1][0] # denomination of 2
 >>> walletB.transferTokens(t,'myaccount',[],[coin1, coin2],type='redeem')
@@ -53,19 +52,20 @@ Client <Message('finished',None)>
 
 Test the coin spend protocol.
 
+>>> issuer = makeIssuer()
 >>> t = ClientTest(walletB.listen,clientnick='walletA',servernick='walletB')
 >>> t2 = ClientTest(issuer.listen,clientnick='walletB',servernick='issuer')
 >>> walletB.issuer_transport = t2
->>> walletA.sendCoins(t,amount=10,target='a book')
+>>> walletA.sendCoins(t,amount=1,target='a book',coins = [coinB])
 walletA <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
 walletB <Message('HANDSHAKE_ACCEPT',None)>
-walletA <Message('SUM_ANNOUNCE',['...', 3, 'a book'])>
+walletA <Message('SUM_ANNOUNCE',['...', 1, 'a book'])>
 walletB <Message('SUM_ACCEPT',None)>
-walletA <Message('COIN_SPEND',['...', [[(...)], [(...)]], 'a book'])>
+walletA <Message('COIN_SPEND',['...', [[(...)]], 'a book'])>
 walletB <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
 issuer <Message('HANDSHAKE_ACCEPT',None)>
-walletB <Message('TRANSFER_TOKEN_REQUEST',['...', 'my account', [], [[(...)], [(...)]], ['type', 'redeem']])>
-issuer <Message('TRANSFER_TOKEN_ACCEPT',3)>
+walletB <Message('TRANSFER_TOKEN_REQUEST',['...', 'my account', [], [[(...)]], ['type', 'redeem']])>
+issuer <Message('TRANSFER_TOKEN_ACCEPT',1)>
 walletB <Message('GOODBYE',None)>
 issuer <Message('GOODBYE',None)>
 walletB <Message('finished',None)>
@@ -74,7 +74,12 @@ walletA <Message('GOODBYE',None)>
 walletB <Message('GOODBYE',None)>
 walletA <Message('finished',None)>
 
+
+>>> coinB.validate_with_CDD_and_MintKey(CDD,mint_key1)
+True
 """
+
+
 
 def generateCDD():
     import crypto, containers, base64
@@ -90,7 +95,7 @@ def generateCDD():
                 'ThWrJUE6N4lMhk=,ujW93T/IqikcIMJHdQUDRqVdClYNreRBz+P/vgzrRZqCVnB9x+d' + \
                 'kLu5VdPzJKDoeOkaD7AGDyOJJFNSS3w8gMw==,9TJPF5RSdm/u2L0RSaehwrS4IOEUi' + \
                 'oBZapb1aQUeohzDgAytuBjp1xywmsYmNEKHXy04qwInKiCPA7blgqdOVQ=='
-
+    
     private_key = crypto.RSAKeyPair(input=[base64.b64decode(i) for i in keystring.split(',')])
     
     public_key = private_key.newPublicKeyPair()
@@ -110,6 +115,7 @@ def generateCDD():
 
     return private_key, cdd
 
+#IS private key, CDD
 CDD_private, CDD = generateCDD()
 
 def makeKeys512():
@@ -178,6 +184,7 @@ def makeKeys512():
 
     return keys
 
+#contains private mint keys!
 keys512 = makeKeys512() 
 
 def addSignature(cont, hash_alg, sign_alg, signing_key, keyprint):
@@ -269,7 +276,37 @@ def makeCoins():
     return ((coin0_0, coin0_1), (coin1_0,))
 
 coins = makeCoins()
-    
+
+
+#summary of containers
+is_private_key = CDD_private
+CDD = CDD
+mint_private_key1 = keys512[0]
+mint_private_key2 = keys512[1]
+mint_key1 = mintKeys[0]
+mint_key2 = mintKeys[1]
+coinA = coins[0][0] # mint_key1
+coinB = coins[0][1] # mint_key1
+coinC = coins[1][0]  # mint_key2
+
+
+#entities
+import entities
+
+def makeIssuer():
+    '''
+    >>> issuer = makeIssuer()
+    '''
+    issuer = entities.Issuer()
+    issuer.signedKeys = {1:[mint_key1],
+                         2:[mint_key2]}
+    issuer.keyids = {mint_key1.key_identifier:mint_key1, 
+                     mint_key2.key_identifier:mint_key2}
+
+    issuer.keys = is_private_key
+    issuer.cdd = CDD
+    return issuer
+
 if __name__ == "__main__":
     import doctest
     doctest.testmod(optionflags=doctest.ELLIPSIS)

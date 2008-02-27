@@ -896,20 +896,30 @@ class CurrencyCoin(CurrencyBase):
             if self.jsontext:
                 return self.jsontext
             else:
-                data = self.toPython()
-                data.append(['signature',base64.b64encode(self.signature)])
+                data = self.toPython(forcesig=1)
                 self.jsontext = json.write(data)
                 return self.jsontext
         else:       
-            return json.write(self.toPython())
+            return json.write(self.toPython(nosig=1))
 
     def fromJson(self,text):
         data = json.read(text)
         if len(data) == len(self.fields) + 1 and data[-1][0] == 'signature':
-            s = Signature()
-            self.signature = base64.b64decode(data[-1][1])
             self.jsontext = text
         return self.fromPython(data)
+
+    def toPython(self,forcesig=None,nosig=None):
+        data = CurrencyBase.toPython(self)
+        if forcesig or (not nosig and self.signature):
+            data.append(('signature',base64.b64encode(self.signature)))
+        return data            
+
+    def fromPython(self,data):
+        CurrencyBase.fromPython(self,data)
+        if len(data) == len(self.fields) + 1 and data[-1][0] == 'signature':
+            self.signature = base64.b64decode(data[-1][1])
+        return self            
+
 
     def validate_with_CDD_and_MintKey(self, currency_description_document, mint_key):
 
@@ -925,8 +935,8 @@ class CurrencyCoin(CurrencyBase):
 
         return True
 
- 
 
 if __name__ == "__main__":
     import doctest
-    doctest.testmod()
+    doctest.testmod(optionflags=doctest.ELLIPSIS) 
+
