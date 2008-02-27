@@ -4,7 +4,7 @@
 >>> walletA = Wallet()
 >>> walletB = Wallet()
 >>> issuer = Issuer()
->>> issuer.createKeys(512)
+>>> issuer.createKey(keylength=512)
 
 >>> CDD.toJson()
 '[["standard_version","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["short_currency_identifier","OC"],["issuer_service_location","opencoin://issuer.opencent.net:8002"],["denominations",[1,2,5,10,20,50,100,200,500,1000]],["issuer_cipher_suite",["RSASigningAlgorithm","RSABlindingAlgorithm","SHA256HashingAlgorithm"]],["issuer_public_master_key","sloGu4+P4rslyC4RiAJrZbG0Z90FwEV88eW1JnNv7BDU33+uIhi2G0f/XL+AoUwmF1VsdhQhzEtGNVjnlx0TViWgqvrYX6AqB1/R3zYP9+JnuIIyHiyS+Z+Y3uoB0sLMD+dvHcDRo7cbb+ZNAvlcPoQ4Hb3+tuxwBMmVkZMaOu8=,AQAB"],["signature",[["keyprint","hxz5pRwS+RFp88qQliXYm3R5uNighktwxqEh4RMOuuk="],["signature","fmgREXeLvrziaPMFa4/KNR9aNda4DZPO+6noROTlbNVX+7ht2Gp/58t6V5eO9HUD2yOWLmVvOlLfVIwmC8PJDefRhMC7ZYt/5tw9ydtiD/zBJzzHGPnK6akB1l2/bkBHEQPXm0PmTFfY5qH069CK0HxzCOj7O6uYFOUqg9slQek="]]]]'

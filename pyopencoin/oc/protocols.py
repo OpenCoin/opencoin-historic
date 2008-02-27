@@ -470,7 +470,7 @@ class giveMintingKeyProtocol(Protocol):
     """An issuer hands out a key. The other side of fetchMintingKeyProtocol.
     >>> from entities import Issuer
     >>> issuer = Issuer()
-    >>> issuer.createKeys(512)
+    >>> issuer.createKey(keylength=512)
     >>> now = 0; later = 1; much_later = 2
     >>> pub1 = issuer.createSignedMintKey('1', now, later, much_later)
     >>> gmp = giveMintingKeyProtocol(issuer)

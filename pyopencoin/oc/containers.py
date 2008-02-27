@@ -812,7 +812,9 @@ class CurrencyBlank(CurrencyBase):
         return self.blinding.unblind(signature)
 
     def setBlind(self, blind_alg, key, blind_factor=None):
-        # FIXME: do we need the key for anything?
+        """setBlind is used to set the state of self.blinding without performing the blinding.
+        It is similar to blind_blank except that it does not perform any blinding itself.
+        """
         
         if blind_factor:
             self.blind_factor = blind_factor

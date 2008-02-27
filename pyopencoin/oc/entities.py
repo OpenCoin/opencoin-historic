@@ -100,7 +100,7 @@ class Issuer(Entity):
     """An isser
 
     >>> i = Issuer()
-    >>> i.createKeys(256)
+    >>> i.createKey(keylength=256)
     >>> #i.keys.public()
     >>> #i.keys
     >>> #str(i.keys)
@@ -109,7 +109,7 @@ class Issuer(Entity):
     def __init__(self):
         self.dsdb = DSDB()
         self.mint = Mint()
-        self.keys = None
+        self.masterKey = None
         self.cdd  = None
 
         #Signed minting keys
@@ -129,10 +129,10 @@ class Issuer(Entity):
         except KeyError:            
             raise 'KeyFetchError'
 
-    def createKeys(self,keylength=1024):
+    def createKey(self,keylength=1024):
         import crypto
-        keys = crypto.createRSAKeyPair(keylength, public=False)
-        self.keys = keys
+        masterKey = crypto.createRSAKeyPair(keylength, public=False)
+        self.masterKey = masterKey
 
         
      
@@ -144,7 +144,7 @@ class Issuer(Entity):
         
        
         if not signing_key:
-            signing_key = self.keys
+            signing_key = self.masterKey
 
         import crypto
         hash_alg = crypto.SHA256HashingAlgorithm
