@@ -320,10 +320,10 @@ class DSDB:
     >>> dsdb.spend(9, (tokens[7], tokens[8]))
     """
 
-    def __init__(self, database={}, locks={}):
-        self.database = database # a dictionary by MintKey of (dictionaries by
-                                 #   serial of tuple of ('Spent',), ('Locked', time_expire, id))
-        self.locks = locks       # a dictionary by id of tuple of (time_expire, tuple(tokens))
+    def __init__(self, database=None, locks=None):
+        self.database = database or {} # a dictionary by MintKey of (dictionaries by
+                                       #   serial of tuple of ('Spent',), ('Locked', time_expire, id))
+        self.locks = locks or {}       # a dictionary by id of tuple of (time_expire, tuple(tokens))
 
     def lock(self, id, tokens, lock_time):
         """Lock the tokens.
