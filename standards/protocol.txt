@@ -1,17 +1,67 @@
-OpenCoin 
+OpenCoin Project                                            N. Toedtmann
+http://opencoin.org/                                         J. H. Baach
+Category: Draft                                                 M. Ryden
+
+                         OpenCoin Protocol v1.0
+
+Status of this Memo
+
+   This draft is work in heavy progress. Do not consider it's content
+   stable in any sense as long as this note is present. Get in touch
+   with opencoin.org [1] and fetch a recent copy [2].
+   
+
+Copyright Notice
+
+   [ToDo]
+
+
+Abstract
+
+   This document describes the OpenCoin protocol which seeks to
+   implement David Chaum's concept of "untraceable payments" [3].
+
 
 ToDo
-====
-* do the stuff in ./TODO
-* replace "coin" with "token"
-* decide whether the protocol atoms are tokens or lists of tokens
-* throw out reduntant "TRANSFER_TOKEN" explanatoins
+
+   - do the stuff in ./TODO
+   - "Copyright Notice"
+   - "Introduction"
+   - replace "coin" with "token"
+   - decide whether the protocol atoms are tokens or lists of tokens
+   - throw out reduntant "TRANSFER_TOKEN" explanatoins
 
 
-How the wallet creates a coin and communicates with an issuer
-=============================================================
+Table of Contents
+
+   1. Introduction
+   2. General guidelines
+   3. The OpenCoin protocol
+      3.1.  Issuer setup
+      3.2.  Wallet setup
+      3.3.  Wallet creates blanks
+      3.3.5."TRANSFER_TOKEN": A generic wallet-issuer request
+      3.4.  Wallet send minting request to issuer  
+      3.5.  Wallet gets coin back
+      3.6.  Wallet to Wallet
+      3.7.  Redeeming Coins 
+      3.8.  Accepting coins
+   4. References
+
+
+1. Introduction
+
+[ToDo]
+
+
+2. General guidelines
+
+[ToDo]
+
+
+3. The OpenCoin protocol
  
-#1 issuer setup
+3.1 Issuer setup
 
 * issuer generates master key pair (ALG,pM,sM)
 
@@ -76,13 +126,12 @@ How the wallet creates a coin and communicates with an issuer
 * issuer fires up issuer service (=IS) at <opencoin://issuer.opencent.net:8002>
 
 
-
-#2 wallet setup
+3.2 Wallet setup
 
 * fetch "currency description document" from issuer
 
 
-#3 wallet creates blanks
+3.3 Wallet creates blanks
 
 * Wallet: fetches current public minting keys for denomination
 
@@ -111,7 +160,7 @@ IS:
   Keep (r, blank, blind) in mind. 
   
 
-#3.5 "TRANSFER_TOKEN": A generic wallet-issuer request
+3.3.5 "TRANSFER_TOKEN": A generic wallet-issuer request
 
 The atom for this transaction is a list of coins - if one of the coins /blanks
 fail, the whole transaction fails.
@@ -164,7 +213,7 @@ fail, the whole transaction fails.
     TRANSFER_TOKEN_RESUME( transaction_id )
 
 
-#4 wallet send minting request to issuer  
+3.4 Wallet send minting request to issuer  
 
 * Send [was: MINT_REQUEST]
 
@@ -195,7 +244,7 @@ fail, the whole transaction fails.
   some time later and passes "signed blind"="blind coin" back to IS 
 
 
-#5 Wallet gets coin back
+3.5 Wallet gets coin back
 
 * Wallet asks issuer service [was: FETCH_MINTED_REQUEST]
 
@@ -227,7 +276,7 @@ fail, the whole transaction fails.
 * Wallet unblinds signed blind and yields coin  (or reblinds)
 
 
-#6 Wallet to Wallet
+3.6 Wallet to Wallet
 
 Alice - sends a coin
 Bob - receives the coin
@@ -360,8 +409,7 @@ if DSDB is required (normal case):
     * (Wallet Bob and IS continue as in #4 and #8)
 
 
-
-#7 Redeeming Coins 
+3.7 Redeeming Coins 
 
 * Wallet locks serials at IS (see above LOCK_COIN)
 
@@ -375,12 +423,12 @@ if DSDB is required (normal case):
         ONLINE_BANKING_ACCOUNT=#string(account_identifier)
         and so on... to be defined with relationship between IS and individual
 
-* continue with #8
+* continue with 3.8
 
 * Send money to target
 
 
-#8 Accepting coins
+3.8 Accepting coins
 
 * IS checks:
     - if minting keys are still valid (XXX coin has not expired)
@@ -402,3 +450,13 @@ if DSDB is required (normal case):
 
     TRANSFER_TOKEN_ACCEPT( transaction_id, message, (empty list))
 
+
+4. References
+
+[1]  The OpenCoin project <http://opencoin.org/>
+
+[2]  The OpenCoin project, "OpenCoin protocol v1.0"
+     <https://trac.opencoin.org/trac/opencoin/browser/trunk/standards/protocol.txt>
+
+[3]  David Chaum, "Blind signatures for untraceable payments", Advances in 
+     Cryptology - Crypto '82, Springer-Verlag (1983), 199-203.
