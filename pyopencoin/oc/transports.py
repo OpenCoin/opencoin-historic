@@ -184,7 +184,50 @@ class SimpleTestTransport(Transport):
         self.newMessage(Message(type,data))
         return self.read()
 
-class ClientTest(Transport):
+
+################# These two are for real testing ######################
+
+class ServerTest(Transport):
+    
+    def __init__(self,other=None,autocontinue=1,autoprint='message'):
+        self.buffer = None
+        self.autocontinue = autocontinue
+        self.autoprint = autoprint
+        self.log = []
+
+        if other:
+            #Lets connect the two
+            self.other = other
+            other.other = self
+
+    def write(self,message):
+        if message:
+            l = '%s %s' % (self.nick,message)
+            if self.autoprint == 'message':
+                print '%s %s' % (self.nick,message)
+            elif self.autoprint == 'json':
+                print '%s: %s' % (self.nick,message.toJson())
+                
+            self.log.append((self.nick,message))
+            if message.type != 'finished':
+                if self.autocontinue: 
+                    #print 'transport'
+                    self.other.newMessage(message)
+                else:
+                    self.buffer = message
+
+    def next(self):
+        if self.buffer:
+            m = self.buffer
+            self.buffer = None
+            self.other.newMessage(m)
+    
+
+    def printlog(self):
+        print '\n'.join(['%s: %s' % (l[0],l[1].toJson()) for l in self.log])
+            
+
+class ClientTest(ServerTest):
     """
     >>> from entities import Wallet
     >>> client = Wallet()
@@ -196,58 +239,31 @@ class ClientTest(Transport):
     walletA <Message('Goodbye',None)>
     walletB <Message('Goodbye',None)>
     walletA <Message('finished',None)>
-    >>> t.printlog()    
-    walletA: ["sendMoney",[1,2]]
-    walletB: ["Receipt",null]
-    walletA: ["Goodbye",null]
-    walletB: ["Goodbye",null]
-    walletA: ["finished",null]
+
+
 
 
     """
         
-    def __init__(self,callback,clientnick=None,servernick=None,**kwargs):
+    def __init__(self,callback,clientnick=None,servernick=None,autocontinue=1,autoprint='message',**kwargs):
         self.callback = callback
         self.kwargs = kwargs
         self.nick=clientnick or 'Client'
         self.servernick = servernick or 'Server'
         self.log = []
 
+        self.autocontinue = autocontinue
+        self.buffer = None
+        self.autoprint = autoprint
+
     def start(self):
-        servertransport = ServerTest(self)
+        servertransport = ServerTest(self,autoprint=self.autoprint)
         servertransport.nick = self.servernick
         kwargs = self.kwargs
         self.callback(servertransport,**kwargs)
 
-    def write(self,message):
-        if message:
-            l = '%s %s' % (self.nick,message)
-            print l
-            self.log.append((self.nick,message))
-            if message.type != 'finished':
-                #print 'transport'
-                self.other.newMessage(message)
-
-    def printlog(self):
-        print '\n'.join(['%s: %s' % (l[0],l[1].toJson()) for l in self.log])
    
 
-class ServerTest(Transport):
-    
-    def __init__(self,other=None):
-        if other:
-            #Lets connect the two
-            self.other = other
-            other.other = self
-
-    def write(self,message):
-        if message:
-            l = '%s %s' % (self.nick,message)
-            print l
-            self.other.log.append((self.nick,message))
-            if message.type != 'finished':
-                #print 'transport'
-                self.other.newMessage(message)    
 
 
 
