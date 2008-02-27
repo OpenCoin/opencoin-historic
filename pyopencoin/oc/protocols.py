@@ -280,7 +280,7 @@ class TransferTokenSender(Protocol):
 
 class TransferTokenRecipient(Protocol):
     """
-    >>> import entities, tests,containers, base64
+    >>> import entities, tests,containers, base64, copy
     >>> issuer = tests.makeIssuer()
 
     >>> ttr = TransferTokenRecipient(issuer)
@@ -291,13 +291,25 @@ class TransferTokenRecipient(Protocol):
     >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['123', 'my account', [], ['foobar'], ['type', 'redeem']]))    
     <Message('PROTOCOL_ERROR','send again')>
 
+    The malformed coin should be rejected
+    >>> malformed = copy.deepcopy(tests.coins[0][0])
+    >>> malformed.signature = 'Not a valid signature'
+    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['123', 'my account', [], [malformed.toPython()], ['type', 'redeem']]))
+    <Message('TRANSFER_TOKEN_REJECT',['123', [], [['sj17RxE1hfO06+oTgBs9Z7xLut/3NN+nHJbXSJYTks0=', 'Error']]])>
+
+    The unknown key_identifier should be rejected
+    >>> malformed = copy.deepcopy(tests.coins[0][0])
+    >>> malformed.key_identifier = 'Not a valid key identifier'
+    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['123', 'my account', [], [malformed.toPython()], ['type', 'redeem']]))
+    <Message('TRANSFER_TOKEN_REJECT',['123', [], [['Tm90IGEgdmFsaWQga2V5IGlkZW50aWZpZXI=', 'Error']]])>
+
     >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['123', 'my account', [], [coin1, coin2], ['type', 'redeem']]))
     <Message('TRANSFER_TOKEN_ACCEPT',3)>
 
     Try to double spend. Should not work.
     >>> ttr.state = ttr.start 
     >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['123', 'my account', [], [coin1, coin2], ['type', 'redeem']]))
-    <Message('PROTOCOL_ERROR','send again')>
+    <Message('TRANSFER_TOKEN_REJECT',['123', [], [['What do we put here?', 'Error']]])>
 
     >>> blank1 = containers.CurrencyBlank().fromPython(tests.coinA.toPython(nosig=1))
     >>> blank2 = containers.CurrencyBlank().fromPython(tests.coinB.toPython(nosig=1))
@@ -324,6 +336,8 @@ class TransferTokenRecipient(Protocol):
             options.update(len(message.data)>4 and message.data[4:] or [])
         if options['type'] == 'redeem':
 
+            failures = []
+
             #check if coins are 'well-formed'
             try:
                 coins = [containers.CurrencyCoin().fromPython(c) for c in coins]
@@ -332,17 +346,19 @@ class TransferTokenRecipient(Protocol):
 
             #check if they are valid
             for coin in coins:
-                mintKey = self.issuer.signedKeys[coin.denomination][-1]
-                if not coin.validate_with_CDD_and_MintKey(self.issuer.cdd, mintKey):
-                    return Message('PROTOCOL_ERROR', 'send again')
+                mintKey = self.issuer.keyids.get(coin.key_identifier, None)
+                if not mintKey or not coin.validate_with_CDD_and_MintKey(self.issuer.cdd, mintKey):
+                    failures.append(coin)
+            if failures:
+                return Message('TRANSFER_TOKEN_REJECT', [transaction_id, [], 
+                               [[coin.encodeField('key_identifier'), 'Error'] for coin in failures]])
 
             #and not double spent
             try:
-                self.issuer.dsdb.lock(transaction_id,coins,10)
+                self.issuer.dsdb.lock(transaction_id,coins,10) #FIXME: questionable time
             except LockingError, e:
-                return Message('PROTOCOL_ERROR', 'send again')
+                return Message('TRANSFER_TOKEN_REJECT', [transaction_id, [], [['What do we put here?', 'Error']]])
             
-
             # XXX transmit funds
             
             if not self.issuer.transferToTarget(target,coins):
@@ -350,8 +366,9 @@ class TransferTokenRecipient(Protocol):
 
             #register them as spent
             try:
-                self.issuer.dsdb.spend(transaction_id,coins,10)
+                self.issuer.dsdb.spend(transaction_id,coins,10) #FIXME: questionable time
             except:                
+                #Note: if we fail here, that means we have large problems, since the coins are locked
                 return Message('PROTOCOL_ERROR', 'send again')
 
             self.state = self.goodbye
@@ -360,17 +377,31 @@ class TransferTokenRecipient(Protocol):
 
             #check that we have the keys
             import base64
-            for keyid,blinds in blindslist:
-                keyid = base64.b64decode(keyid)
-                key = self.issuer.keyids[keyid]
+            blinds = [[self.issuer.keyids[base64.b64decode(keyid)], blinds] for keyid, blinds in blindslist]
 
             #check target
-            
             if not self.issuer.debitTarget(target,blindslist):
                 return Message('PROTOCOL_ERROR', 'send again')
 
-            #XXX jhb: continue work tomorrow
+            #check the MintKeys for validity
+            from calendar import timegm
+            timeNow = timegm((2008,01,31,0,0,0)) # FIXME: need a persistant time function to allow testing and real times
+            failures = []
+            for mintKey, blinds in blinds:
+                can_mint, can_redeem = mintKey.verify_time(timeNow)
+                if not can_mint:
+                    # TODO: We need more logic here. can_mint only specifies if we are
+                    # between not_before and key_not_after. We may also need to do the
+                    # checking of the period of time the mint can mint but the IS cannot
+                    # send the key to the mint.
+                    failures.append(mintKey.encodeField('key_identifier'))
+
+            if failures:
+                return Message('TRANSFER_TOKEN_REJECT', [transaction_id, 'Invalid key identifier', failures, []])
+
+
             return Message('PROTOCOL_ERROR', 'send again')
+                
             
             #respond
             pass 
