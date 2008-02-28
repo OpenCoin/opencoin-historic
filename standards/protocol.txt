@@ -167,16 +167,14 @@ IS:
 The atom for this transaction is a list of tokens - if one of the tokens /blanks
 fail, the whole transaction fails.
 
-* Send 
+* Client sends
    
-   TRANSFER_TOKEN_REQUEST( transaction_id, list_of_options, target, \
-                            list_of_blinds, list_of_tokens )
+        TRANSFER_TOKEN_REQUEST( 
+            transaction_id, list_of_options, target, list_of_blinds+keyids, list_of_tokens
+        )
     
-   XXX list of blinds -> list of (blinds + denomination key/id)
-   XXX both sides need to enforce correctness of 
-
-
   to IS (issuer service), where 
+
   * transaction_id is a base64(random(128bit)) referencing this transaction
     e.g. for later resume after an abort. 
   * option may contain variable=value pairs like "JITM=mandatory".
@@ -189,7 +187,7 @@ fail, the whole transaction fails.
   be empty:
   * target        : token exchange (value(list_of_blinds) = value(list_of_tokens))
   * list_of_tokens : mint request
-  * list_of_blinds: redemption
+  * list_of_blinds+keyids: redemption
 
   If at least one of the blinds or tokens is rejected, the issuer answers
 
@@ -217,7 +215,7 @@ fail, the whole transaction fails.
 * Send [was: MINT_REQUEST]
 
     TRANSFER_TOKEN_REQUEST( transaction_id, list_of_options, target, \
-                            list_of_blinds, (empty list) )
+                            list_of_blinds+keyids, (empty list) )
 
   to issuer service
 
@@ -264,7 +262,7 @@ fail, the whole transaction fails.
 
   or passes signed blinds to wallet Bob, must preserve order
 
-    TRANSFER_TOKEN_ACCEPT( transaction_id, message, list_of_singed_blinds)
+    TRANSFER_TOKEN_ACCEPT( transaction_id, message, list_of_singed_blinds )
     
   Session terminates
 
