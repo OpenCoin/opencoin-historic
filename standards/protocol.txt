@@ -25,7 +25,7 @@ Abstract
 ToDo
 
    - do the stuff in ./TODO
-   - "Copyright Notice"
+   - licence of this document?
    - "Introduction"
    - replace "coin" with "token"
    - decide whether the protocol atoms are tokens or lists of tokens
@@ -288,87 +288,6 @@ Bob - receives the coin
     creates a list of coins to send
   * Wallet Alice and Wallet Bob are synchronized to UTC (within some small margin of error)
 
-* Alice fetches DSDB key at IS
-
-    DSDB_KEY_REQUEST
-    DSDB_KEY_PASS(keycertificate)
-
-* Wallet Alice sends obfuscated blanks (coins without signature and with serial
-  encrypted for DSDB) with the serial to Wallet Bob (Wallet Alice now needs to wait a while)
-
-  {
-      standard identifier = http://opencoin.org/OpenCoinProtocol/1.0
-      currency identifier = http://opencent.net/OpenCent 
-      denomination        = denomination
-      key identifier      = key_id(signing key)
-      serial              = base64(encrypt(ALG,pub-key-of-DSDB, serial))
-  }
-
-     BLANK_PRESENT( dsdb_keycertificate list(blank1, blank2, ...) )
-     XXX remove crypto reference
-
-* Wallet Bob check:
-
-  * Wallet Bob validates the blanks
-    - do we have the "currency description document"
-    - do we trust the issuer (do we have a valid public key)
-    - checks blanks against cdd
-
-  * If blanks are invalid, the transfer is declined by Wallet Bob
-    (later: cdd transfer between wallets)
-
-  * Wallet Bob shows proposed transfer to Bob
-
-  * Bob decides whether to 
-    - accept transfer (trust issuer, enough currency)
-    - accept transfer without double spending checking
-    - decline transfer
-
-      BLANK_REJECT( list( (encrypted_serial_blank1, "Reason1"), ... ) )
-      BLANK_REJECT( emptylist, "Reason")
-
-if DSDB is required (normal case):
-
-    * Wallet Bob prepares for coin exchange with IS, by creating blanks of same sum (see #3)
-
-    * Wallet Bob DSDB lookup
-      - parse cdd for issuer service location
-      - parse blanks for necessary minting key ids
-      - start session with authenticated issuer service (IS) (secured and authenticated by transport layer, e.g. SSL)
-        - get all missing minting key certs (MINTING_KEY_FETCH_KEYID)
-        - IS sends key certs or rejects a key id (unknown, outdated) (MINTING_KEY_PASS/FAILURE)
-        - lock list of encrypted coin serial numbers at IS (DSDB) 
-            LOCK_COIN_REQUEST( DSDB_key_key_id, transaction_id,
-                               list( (key_identifier1, encrypted_serial1), ... ) )
-
-        - IS either accepts with locking time or rejects with list of rejected serials + reason (locked, spent) 
-            If all coins lock:
-               LOCK_COIN_ACCEPT(transaction_id, lock_expires)
-            If some coins cannot lock, no coins are locked.
-               LOCK_COIN_FAILURE(transaction_id, list( (key_identifier1, encrypted_serial1, "Reason1"), ...))
-
-                     Reasons:
-                          
-                          Key ID of DSDB is unknown or expired       Permanant
-                          Key ID of blank is unknown or expired      Permanant
-                          Decryption of serial failed                Permanant
-                          Serial already spent                       Permanant
-                          Serial locked (not spent)                  Temporary
-
-
-      (this part pauses, session is kept)
-
-* Wallet Bob tells Wallet Alice accept or reject with reason (unknown, outdated, locked, spent) for each rejected blank
-  (if one blank is rejected the whole transfer has to be rejected) (future: bob signs receipt)
-
-      BLANK_FAILURE( list( (encrypted_serial_blank1, "Reason1"), ...))
-      BLANK_FAILURE( emptylist, "Reason")
-
-      BLANK_ACCEPT
-
-      Note: After BLANK_ACCEPT, a BLANK_REJECT(emptylist, "Reason) can be given to abort the transaction until
-            COIN_SPEND is sent
-            
 * Wallet Alice sends coins to Wallet Bob (this time including their clear serial and signature)
   
     COIN_SPEND( list(coin1, ...) )
@@ -387,22 +306,12 @@ if DSDB is required (normal case):
     (in case of rejection Wallet Alice needs to do emergency meassures, quickly trying to exchange coins with IS 
      itself etc.)
 
-
-if DSDB is required (normal case):
-    
-    * in case of reject in the checking phase delete the blanks, otherwise
-        UNLOCK_COIN_REQUEST(transaction_id)
-
     * Wallet Bob sends buy request (blanks + coins)
 
     
         TRANSFER_TOKEN_REQUEST( transaction_id, list_of_options, "", \
                                 list_of_blinds, list_of_coins )
 
-
-    (the transaction_id has to be the same as in the lock request, and 
-     the list of coins has to match the list of locked coins. You can't
-     have split / partial redemption)
 
     * IS has to check if sum of blanks and coins are equal
 
