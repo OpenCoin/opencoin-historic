@@ -279,43 +279,56 @@ fail, the whole transaction fails.
 3.6 Wallet to Wallet
 
 Alice - sends a coin
-Bob - receives the coin
+Bob   - receives the coin
 
-* Prerequisites:
+Note: 
+  The request type "COIN_SPEND" may get exchanged by "TRANSFER_TOKEN_REQUEST"
+  of type "redeem" in future versions of this protocol.
+
+* Prerequisites
   * Wallet Alice locates Wallet Bob and sets up (secure) connection
   * Alice knows how much to send and tells her Wallet
-  * Wallet Alice calculates a splitting of sum into coins (units) and
-    creates a list of coins to send
-  * Wallet Alice and Wallet Bob are synchronized to UTC (within some small margin of error)
+  * Wallet Alice calculates a splitting of sum into coins (units)
+    and reates a list of coins to send
+  * Wallet Alice and Wallet Bob are synchronized to UTC (within some small 
+    margin of error)
 
-* Wallet Alice sends coins to Wallet Bob (this time including their clear serial and signature)
+
+* [ToDo] Handshake
+
+
+* Wallet Alice announces sum of tokens she wishes to spend for a certain
+  prupose=target, wallet Bob decides if it is going to accept them:
+
+    A:      SUM_ANNOUNCE( transaction_id, sum, target )
+    B:      SUM_ACCEPT( transaction_id )
+        or  SUM_REJECT( transaction_id, "Reason" )
+
+
+* Wallet Alice sends coins to Wallet Bob (this time including their clear 
+  serial and signature)
   
-    COIN_SPEND( list(coin1, ...) )
-
-* Wallet Bob checks that the coins match the blanks and that signatures are valid
-
-* Wallet Bob accepts transaction or rejects with reason (unknown, invalid) for each rejected coin
-
-     COIN_REJECT( list( (coin1, "Reason1") ) )
-     COIN_REJECT( emptylist, "Reason")
-
-     COIN_ACCEPT
-
-* Wallet Bob terminates session with Wallet Alice
-
-    (in case of rejection Wallet Alice needs to do emergency meassures, quickly trying to exchange coins with IS 
-     itself etc.)
-
-    * Wallet Bob sends buy request (blanks + coins)
-
-    
-        TRANSFER_TOKEN_REQUEST( transaction_id, list_of_options, "", \
-                                list_of_blinds, list_of_coins )
+    A:      COIN_SPEND( transaction_id, list(coin1, ...) )
 
 
-    * IS has to check if sum of blanks and coins are equal
+* Wallet Bob checks if the sum of their values matches the announced sum, if 
+  they are valid and (if the former tests do not fail) tries itself to spent
+  the tokens at the issuer with a TRANSFER_TOKEN_REQUEST of type "redeem" or
+  "exchange", using a new, different transaction_id. If one of these fail,
+  wallet Bob rejects the request it with a reason/reasons, otherwise accepts
+  them:
 
-    * (Wallet Bob and IS continue as in #4 and #8)
+    B:      COIN_REJECT( transaction_id, list( (coinN, "ReasonN") ) )
+        or  COIN_REJECT( transaction_id, emptylist, "Reason")
+        or  COIN_ACCEPT( transaction_id )
+
+  Possible reasons are "unknown", "invalid" ... [ToDo].
+
+  In case of rejection, wallet Alice itself should immediatly exchange these 
+  tokens at the issuer as an emergancy countermeasure against token theft.
+
+  In case of acceptance, wallet Alice must delete all instances of the spent
+  tokens.
 
 
 3.7 Redeeming Coins 
