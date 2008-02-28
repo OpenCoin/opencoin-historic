@@ -43,7 +43,7 @@ Test the transfer token protocol
 >>> walletB.transferTokens(t,'myaccount',[],[coin1, coin2],type='redeem')
 Client <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
 Server <Message('HANDSHAKE_ACCEPT',None)>
-Client <Message('TRANSFER_TOKEN_REQUEST',['...', 'myaccount', [], [[(...)], [(...)]], ['type', 'redeem']])>
+Client <Message('TRANSFER_TOKEN_REQUEST',['...', 'myaccount', [], [[(...)], [(...)]], [['type', 'redeem']]])>
 Server <Message('TRANSFER_TOKEN_ACCEPT',3)>
 Client <Message('GOODBYE',None)>
 Server <Message('GOODBYE',None)>
@@ -64,7 +64,7 @@ walletB <Message('SUM_ACCEPT',None)>
 walletA <Message('COIN_SPEND',['...', [[(...)]], 'a book'])>
 walletB <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
 issuer <Message('HANDSHAKE_ACCEPT',None)>
-walletB <Message('TRANSFER_TOKEN_REQUEST',['...', 'my account', [], [[(...)]], ['type', 'redeem']])>
+walletB <Message('TRANSFER_TOKEN_REQUEST',['...', 'my account', [], [[(...)]], [['type', 'redeem']]])>
 issuer <Message('TRANSFER_TOKEN_ACCEPT',1)>
 walletB <Message('GOODBYE',None)>
 issuer <Message('GOODBYE',None)>

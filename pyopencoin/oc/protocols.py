@@ -238,7 +238,7 @@ class TransferTokenSender(Protocol):
     >>> tts.state(Message(None))
     <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
     >>> tts.state(Message('HANDSHAKE_ACCEPT'))
-    <Message('TRANSFER_TOKEN_REQUEST',['...', 'my account', [], [[(...)], [(...)]], ['type', 'redeem']])>
+    <Message('TRANSFER_TOKEN_REQUEST',['...', 'my account', [], [[(...)], [(...)]], [['type', 'redeem']]])>
     >>> tts.state(Message('TRANSFER_TOKEN_ACCEPT',3))
     <Message('GOODBYE',None)>
 
@@ -264,8 +264,8 @@ class TransferTokenSender(Protocol):
                 self.target,
                 self.blanks,
                 self.coins]
-        for item in self.kwargs.items():
-            data.append(list(item))                
+        if self.kwargs:
+            data.append([list(i) for i in self.kwargs.items()])                
         self.state = self.goodbye
         return Message('TRANSFER_TOKEN_REQUEST',data)
 
@@ -288,27 +288,27 @@ class TransferTokenRecipient(Protocol):
     >>> coin2 = tests.coins[1][0].toPython() # denomination of 2
 
     This should not be accepted
-    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['123', 'my account', [], ['foobar'], ['type', 'redeem']]))    
+    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['123', 'my account', [], ['foobar'], [['type', 'redeem']]]))    
     <Message('PROTOCOL_ERROR','send again')>
 
     The malformed coin should be rejected
     >>> malformed = copy.deepcopy(tests.coins[0][0])
     >>> malformed.signature = 'Not a valid signature'
-    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['123', 'my account', [], [malformed.toPython()], ['type', 'redeem']]))
+    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['123', 'my account', [], [malformed.toPython()], [['type', 'redeem']]]))
     <Message('TRANSFER_TOKEN_REJECT',['123', [], [['sj17RxE1hfO06+oTgBs9Z7xLut/3NN+nHJbXSJYTks0=', 'Error']]])>
 
     The unknown key_identifier should be rejected
     >>> malformed = copy.deepcopy(tests.coins[0][0])
     >>> malformed.key_identifier = 'Not a valid key identifier'
-    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['123', 'my account', [], [malformed.toPython()], ['type', 'redeem']]))
+    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['123', 'my account', [], [malformed.toPython()], [['type', 'redeem']]]))
     <Message('TRANSFER_TOKEN_REJECT',['123', [], [['Tm90IGEgdmFsaWQga2V5IGlkZW50aWZpZXI=', 'Error']]])>
 
-    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['123', 'my account', [], [coin1, coin2], ['type', 'redeem']]))
+    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['123', 'my account', [], [coin1, coin2], [['type', 'redeem']]]))
     <Message('TRANSFER_TOKEN_ACCEPT',3)>
 
     Try to double spend. Should not work.
     >>> ttr.state = ttr.start 
-    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['123', 'my account', [], [coin1, coin2], ['type', 'redeem']]))
+    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['123', 'my account', [], [coin1, coin2], [['type', 'redeem']]]))
     <Message('TRANSFER_TOKEN_REJECT',['123', [], [['What do we put here?', 'Error']]])>
 
     >>> blank1 = containers.CurrencyBlank().fromPython(tests.coinA.toPython(nosig=1))
@@ -318,7 +318,7 @@ class TransferTokenRecipient(Protocol):
     >>> blindslist = [[tests.mint_key1.encodeField('key_identifier'),[blind1]],
     ...               [tests.mint_key2.encodeField('key_identifier'),[blind2]]]
     >>> ttr.state = ttr.start
-    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['123', 'my account', blindslist, [], ['type', 'mint']]))
+    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['123', 'my account', blindslist, [], [['type', 'mint']]]))
     <Message('TRANSFER_TOKEN_ACCEPT',['123', 'A message', [['sj17RxE1hfO06+oTgBs9Z7xLut/3NN+nHJbXSJYTks0=', ['jWUOkVfIulEvPjR4HfdxOtEF2vk3ss8vkKSL6aSd2w4Sj0vChSjtmiabkWdbxLTLth13dmigB0vBXDggjBzM7w==']], ['WbXTWO4M60oZ/LGY+sccKf5Oq6HxrjrY4qAxrBDXuek=', ['xBzoYV7W/2NuWdQQrwal7xFbky5D/m3D5Y9aTtuwZPirvK4gx7Po5+VrfGm04BuHo7kwnZ3ZGfUDIXIoILm2ng==']]]])>
 
     """
@@ -334,7 +334,7 @@ class TransferTokenRecipient(Protocol):
         options = {'type':'unknown'}
         if message.data:
             transaction_id,target,blindslist,coins = message.data[:4]
-            options.update(len(message.data)>4 and message.data[4:] or [])
+            options.update(len(message.data)==5 and message.data[4] or [])
         if options['type'] == 'redeem':
 
             failures = []
