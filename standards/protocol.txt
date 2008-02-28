@@ -45,7 +45,6 @@ Table of Contents
       3.5.  Wallet gets coin back
       3.6.  Wallet to Wallet
       3.7.  Redeeming Coins 
-      3.8.  Accepting coins
    4. References
 
 
@@ -333,44 +332,37 @@ Note:
 
 3.7 Redeeming Coins 
 
-* Wallet locks serials at IS (see above LOCK_COIN)
+* Wallet sends coins + target to IS
 
-* Wallet sends coins + target to IS [was: REDEEM_COINS_REQUEST]
+    W:  TRANSFER_TOKEN_REQUEST(
+            transaction_id, list_of_options, target, (empty list), list_of_coins 
+        )
 
-   TRANSFER_TOKEN_REQUEST( transaction_id, list_of_options, target, \
-                           (empty list), list_of_coins )
+  target may be an account and is of the form:
 
-    target may be an account and is of the form:
         MINT_REQUEST=#base64(request_id)
         ONLINE_BANKING_ACCOUNT=#string(account_identifier)
         and so on... to be defined with relationship between IS and individual
 
-* continue with 3.8
 
-* Send money to target
-
-
-3.8 Accepting coins
-
-* IS checks:
+* IS checks if tokens and target are valid
     - if minting keys are still valid (XXX coin has not expired)
     - if serial is still valid (against DSDB)
     - if signature is valid
-    - if target is valid
 
-* IS rejects with reason (key id unknown, coin outdated, coin spent, signature
-  invalid) per coin or [was: REDEEM_COINS_REJECT]
+  If not, IS rejects with reason (key id unknown, coin outdated, coin spent, 
+  signature invalid) per coin or sweeping
 
-    TRANSFER_TOKEN_REJECT( transaction_id, reason,
-                           (empty list), list( (coin1.key_id,  reason1), ... )  )
+    IS: TRANSFER_TOKEN_REJECT( 
+            transaction_id, reason, (empty list), list( (coin1.key_id,  reason1), ... )  )
+        )
 
-* (IS tries to service target, rejects with reason if not possible)
+  If tokens and target are valid, IS enters the serials of the tokens into the
+  DSDB, servers the target and replies
 
-* IS enters serials into DSDB
-
-* IS sends accept to Wallet [was: REDEEM_COINS_ACCEPT]
-
-    TRANSFER_TOKEN_ACCEPT( transaction_id, message, (empty list))
+    IS: TRANSFER_TOKEN_ACCEPT( 
+            transaction_id, message, (empty list)
+        )
 
 
 4. References
