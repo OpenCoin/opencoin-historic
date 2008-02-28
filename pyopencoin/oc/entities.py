@@ -15,6 +15,11 @@ class Entity(object):
     def fromJson(self,text):
         return self.fromPython(json.read(text))
 
+##################### time ################################
+def getTime():
+    import time
+    return time.time()
+
 #################### Wallet ###############################
 
 class Wallet(Entity):
@@ -22,6 +27,7 @@ class Wallet(Entity):
 
     def __init__(self):
         self.coins = []
+        self.getTime = getTime
 
 
     def fetchMintingKey(self,transport,denomination):
@@ -111,6 +117,7 @@ class Issuer(Entity):
         self.mint = Mint()
         self.masterKey = None
         self.cdd  = None
+        self.getTime = getTime
 
         #Signed minting keys
         self.signedKeys = {} # dict(denomination=[key,key,...])
@@ -331,6 +338,7 @@ class DSDB:
         self.database = database or {} # a dictionary by MintKey of (dictionaries by
                                        #   serial of tuple of ('Spent',), ('Locked', time_expire, id))
         self.locks = locks or {}       # a dictionary by id of tuple of (time_expire, tuple(tokens))
+        self.getTime = getTime
 
     def lock(self, id, tokens, lock_time):
         """Lock the tokens.
@@ -386,7 +394,10 @@ class DSDB:
         return
 
     def unlock(self, id):
-        """Unlocks an id from the dsdb."""
+        """Unlocks an id from the dsdb.
+        This only unlocks if a transaction is locked. If the transaction is
+        completed and the token is spent, it cannot unlock.
+        """
         
         if not self.locks.has_key(id):
             raise LockingError('Unknown transaction_id')
@@ -435,7 +446,7 @@ class DSDB:
         return
 
 class Mint:
-    """A Mint is the minting agent for a a currency. It has the 
+    """A Mint is the minting agent for a currency. It has the 
     >>> m = Mint()
 
     >>> import tests, crypto, base64
@@ -457,6 +468,7 @@ class Mint:
         self.keyids = {}
         self.privatekeys = {}
         self.sign_algs = {}
+        self.getTime = getTime
 
 
     def getKey(self,denomination,notbefore,notafter):
@@ -478,7 +490,7 @@ class Mint:
             mintKey = self.keyids[key_identifier]
             
             signer = sign_alg(self.privatekeys[key_identifier])
-        except KeyError:
+        except KeyError, reason:
             return False
         
         if mintKey.verify_time(mintKey.key_not_after)[0]: # FIXME: Actually check time

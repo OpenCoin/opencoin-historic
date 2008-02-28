@@ -303,6 +303,12 @@ def makeIssuer():
     issuer.keyids = {mint_key1.key_identifier:mint_key1, 
                      mint_key2.key_identifier:mint_key2}
 
+    issuer.mint.addMintKey(mint_key1, CDD.issuer_cipher_suite.signing)
+    issuer.mint.addMintKey(mint_key2, CDD.issuer_cipher_suite.signing)
+
+    issuer.mint.privatekeys = {mint_key1.key_identifier: mint_private_key1,
+                               mint_key2.key_identifier: mint_private_key2}
+
     issuer.keys = is_private_key
     issuer.cdd = CDD
     return issuer

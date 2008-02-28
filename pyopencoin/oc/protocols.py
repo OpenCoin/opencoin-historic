@@ -313,13 +313,14 @@ class TransferTokenRecipient(Protocol):
 
     >>> blank1 = containers.CurrencyBlank().fromPython(tests.coinA.toPython(nosig=1))
     >>> blank2 = containers.CurrencyBlank().fromPython(tests.coinB.toPython(nosig=1))
-    >>> blind1 = blank1.blind_blank(tests.CDD,tests.mint_key1)
-    >>> blind2 = blank2.blind_blank(tests.CDD,tests.mint_key2)
+    >>> blind1 = blank1.blind_blank(tests.CDD,tests.mint_key1, blind_factor='a'*26)
+    >>> blind2 = blank2.blind_blank(tests.CDD,tests.mint_key2, blind_factor='a'*26)
     >>> blindslist = [[tests.mint_key1.encodeField('key_identifier'),[blind1]],
     ...               [tests.mint_key2.encodeField('key_identifier'),[blind2]]]
     >>> ttr.state = ttr.start
     >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['123', 'my account', blindslist, [], ['type', 'mint']]))
-    <Message('PROTOCOL_ERROR','send again')>
+    <Message('TRANSFER_TOKEN_ACCEPT',['123', 'A message', [['sj17RxE1hfO06+oTgBs9Z7xLut/3NN+nHJbXSJYTks0=', ['jWUOkVfIulEvPjR4HfdxOtEF2vk3ss8vkKSL6aSd2w4Sj0vChSjtmiabkWdbxLTLth13dmigB0vBXDggjBzM7w==']], ['WbXTWO4M60oZ/LGY+sccKf5Oq6HxrjrY4qAxrBDXuek=', ['xBzoYV7W/2NuWdQQrwal7xFbky5D/m3D5Y9aTtuwZPirvK4gx7Po5+VrfGm04BuHo7kwnZ3ZGfUDIXIoILm2ng==']]]])>
+
     """
 
     def __init__(self,issuer):
@@ -387,7 +388,7 @@ class TransferTokenRecipient(Protocol):
             from calendar import timegm
             timeNow = timegm((2008,01,31,0,0,0)) # FIXME: need a persistant time function to allow testing and real times
             failures = []
-            for mintKey, blinds in blinds:
+            for mintKey, blindlist in blinds:
                 can_mint, can_redeem = mintKey.verify_time(timeNow)
                 if not can_mint:
                     # TODO: We need more logic here. can_mint only specifies if we are
@@ -399,9 +400,17 @@ class TransferTokenRecipient(Protocol):
             if failures:
                 return Message('TRANSFER_TOKEN_REJECT', [transaction_id, 'Invalid key identifier', failures, []])
 
+            #mint them immediately (the only thing we can do right now with the mint)
+            minted = []
+            for key, blindlist in blinds:
+                this_set = []
+                for blind in blindlist:
+                    signature = self.issuer.mint.signNow(key.key_identifier, blind)
+                    this_set.append(base64.b64encode(signature))
 
-            return Message('PROTOCOL_ERROR', 'send again')
-                
+                minted.append([key.encodeField('key_identifier'), this_set])
+
+            return Message('TRANSFER_TOKEN_ACCEPT', [transaction_id, 'A message', minted])
             
             #respond
             pass 
