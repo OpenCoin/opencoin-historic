@@ -2,7 +2,7 @@ OpenCoin Project                                            N. Toedtmann
 http://opencoin.org/                                         J. H. Baach
 Category: Draft                                                 M. Ryden
 
-                         OpenCoin Protocol v1.0
+                      OpenCoin Formats and Protocol
 
 Status of this Memo
 
@@ -13,7 +13,7 @@ Status of this Memo
 
 Copyright Notice
 
-   [ToDo]
+   Copyright (c) N. Toedtmann, J. H. Baach, M. Ryden (2008).
 
 
 Abstract
