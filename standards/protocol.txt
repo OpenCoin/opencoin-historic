@@ -30,6 +30,9 @@ ToDo
    - replace "COIN_SPEND" with "TRANSFER_TOKEN"
    - decide whether the protocol atoms are tokens or lists of tokens
    - throw out reduntant "TRANSFER_TOKEN" explanatoins
+   - add authentication and authorization, at least for "target"
+     when mintig
+   - add mandatory trusted channel (Bluetooth, TLS)
 
 
 Table of Contents
@@ -166,9 +169,6 @@ fail, the whole transaction fails.
 
 * Send 
    
-   XXX target might be an attack target, maybe insert authentication
-   XXX make the transaction type explicit?
-
    TRANSFER_TOKEN_REQUEST( transaction_id, list_of_options, target, \
                             list_of_blinds, list_of_tokens )
     
