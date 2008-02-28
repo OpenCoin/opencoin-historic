@@ -27,7 +27,7 @@ ToDo
    - do the stuff in ./TODO
    - licence of this document?
    - "Introduction"
-   - replace "coin" with "token"
+   - replace "COIN_SPEND" with "TRANSFER_TOKEN"
    - decide whether the protocol atoms are tokens or lists of tokens
    - throw out reduntant "TRANSFER_TOKEN" explanatoins
 
@@ -42,9 +42,9 @@ Table of Contents
       3.3.  Wallet creates blanks
       3.3.5."TRANSFER_TOKEN": A generic wallet-issuer request
       3.4.  Wallet send minting request to issuer  
-      3.5.  Wallet gets coin back
-      3.6.  Wallet to Wallet
-      3.7.  Redeeming Coins 
+      3.5.  Wallet gets token back
+      3.6.  Wallet to wallet
+      3.7.  Redeeming tokens
    4. References
 
 
@@ -94,7 +94,7 @@ Table of Contents
     denomination        = denomination
     not_before          = TIME(...)
     key_not_after       = TIME(...)
-    coin_not_after      = TIME(...)
+    token_not_after      = TIME(...)
     public key          = base64(pP)
 
     issuer              = base64(hash(pM))
@@ -161,7 +161,7 @@ IS:
 
 3.3.5 "TRANSFER_TOKEN": A generic wallet-issuer request
 
-The atom for this transaction is a list of coins - if one of the coins /blanks
+The atom for this transaction is a list of tokens - if one of the tokens /blanks
 fail, the whole transaction fails.
 
 * Send 
@@ -170,7 +170,7 @@ fail, the whole transaction fails.
    XXX make the transaction type explicit?
 
    TRANSFER_TOKEN_REQUEST( transaction_id, list_of_options, target, \
-                            list_of_blinds, list_of_coins )
+                            list_of_blinds, list_of_tokens )
     
    XXX list of blinds -> list of (blinds + denomination key/id)
    XXX both sides need to enforce correctness of 
@@ -181,21 +181,21 @@ fail, the whole transaction fails.
     e.g. for later resume after an abort. 
   * option may contain variable=value pairs like "JITM=mandatory".
   * target 
-    * value(list_of_blinds) = value(list_of_coins): empty
-    * value(list_of_blinds) > value(list_of_coins): payment reference
-    * value(list_of_blinds) < value(list_of_coins): account reference
+    * value(list_of_blinds) = value(list_of_tokens): empty
+    * value(list_of_blinds) > value(list_of_tokens): payment reference
+    * value(list_of_blinds) < value(list_of_tokens): account reference
 
   For now, only 'pure' transactions are allowed, so one of these must 
   be empty:
-  * target        : coin exchange (value(list_of_blinds) = value(list_of_coins))
-  * list_of_coins : mint request
+  * target        : token exchange (value(list_of_blinds) = value(list_of_tokens))
+  * list_of_tokens : mint request
   * list_of_blinds: redemption
 
-  If at least one of the blinds or coins is rejected, the issuer answers
+  If at least one of the blinds or tokens is rejected, the issuer answers
 
     TRANSFER_TOKEN_REJECT( transaction_id, reason,
                            list( (blind1.key_id, reason1), ... ), \
-                           list( (coin1.key_id,  reason1), ... )  )
+                           list( (token1.key_id,  reason1), ... )  )
 
   where "reason" may be some general failure like "500 minting not available".
   If the request is accepted with no delay, IS answers
@@ -240,10 +240,10 @@ fail, the whole transaction fails.
 
 
   In case of delayed minting, mint processes request (signs blind with key_id)
-  some time later and passes "signed blind"="blind coin" back to IS 
+  some time later and passes "signed blind"="blind token" back to IS 
 
 
-3.5 Wallet gets coin back
+3.5 Wallet gets token back
 
 * Wallet asks issuer service [was: FETCH_MINTED_REQUEST]
 
@@ -272,13 +272,13 @@ fail, the whole transaction fails.
   If not, delete blind and inform user (optional: inform issuer about error)
   (optional: if yes, inform issuer that he may delete the request)
 
-* Wallet unblinds signed blind and yields coin  (or reblinds)
+* Wallet unblinds signed blind and yields token  (or reblinds)
 
 
-3.6 Wallet to Wallet
+3.6 Wallet to wallet
 
-Alice - sends a coin
-Bob   - receives the coin
+Alice - sends a token
+Bob   - receives the token
 
 Note: 
   The request type "COIN_SPEND" may get exchanged by "TRANSFER_TOKEN_REQUEST"
@@ -287,8 +287,8 @@ Note:
 * Prerequisites
   * Wallet Alice locates Wallet Bob and sets up (secure) connection
   * Alice knows how much to send and tells her Wallet
-  * Wallet Alice calculates a splitting of sum into coins (units)
-    and reates a list of coins to send
+  * Wallet Alice calculates a splitting of sum into tokens (units)
+    and reates a list of tokens to send
   * Wallet Alice and Wallet Bob are synchronized to UTC (within some small 
     margin of error)
 
@@ -304,10 +304,10 @@ Note:
         or  SUM_REJECT( transaction_id, "Reason" )
 
 
-* Wallet Alice sends coins to Wallet Bob (this time including their clear 
+* Wallet Alice sends tokens to Wallet Bob (this time including their clear 
   serial and signature)
   
-    A:      COIN_SPEND( transaction_id, list(coin1, ...) )
+    A:      COIN_SPEND( transaction_id, list(token1, ...) )
 
 
 * Wallet Bob checks if the sum of their values matches the announced sum, if 
@@ -317,7 +317,7 @@ Note:
   wallet Bob rejects the request it with a reason/reasons, otherwise accepts
   them:
 
-    B:      COIN_REJECT( transaction_id, list( (coinN, "ReasonN") ) )
+    B:      COIN_REJECT( transaction_id, list( (tokenN, "ReasonN") ) )
         or  COIN_REJECT( transaction_id, emptylist, "Reason")
         or  COIN_ACCEPT( transaction_id )
 
@@ -330,12 +330,12 @@ Note:
   tokens.
 
 
-3.7 Redeeming Coins 
+3.7 Redeeming tokens 
 
-* Wallet sends coins + target to IS
+* Wallet sends tokens + target to IS
 
     W:  TRANSFER_TOKEN_REQUEST(
-            transaction_id, list_of_options, target, (empty list), list_of_coins 
+            transaction_id, list_of_options, target, (empty list), list_of_tokens 
         )
 
   target may be an account and is of the form:
@@ -346,15 +346,15 @@ Note:
 
 
 * IS checks if tokens and target are valid
-    - if minting keys are still valid (XXX coin has not expired)
+    - if minting keys are still valid (XXX token has not expired)
     - if serial is still valid (against DSDB)
     - if signature is valid
 
-  If not, IS rejects with reason (key id unknown, coin outdated, coin spent, 
-  signature invalid) per coin or sweeping
+  If not, IS rejects with reason (key id unknown, token outdated, token spent, 
+  signature invalid) per token or sweeping
 
     IS: TRANSFER_TOKEN_REJECT( 
-            transaction_id, reason, (empty list), list( (coin1.key_id,  reason1), ... )  )
+            transaction_id, reason, (empty list), list( (token1.key_id,  reason1), ... )  )
         )
 
   If tokens and target are valid, IS enters the serials of the tokens into the
