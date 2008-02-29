@@ -12,11 +12,11 @@
 Lets test without having any keys in the mint
 
 >>> t = ClientTest(issuer.giveMintingKey)
->>> walletA.fetchMintingKey(t,denomination='1')
+>>> walletA.fetchMintingKey(t,denominations=['1'])
 Client <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
 Server <Message('HANDSHAKE_ACCEPT',None)>
-Client <Message('MINTING_KEY_FETCH_DENOMINATION','1')>
-Server <Message('MINTING_KEY_FAILURE','no key for that denomination available')>
+Client <Message('MINTING_KEY_FETCH_DENOMINATION',[['1'], '0'])>
+Server <Message('MINTING_KEY_FAILURE',[['1', 'Unknown denomination']])>
 Client <Message('GOODBYE',None)>
 Server <Message('GOODBYE',None)>
 Client <Message('finished',None)>
@@ -26,11 +26,11 @@ Now, lets have a key
 >>> now = 0; later = 1; much_later = 2
 >>> pub1 = issuer.createSignedMintKey('1', now, later, much_later)
 >>> t = ClientTest(issuer.giveMintingKey)
->>> walletA.fetchMintingKey(t,denomination='1')
+>>> walletA.fetchMintingKey(t,denominations=['1'])
 Client <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
 Server <Message('HANDSHAKE_ACCEPT',None)>
-Client <Message('MINTING_KEY_FETCH_DENOMINATION','1')>
-Server <Message('MINTING_KEY_PASS',[...])>
+Client <Message('MINTING_KEY_FETCH_DENOMINATION',[['1'], '0'])>
+Server <Message('MINTING_KEY_PASS',[[...]])>
 Client <Message('GOODBYE',None)>
 Server <Message('GOODBYE',None)>
 Client <Message('finished',None)>

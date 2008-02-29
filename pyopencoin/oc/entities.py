@@ -30,8 +30,8 @@ class Wallet(Entity):
         self.getTime = getTime
 
 
-    def fetchMintingKey(self,transport,denomination):
-        protocol = protocols.fetchMintingKeyProtocol(denomination)
+    def fetchMintingKey(self,transport,denominations):
+        protocol = protocols.fetchMintingKeyProtocol(denominations)
         transport.setProtocol(protocol)
         transport.start()
         protocol.newMessage(Message(None))
@@ -124,7 +124,8 @@ class Issuer(Entity):
         self.keyids = {}     #
 
 
-    def getKeyByDenomination(self,denomination):
+    def getKeyByDenomination(self,denomination,time):
+        #FIXME: the time argument is supposed to get all the keys at a certain time
         try:
             return self.signedKeys.get(denomination,[])[-1]
         except (KeyError, IndexError):            

@@ -431,34 +431,31 @@ class fetchMintingKeyProtocol(Protocol):
     Used by a wallet to fetch the mints keys, needed when 
     creating blanks
        
-    ??? Should it be suitable to fetch more than one denomination at a time?
-    Maybe all the keys?
-
     Lets fetch by denomination
 
-    >>> fmp = fetchMintingKeyProtocol(denomination=1)
+    >>> fmp = fetchMintingKeyProtocol(denominations=['1'])
     >>> fmp.state(Message(None))
     <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
 
     >>> fmp.state(Message('HANDSHAKE_ACCEPT'))
-    <Message('MINTING_KEY_FETCH_DENOMINATION',1)>
+    <Message('MINTING_KEY_FETCH_DENOMINATION',[['1'], '0'])>
 
     >>> from tests import mintKeys
     >>> mintKey = mintKeys[0]
-    >>> fmp.state(Message('MINTING_KEY_PASS',mintKey.toPython()))
+    >>> fmp.state(Message('MINTING_KEY_PASS',[mintKey.toPython()]))
     <Message('GOODBYE',None)>
 
 
     And now by keyid
 
-    >>> fmp = fetchMintingKeyProtocol(keyid='sj17RxE1hfO06+oTgBs9Z7xLut/3NN+nHJbXSJYTks0=')
+    >>> fmp = fetchMintingKeyProtocol(keyids=['sj17RxE1hfO06+oTgBs9Z7xLut/3NN+nHJbXSJYTks0='])
     >>> fmp.state(Message(None))
     <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
 
     >>> fmp.state(Message('HANDSHAKE_ACCEPT'))
-    <Message('MINTING_KEY_FETCH_KEYID','sj17RxE1hfO06+oTgBs9Z7xLut/3NN+nHJbXSJYTks0=')>
+    <Message('MINTING_KEY_FETCH_KEYID',['sj17RxE1hfO06+oTgBs9Z7xLut/3NN+nHJbXSJYTks0='])>
 
-    >>> fmp.state(Message('MINTING_KEY_PASS',mintKey.toPython()))
+    >>> fmp.state(Message('MINTING_KEY_PASS',[mintKey.toPython()]))
     <Message('GOODBYE',None)>
 
 
@@ -477,17 +474,22 @@ class fetchMintingKeyProtocol(Protocol):
     <Message('PROTOCOL_ERROR','send again')>
 
     >>> fmp.newState(fmp.getKey)
-    >>> fmp.state(Message('MINTING_KEY_PASS', ["foo"]))
+    >>> fmp.state(Message('MINTING_KEY_PASS', [["foo"]]))
     <Message('PROTOCOL_ERROR','send again')>
     
     """
     
     
-    def __init__(self,denomination=None,keyid=None):
+    def __init__(self,denominations=None,keyids=None,time=None):
         
-        self.denomination = denomination
-        self.keyid = keyid
-        self.keycert = None
+        self.denominations = denominations
+        self.keyids = keyids
+        self.keycerts = []
+
+        if not time: # The encoded value of time
+            self.time = '0'
+        else:
+            self.time = containers.encodeTime(time)
 
         Protocol.__init__(self)
 
@@ -500,12 +502,12 @@ class fetchMintingKeyProtocol(Protocol):
 
         if message.type == 'HANDSHAKE_ACCEPT':
             
-            if self.denomination:
+            if self.denominations:
                 self.newState(self.getKey)
-                return Message('MINTING_KEY_FETCH_DENOMINATION',self.denomination)
-            elif self.keyid:
+                return Message('MINTING_KEY_FETCH_DENOMINATION',[self.denominations, self.time])
+            elif self.keyids:
                 self.newState(self.getKey)
-                return Message('MINTING_KEY_FETCH_KEYID',self.keyid) 
+                return Message('MINTING_KEY_FETCH_KEYID',self.keyids) 
 
         elif message.type == 'HANDSHAKE_REJECT':
             self.newState(self.finish)
@@ -518,17 +520,19 @@ class fetchMintingKeyProtocol(Protocol):
         """Gets the actual key"""
 
         if message.type == 'MINTING_KEY_PASS':
-            try:
-                self.keycert = containers.MintKey().fromPython(message.data)
-            except Exception, reason:
-                return Message('PROTOCOL_ERROR','send again')
+            for key in message.data:
+                try:
+                    keycert = containers.MintKey().fromPython(key)
+                    self.keycerts.append(keycert)
+                except Exception, reason:
+                    return Message('PROTOCOL_ERROR','send again')
             
             self.newState(self.finish)
             return Message('GOODBYE')
                 
 
         elif message.type == 'MINTING_KEY_FAILURE':
-            self.reason = message.data
+            self.reasons = message.data
             self.newState(self.finish)
             return Message('GOODBYE')
         
@@ -549,29 +553,28 @@ class giveMintingKeyProtocol(Protocol):
     >>> gmp.state(Message('HANDSHAKE',{'protocol': 'opencoin 1.0'}))
     <Message('HANDSHAKE_ACCEPT',None)>
 
-    >>> m = gmp.state(Message('MINTING_KEY_FETCH_DENOMINATION','1'))
-    >>> m == Message('MINTING_KEY_PASS',pub1.toPython())
+    >>> m = gmp.state(Message('MINTING_KEY_FETCH_DENOMINATION',[['1'], '0']))
+    >>> m == Message('MINTING_KEY_PASS',[pub1.toPython()])
     True
 
     >>> gmp.newState(gmp.giveKey)
-    >>> m = gmp.state(Message('MINTING_KEY_FETCH_KEYID',pub1.key_identifier))
-    >>> m == Message('MINTING_KEY_PASS',pub1.toPython())
+    >>> m = gmp.state(Message('MINTING_KEY_FETCH_KEYID',[pub1.key_identifier]))
+    >>> m == Message('MINTING_KEY_PASS',[pub1.toPython()])
     True
 
     >>> gmp.newState(gmp.giveKey)
-    >>> gmp.state(Message('MINTING_KEY_FETCH_DENOMINATION','2'))
-    <Message('MINTING_KEY_FAILURE','no key for that denomination available')>
+    >>> gmp.state(Message('MINTING_KEY_FETCH_DENOMINATION',[['2'], '0']))
+    <Message('MINTING_KEY_FAILURE',[['2', 'Unknown denomination']])>
    
 
     >>> gmp.newState(gmp.giveKey)
-    >>> gmp.state(Message('MINTING_KEY_FETCH_KEYID','non existient id'))
-    <Message('MINTING_KEY_FAILURE','no such keyid')>
+    >>> gmp.state(Message('MINTING_KEY_FETCH_KEYID',['non existant id']))
+    <Message('MINTING_KEY_FAILURE',[['non existant id', 'Unknown key_identifier']])>
 
     >>> gmp.newState(gmp.giveKey)
     >>> gmp.state(Message('bla','blub'))
-    <Message('MINTING_KEY_FAILURE','wrong question')>
+    <Message('PROTOCOL_ERROR','send again')>
 
-    TODO: Add PROTOCOL_ERROR checking (when the coins don't undo)
     """
 
     def __init__(self,issuer):
@@ -597,26 +600,41 @@ class giveMintingKeyProtocol(Protocol):
     
         self.newState(self.goodbye)
 
-        error = None
+        errors = []
+        keys = []
         if message.type == 'MINTING_KEY_FETCH_DENOMINATION':
             try:
-                key = self.issuer.getKeyByDenomination(message.data)            
-            except 'KeyFetchError':                
-                error = 'no key for that denomination available'
+                denominations, time = message.data
+            except ValueError: # catch tuple unpack errors
+                return Message('PROTOCOL_ERROR', 'send again')
+
+            if time == '0':
+                time = self.issuer.getTime()
+            else:
+                time = containers.decodeTime(time)
+                
+            for denomination in denominations:
+                try:
+                    key = self.issuer.getKeyByDenomination(denomination, time)            
+                    keys.append(key)
+                except 'KeyFetchError': 
+                    errors.append([denomination, 'Unknown denomination'])
         
         elif message.type == 'MINTING_KEY_FETCH_KEYID':                
-            try:
-                key = self.issuer.getKeyById(message.data)                
-            except 'KeyFetchError':                
-                error = 'no such keyid'
+            for keyid in message.data:
+                try:
+                    key = self.issuer.getKeyById(keyid)
+                    keys.append(key)
+                except 'KeyFetchError':                
+                    errors.append([keyid, 'Unknown key_identifier'])
         
         else:
-            error = 'wrong question'
+            return Message('PROTOCOL_ERROR', 'send again')
 
-        if not error:            
-            return Message('MINTING_KEY_PASS',key.toPython())
+        if not errors:            
+            return Message('MINTING_KEY_PASS',[key.toPython() for key in keys])
         else:
-            return Message('MINTING_KEY_FAILURE',error)
+            return Message('MINTING_KEY_FAILURE',errors)
 
 ############################### For testing ########################################
 
