@@ -1,12 +1,12 @@
 Messages between any two parties of the network
 
 
-Wallet & Wallet         Wallet & IS                     Wallet & DSDB
+Wallet & Wallet         Wallet & IS 
 
-=============           =====================           =================
-= BLANK     =           = MINTING_KEY       =           = LOCK_COIN     =
-= COIN      =           = TRANSFER_TOKEN    =           = UNLOCK_COIN  =
-=============           = DSDB_KEY          =           =================
+=============           =====================
+= BLANK     =           = MINTING_KEY       =
+= COIN      =           = TRANSFER_TOKEN    =
+=============           = DSDB_KEY          =
                         =====================
                         
     Prior: All messages between two entities that can occur directly before this one
@@ -85,7 +85,7 @@ B:
 
 
 
-COINS
+COIN
 -----
 
 A:
@@ -132,30 +132,29 @@ B:
 =====================
 = MINTING_KEY       =
 = TRANSFER_TOKEN    =
-= DSDB_KEY          =
 =====================
 
 MINTING_KEY
 -----------
 
 Wallet:
-  MINTING_KEY_FETCH_DENOMINATION    #string(denomination)
+  MINTING_KEY_FETCH_DENOMINATION    list(denomination, ...) #TIME(time)
     Prior:  Hello
     Follow: MINTING_KEY_PASS
             MINTING_KEY_FAILURE
             
-  MINTING_KEY_FETCH_KEYID   #hexstring(key_id)
+  MINTING_KEY_FETCH_KEYID   list(#base64(key_identifier), ...) #TIME(time)
     Prior:  Hello
     Follow: MINTING_KEY_PASS
             MINTING_KEY_FAILURE
 
 IS:
-  MINTING_KEY_PASS  keycertificate
+  MINTING_KEY_PASS  list(keycertificate, ...)
     Prior:  MINTING_KEY_FETCH_DENOMINATION
             MINTING_KEY_FETCH_KEYID
     Follow: Goodbye
             
-  MINTING_KEY_FAILURE   "Reason"
+  MINTING_KEY_FAILURE   list(([denomination|#base64(key_identifier)], reason), ...)
                         Reasons:
                             Unknown denomination
                             Unknown key_id
@@ -170,10 +169,14 @@ TRANSFER_TOKEN
 
 Wallet:
   TRANSFER_TOKEN_REQUEST    #base64(transaction_id)
-                            list(option1,...)
                             target
-                            list(blind1,...)
-                            list(coin1,...)
+                            list(i-don't-remember-what-this-could-be-for,...)
+                            list((#base64(key_identifier), list(blind,...)),...)
+                            list(coin,...)
+                            list(('type', type), (option, value),...)
+                            Types:
+                                'Redeem'
+                                'Exchange' (What does this one infer?)
     Prior:  Hello
     Follow: TRANSFER_TOKEN_REJECT
             TRANSFER_TOKEN_ACCEPT
@@ -186,19 +189,48 @@ Wallet:
             TRANSFER_TOKEN_DELAY
                 
 IS:
-  TRANSFER_TOKEN_REJECT #base64(transaction_id) "Reason"
-                        list( (#key_id(blind1), "Reason1"), ...)
-                        list( (#key_id(coin1), "Reason1"), ...)
+  TRANSFER_TOKEN_REJECT #base64(transaction_id)
+                        type
+                        reason
+                        list(reason-detail, reason-detail)
+                        Types:
+                            'Generic'
+                            'Option'
+                            'Blind'
+                            'Token'
                         Reasons:
-                            **Haven't done this yet**
+                            Generic:
+                                'Rejected'
+                            Option:
+                                'Rejected'
+                                'Unknown option'
+                                'Incorrect type'
+                                'See detail':
+                                    'None'
+                                    All options of Reason, except 'See detail'
+                            Blind:
+                                'Rejected'
+                                'Unknown key_identifier'
+                                'Key too soon'
+                                'Key expired'
+                                'Unable to blind'
+                                'See detail':
+                                    'None'
+                                    All options of Reason, except 'See detail'
+                            Token:
+                                'Rejected'
+                                'Unknown key_identifier'
+                                'Key rejected' (we made the key invalid. ugh. what's the word?)
+                                'Improper token'
+                                'See detail':
+                                    'None'
+                                    All options of Reason, except 'See detail'
     Prior:  TRANSFER_TOKEN_REQUEST
             TRANSFER_TOKEN_RESUME
     Follow: Goodbye
     
-  TRANSFER_TOKEN_ACCEPT #base64(transaction_id) "Message"
-                        list(signed_blind1,...)
-                        Messages:
-                            **Haven't done this yet**
+  TRANSFER_TOKEN_ACCEPT #base64(transaction_id)
+                        list(signed_blind,...)
     Prior:  TRANSFER_TOKEN_REQUEST
             TRANSFER_TOKEN_RESUME
     Follow: Goodbye
@@ -209,87 +241,5 @@ IS:
     Prior:  TRANSFER_TOKEN_REQUEST
             TRANSFER_TOKEN_RESUME
     Follow: Goodbye
-
-
-
-DSDB_KEY
---------------
-
-Wallet:
-  DSDB_KEY_REQUEST
-    Prior:  Hello
-    Follow: DSDB_KEY_PASS
-
-IS:
-  DSDB_KEY_PASS keycertificate
-    Prior:  DSDB_KEY_REQUEST
-    Follow: Goodbye
-
-
-============================================================================
-
-
-******************
-* Wallet to DSDB *
-******************
-
-=================
-= LOCK_COIN     =
-= UNLOCK_COIN   =
-=================
-
-LOCK_COIN
-----------
-
-Wallet:
-  LOCK_COIN_REQUEST #key_id_of_DSDB #hex_string(transaction_id) #hex_string(#number_of_obfuscated_blanks)
-                    #key_identifier1 #encrypted_serial1
-                    #key_identifier2 #encrypted_serial2
-    Prior:  Hello
-    Follow: LOCK_COIN_ACCEPT
-            LOCK_COIN_FAILURE
-
-DSDB:
-  LOCK_COIN_ACCEPT      #hex_string(transaction_id) TIME(lock_expires)
-    Prior:  LOCK_COIN_REQUEST
-    Follow: Goodbye
-
-  LOCK_COIN_FAILURE #hex_string(transaction_id) #hex_string(number_of_failures)
-                    #key_identifier1 #encrypted_serial1 "Reason 1"
-                    #key_identifier2 #encrypted_serial2 "Reason 2"
-                        Reasons:
-                            Key ID of DSDB is unknown or expired        Permanant
-                            Key ID of blank is unknown or expired       Permanant
-                            Decryption of serial failed                 Permanant
-                            Serial already redeemed                     Permanant
-                            Serial locked (not spent)                   Temporary
-    Prior:  LOCK_COIN_REQUEST
-    Follow: Goodbye
-
-
-
-UNLOCK_COIN
------------
-
-Wallet:
-  UNLOCK_COIN_REQUEST   #hex_string(transaction_id)
-    Prior:  Hello
-    Follow: UNLOCK_COIN_PASS
-            UNLOCK_COIN_FAILURE
-
-DSDB:
-  UNLOCK_COIN_PASS
-    Prior:  UNLOCK_COIN_REQUEST
-    Follow: Goodbye
-    
-  UNLOCK_COIN_FAILURE   #hex_string(transaction_id) "Reason"
-                            Reasons:
-                                Unknown transaction_id
-                                Transaction already completed
-                                Lock expired *Not really a failure...*
-    Prior:  UNLOCK_COIN_REQUEST
-    Follow: Goodbye
-
-
 
 
