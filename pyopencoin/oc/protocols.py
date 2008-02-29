@@ -317,6 +317,9 @@ class TransferTokenRecipient(Protocol):
     >>> blind2 = blank2.blind_blank(tests.CDD,tests.mint_key2, blind_factor='a'*26)
     >>> blindslist = [[tests.mint_key1.encodeField('key_identifier'),[blind1]],
     ...               [tests.mint_key2.encodeField('key_identifier'),[blind2]]]
+
+    >>> import calendar
+    >>> issuer.getTime = lambda: calendar.timegm((2008,01,31,0,0,0)) 
     >>> ttr.state = ttr.start
     >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['123', 'my account', blindslist, [], [['type', 'mint']]]))
     <Message('TRANSFER_TOKEN_ACCEPT',['123', 'A message', [['sj17RxE1hfO06+oTgBs9Z7xLut/3NN+nHJbXSJYTks0=', ['jWUOkVfIulEvPjR4HfdxOtEF2vk3ss8vkKSL6aSd2w4Sj0vChSjtmiabkWdbxLTLth13dmigB0vBXDggjBzM7w==']], ['WbXTWO4M60oZ/LGY+sccKf5Oq6HxrjrY4qAxrBDXuek=', ['xBzoYV7W/2NuWdQQrwal7xFbky5D/m3D5Y9aTtuwZPirvK4gx7Po5+VrfGm04BuHo7kwnZ3ZGfUDIXIoILm2ng==']]]])>
@@ -385,8 +388,7 @@ class TransferTokenRecipient(Protocol):
                 return Message('PROTOCOL_ERROR', 'send again')
 
             #check the MintKeys for validity
-            from calendar import timegm
-            timeNow = timegm((2008,01,31,0,0,0)) # FIXME: need a persistant time function to allow testing and real times
+            timeNow = self.issuer.getTime()
             failures = []
             for mintKey, blindlist in blinds:
                 can_mint, can_redeem = mintKey.verify_time(timeNow)

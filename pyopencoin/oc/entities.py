@@ -211,6 +211,10 @@ class Issuer(Entity):
     def debitTarget(self,target,blinds):
         return True
 
+    def getNow(self):
+        import time
+        return time.time()
+
 class KeyFetchError(Exception):
     pass
 
