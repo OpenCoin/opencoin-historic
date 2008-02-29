@@ -18,6 +18,7 @@ state (sounds a bit ackward, its easy, check the states code)
 
 from messages import Message
 import containers    
+import types
 
 class Protocol:
     """A protocol ties messages and actions togehter, it is basically one side
@@ -122,7 +123,7 @@ class CoinSpendSender(Protocol):
         self.target = target
         
         import crypto,base64
-        id = crypto.Random().getRandomString(128) #XXX is that a good enough id?
+        id = crypto._r.getRandomString(128) #_r is an instance of Random() (FIXME: should it be namd something else?)
         self.transaction_id = base64.b64encode(id)
 
         Protocol.__init__(self)
@@ -464,7 +465,7 @@ class fetchMintingKeyProtocol(Protocol):
     of lines)
 
     >>> fmp.newState(fmp.getKey)
-    >>> fmp.state(Message('MINTING_KEY_FAILURE',))
+    >>> fmp.state(Message('MINTING_KEY_FAILURE',[['RxE1', 'Unknown key_identifier']]))
     <Message('GOODBYE',None)>
    
     Now lets break something
@@ -473,13 +474,62 @@ class fetchMintingKeyProtocol(Protocol):
     >>> fmp.state(Message('FOOBAR'))
     <Message('PROTOCOL_ERROR','send again')>
 
+    Okay. Now we'll test every possible MINTING_KEY_PASS.
+    The correct argument is a list of coins. Try things to
+    break it.
+    
     >>> fmp.newState(fmp.getKey)
-    >>> fmp.state(Message('MINTING_KEY_PASS', [["foo"]]))
+    >>> fmp.state(Message('MINTING_KEY_PASS', [['foo']]))
+    <Message('PROTOCOL_ERROR','send again')>
+
+    >>> fmp.newState(fmp.getKey)
+    >>> fmp.state(Message('MINTING_KEY_PASS', ['foo']))
+    <Message('PROTOCOL_ERROR','send again')>
+
+    >>> fmp.newState(fmp.getKey)
+    >>> fmp.state(Message('MINTING_KEY_PASS', 'foo'))
+    <Message('PROTOCOL_ERROR','send again')>
+
+    >>> fmp.newState(fmp.getKey)
+    >>> fmp.state(Message('MINTING_KEY_PASS', []))
+    <Message('PROTOCOL_ERROR','send again')>
+
+    Now try every possible bad MINTING_KEY_FAILURE.
+    Note: it may make sense to verify we have tood reasons
+    as well.
+
+    We need to make sure we are setup as handling keyids
+    >>> fmp.keyids and not fmp.denominations
+    True
+
+    Check base64 decoding causes failure
+    >>> fmp.newState(fmp.getKey)
+    >>> fmp.state(Message('MINTING_KEY_FAILURE', [[1, '']]))
+    <Message('PROTOCOL_ERROR','send again')>
+
+    And the normal tests
+    >>> fmp.newState(fmp.getKey)
+    >>> fmp.state(Message('MINTING_KEY_FAILURE', [[]]))
+    <Message('PROTOCOL_ERROR','send again')>
+    
+    Okay. Check the denomination branch now
+    
+    >>> fmp.denominations = ['1']
+    >>> fmp.keyids = None
+
+    Make sure we are in the denomination branch
+    >>> fmp.newState(fmp.getKey)
+    >>> fmp.state(Message('MINTING_KEY_FAILURE', [[1, '']]))
+    <Message('GOODBYE',None)>
+    
+    Do a check
+
+    >>> fmp.newState(fmp.getKey)
+    >>> fmp.state(Message('MINTING_KEY_FAILURE', [[]]))
     <Message('PROTOCOL_ERROR','send again')>
     
     """
-    
-    
+
     def __init__(self,denominations=None,keyids=None,time=None):
         
         self.denominations = denominations
@@ -487,9 +537,9 @@ class fetchMintingKeyProtocol(Protocol):
         self.keycerts = []
 
         if not time: # The encoded value of time
-            self.time = '0'
+            self.encoded_time = '0'
         else:
-            self.time = containers.encodeTime(time)
+            self.encoded_time = containers.encodeTime(time)
 
         Protocol.__init__(self)
 
@@ -504,7 +554,7 @@ class fetchMintingKeyProtocol(Protocol):
             
             if self.denominations:
                 self.newState(self.getKey)
-                return Message('MINTING_KEY_FETCH_DENOMINATION',[self.denominations, self.time])
+                return Message('MINTING_KEY_FETCH_DENOMINATION',[self.denominations, self.encoded_time])
             elif self.keyids:
                 self.newState(self.getKey)
                 return Message('MINTING_KEY_FETCH_KEYID',self.keyids) 
@@ -520,6 +570,12 @@ class fetchMintingKeyProtocol(Protocol):
         """Gets the actual key"""
 
         if message.type == 'MINTING_KEY_PASS':
+            if not isinstance(message.data, types.ListType):
+                return Message('PROTOCOL_ERROR', 'send again')
+            
+            if len(message.data) == 0: # Nothing in the message
+                return Message('PROTOCOL_ERROR','send again')
+
             for key in message.data:
                 try:
                     keycert = containers.MintKey().fromPython(key)
@@ -532,7 +588,27 @@ class fetchMintingKeyProtocol(Protocol):
                 
 
         elif message.type == 'MINTING_KEY_FAILURE':
-            self.reasons = message.data
+            try:
+                self.reasons = []
+                if self.denominations: # Was a denomination search
+                    for reasonlist in message.data:
+                        denomination, reason = reasonlist
+                            
+                        #FIXME: Should we make sure valid reason?
+                        self.reasons.append((denomination, reason))
+
+                else: # Was a key_identifier search
+                    import base64
+                    for reasonlist in message.data:
+                        key, reason = reasonlist
+                            
+                        #FIXME: Should we make sure valid reason?
+                        self.reasons.append((base64.b64decode(key), reason))
+            except TypeError:
+                return Message('PROTOCOL_ERROR', 'send again')
+            except ValueError:
+                return Message('PROTOCOL_ERROR', 'send again')
+
             self.newState(self.finish)
             return Message('GOODBYE')
         
