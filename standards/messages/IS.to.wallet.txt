@@ -3,36 +3,36 @@
 ****************
 
 =====================
-= MINTING_KEY       =
+= MINT_KEY          =
 = TRANSFER_TOKEN    =
 =====================
 
-MINTING_KEY
+MINT_KEY
 -----------
 
 Wallet:
-  MINTING_KEY_FETCH_DENOMINATION    list(denomination, ...) #TIME(time)
+  MINT_KEY_FETCH_DENOMINATION    list(denomination, ...) #TIME(time)
     Prior:  Hello
-    Follow: MINTING_KEY_PASS
-            MINTING_KEY_FAILURE
+    Follow: MINT_KEY_PASS
+            MINT_KEY_FAILURE
             
-  MINTING_KEY_FETCH_KEYID   list(#base64(key_identifier), ...) #TIME(time)
+  MINT_KEY_FETCH_KEYID   list(#base64(key_identifier), ...) #TIME(time)
     Prior:  Hello
-    Follow: MINTING_KEY_PASS
-            MINTING_KEY_FAILURE
+    Follow: MINT_KEY_PASS
+            MINT_KEY_FAILURE
 
 IS:
-  MINTING_KEY_PASS  list(keycertificate, ...)
-    Prior:  MINTING_KEY_FETCH_DENOMINATION
-            MINTING_KEY_FETCH_KEYID
+  MINT_KEY_PASS  list(keycertificate, ...)
+    Prior:  MINT_KEY_FETCH_DENOMINATION
+            MINT_KEY_FETCH_KEYID
     Follow: Goodbye
             
-  MINTING_KEY_FAILURE   list(([denomination|#base64(key_identifier)], reason), ...)
-                        Reasons:
-                            Unknown denomination
-                            Unknown key_id
-    Prior:  MINTING_KEY_FETCH_DENOMINATION
-            MINTING_KEY_FETCH_KEYID
+  MINT_KEY_FAILURE  list(([denomination|#base64(key_identifier)], reason), ...)
+                    Reasons:
+                        Unknown denomination
+                        Unknown key_id
+    Prior:  MINT_KEY_FETCH_DENOMINATION
+            MINT_KEY_FETCH_KEYID
     Follow: Goodbye
   
 
