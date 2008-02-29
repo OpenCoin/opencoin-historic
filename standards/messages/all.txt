@@ -142,7 +142,7 @@ Wallet:
     Follow: MINT_KEY_PASS
             MINT_KEY_FAILURE
             
-  MINT_KEY_FETCH_KEYID  list(#base64(key_identifier), ...) #TIME(time)
+  MINT_KEY_FETCH_KEYID  list(#base64(key_identifier), ...)
     Prior:  Hello
     Follow: MINT_KEY_PASS
             MINT_KEY_FAILURE
