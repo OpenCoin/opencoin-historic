@@ -23,10 +23,11 @@ def getTime():
 #################### Wallet ###############################
 
 class Wallet(Entity):
-    "Just a testwallet. Does nothing, really"
+    "A Wallet"
 
     def __init__(self):
         self.coins = []
+        self.waitingTransfers = []
         self.getTime = getTime
 
 
@@ -41,26 +42,37 @@ class Wallet(Entity):
 
         protocol = protocols.WalletSenderProtocol(self)
         transport.setProtocol(protocol)
-        transport.start()        
+        transport.start()
         #Trigger execution of the protocol
-        protocol.newMessage(Message(None))    
+        protocol.newMessage(Message(None))
 
     def receiveMoney(self,transport):
         protocol = protocols.WalletRecipientProtocol(self)
         transport.setProtocol(protocol)
         transport.start()
 
-    def sendCoins(self,transport,amount,target,coins=None):
-        #FIXME: Doing a broken thing and using something from tests!
-        if not coins:
-            from tests import coins as testcoins
-            coin1 = testcoins[0][0] # denomination of 1
-            coin2 = testcoins[1][0] # denomination of 2
-            coins = [coin1,coin2]
-        protocol = protocols.CoinSpendSender(coins,target)
+    def sendCoins(self,transport,target,amount=None,coins=None):
+        """sendCoins sends coins over a transport to a target of a certain amount or using given coins."""
+        # The coins argument for sendCoins is being phased out. Need to make the amount part work first though. 
+        if coins: #FIXME: phase this out
+            touse = coins
+            amount = sum(coins)
+        elif amount:
+            #FIXME: get coins
+            touse = None
+        else:
+            raise Exception()
+
+        protocol = protocols.CoinSpendSender(touse,target)
         transport.setProtocol(protocol)
         transport.start()
         protocol.newMessage(Message(None))
+
+        if protocol.state == protocol.finish:
+            # FIXME: remove coins
+            if not protocol.coins:
+                raise Exception()
+            pass
 
     def listen(self,transport):
         """
