@@ -345,7 +345,7 @@ class DSDB:
         self.locks = locks or {}       # a dictionary by id of tuple of (time_expire, tuple(tokens))
         self.getTime = getTime
 
-    def lock(self, id, tokens, lock_time):
+    def lock(self, id, tokens, lock_duration):
         """Lock the tokens.
         Tokens are taken as a group. It tries to lock each token one at a time. If it fails,
         it unwinds the locked tokens are reports a failure. If it succeeds, it adds the lock
@@ -356,6 +356,8 @@ class DSDB:
         
         if self.locks.has_key(id):
             raise LockingError('id already locked')
+
+        lock_time = lock_duration + self.getTime()
 
         self.locks[id] = (lock_time, [])
         
@@ -373,10 +375,9 @@ class DSDB:
                     reason = 'Token already spent'
                     break
                 elif lock[0] == 'Locked':
-                    # FIXME: This implements lazy unlocking. Possible DoS attack vector
+                    # XXX: This implements lazy unlocking. Possible DoS attack vector
                     # Active unlocking would remove the if statement
-                    import time
-                    if lock[1] >= 0: # FIXME: Use actual time
+                    if lock[1] >= self.getTime(): # FIXME: This statement passes tests but is wrong. 
                         tokens = []
                         reason = 'Token locked'
                         break
@@ -407,12 +408,19 @@ class DSDB:
         if not self.locks.has_key(id):
             raise LockingError('Unknown transaction_id')
 
+        lazy_unlocked = False
+        if self.locks[id][0] < self.getTime(): # unlock and then error
+            lazy_unlocked = True
+
         for token in self.locks[id][1]:
             del self.database[token.key_identifier][token.serial]
             if len(self.database[token.key_identifier]) == 0:
                 del self.database[token.key_identifier]
 
         del self.locks[id]
+
+        if lazy_unlocked:
+            raise LockingError('Unknown transaction_id')
 
         return
 
@@ -425,12 +433,10 @@ class DSDB:
             if automatic_lock:
                 # we can spend without locking, so lock now.
                 self.lock(id, tokens, 1)
-                #if ret != (True,):
-                #    return (False, ret[1]) 
             else:
                 raise LockingError('Unknown transaction_id')
 
-        if self.locks[id][0] < 0: #FIXME: use real time
+        if self.locks[id][0] < self.getTime():
             self.unlock(id)
             raise LockingError('Unknown transaction_id')
         
@@ -453,6 +459,8 @@ class DSDB:
 class Mint:
     """A Mint is the minting agent for a currency. It has the 
     >>> m = Mint()
+    >>> import calendar
+    >>> m.getTime = lambda: calendar.timegm((2008,01,31,0,0,0))
 
     >>> import tests, crypto, base64
     >>> mintKey = tests.mintKeys[0]
@@ -466,7 +474,9 @@ class Mint:
     'Mq4dqFpKZEvbl+4HeXh0rGrqBk6Fm2bnUjNiVgirDvOuQf4Ty6ZkvpqB95jMyiwNlhx8A1qZmQv5biLM40emUg=='
     
     >>> m.signNow('abcd', 'efg')
-    False
+    Traceback (most recent call last):
+    ...
+    MintError: KeyError: 'abcd'
 
     """
     def __init__(self):
@@ -496,13 +506,16 @@ class Mint:
             
             signer = sign_alg(self.privatekeys[key_identifier])
         except KeyError, reason:
-            return False
+            raise MintError("KeyError: %s" % reason)
         
-        if mintKey.verify_time(mintKey.key_not_after)[0]: # FIXME: Actually check time
+        if mintKey.verify_time(self.getTime())[0]:
             signature = signer.sign(blind)
             return signature
         else:
-            return False
+            raise MintError("MintKey not valid for minting")
+
+class MintError(Exception):
+    pass
 
 if __name__ == "__main__":
     import doctest

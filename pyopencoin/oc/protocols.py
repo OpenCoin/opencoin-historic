@@ -249,7 +249,7 @@ class TransferTokenSender(Protocol):
     def __init__(self,target,blanks,coins,**kwargs):
         import base64
         from crypto import _r as Random
-        id = Random.getRandomString(128) #XXX is that a good enough id?
+        id = Random.getRandomString(128)
         self.transaction_id = base64.b64encode(id)
 
         self.target = target
@@ -281,36 +281,38 @@ class TransferTokenSender(Protocol):
 
 class TransferTokenRecipient(Protocol):
     """
-    >>> import entities, tests,containers, base64, copy
+    >>> import entities, tests, containers, base64, copy, calendar
     >>> issuer = tests.makeIssuer()
+    >>> issuer.getTime = lambda: calendar.timegm((2008,01,31,0,0,0)) 
+    >>> issuer.mint.getTime = issuer.getTime
 
     >>> ttr = TransferTokenRecipient(issuer)
     >>> coin1 = tests.coins[0][0].toPython() # denomination of 1
     >>> coin2 = tests.coins[1][0].toPython() # denomination of 2
 
     This should not be accepted
-    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['123', 'my account', [], ['foobar'], [['type', 'redeem']]]))    
+    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['1234', 'my account', [], ['foobar'], [['type', 'redeem']]]))    
     <Message('PROTOCOL_ERROR','send again')>
 
     The malformed coin should be rejected
     >>> malformed = copy.deepcopy(tests.coins[0][0])
     >>> malformed.signature = 'Not a valid signature'
-    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['123', 'my account', [], [malformed.toPython()], [['type', 'redeem']]]))
-    <Message('TRANSFER_TOKEN_REJECT',['123', [], [['sj17RxE1hfO06+oTgBs9Z7xLut/3NN+nHJbXSJYTks0=', 'Error']]])>
+    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['1234', 'my account', [], [malformed.toPython()], [['type', 'redeem']]]))
+    <Message('TRANSFER_TOKEN_REJECT',['1234', [], [['sj17RxE1hfO06+oTgBs9Z7xLut/3NN+nHJbXSJYTks0=', 'Error']]])>
 
     The unknown key_identifier should be rejected
     >>> malformed = copy.deepcopy(tests.coins[0][0])
     >>> malformed.key_identifier = 'Not a valid key identifier'
-    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['123', 'my account', [], [malformed.toPython()], [['type', 'redeem']]]))
-    <Message('TRANSFER_TOKEN_REJECT',['123', [], [['Tm90IGEgdmFsaWQga2V5IGlkZW50aWZpZXI=', 'Error']]])>
+    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['1234', 'my account', [], [malformed.toPython()], [['type', 'redeem']]]))
+    <Message('TRANSFER_TOKEN_REJECT',['1234', [], [['Tm90IGEgdmFsaWQga2V5IGlkZW50aWZpZXI=', 'Error']]])>
 
-    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['123', 'my account', [], [coin1, coin2], [['type', 'redeem']]]))
-    <Message('TRANSFER_TOKEN_ACCEPT',3)>
+    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['1234', 'my account', [], [coin1, coin2], [['type', 'redeem']]]))
+    <Message('TRANSFER_TOKEN_ACCEPT',['1234', 3])>
 
     Try to double spend. Should not work.
     >>> ttr.state = ttr.start 
-    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['123', 'my account', [], [coin1, coin2], [['type', 'redeem']]]))
-    <Message('TRANSFER_TOKEN_REJECT',['123', [], [['What do we put here?', 'Error']]])>
+    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['1234', 'my account', [], [coin1, coin2], [['type', 'redeem']]]))
+    <Message('TRANSFER_TOKEN_REJECT',['1234', [], [['What do we put here?', 'Error']]])>
 
     >>> blank1 = containers.CurrencyBlank().fromPython(tests.coinA.toPython(nosig=1))
     >>> blank2 = containers.CurrencyBlank().fromPython(tests.coinB.toPython(nosig=1))
@@ -319,11 +321,9 @@ class TransferTokenRecipient(Protocol):
     >>> blindslist = [[tests.mint_key1.encodeField('key_identifier'),[blind1]],
     ...               [tests.mint_key2.encodeField('key_identifier'),[blind2]]]
 
-    >>> import calendar
-    >>> issuer.getTime = lambda: calendar.timegm((2008,01,31,0,0,0)) 
     >>> ttr.state = ttr.start
-    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['123', 'my account', blindslist, [], [['type', 'mint']]]))
-    <Message('TRANSFER_TOKEN_ACCEPT',['123', 'A message', [['sj17RxE1hfO06+oTgBs9Z7xLut/3NN+nHJbXSJYTks0=', ['jWUOkVfIulEvPjR4HfdxOtEF2vk3ss8vkKSL6aSd2w4Sj0vChSjtmiabkWdbxLTLth13dmigB0vBXDggjBzM7w==']], ['WbXTWO4M60oZ/LGY+sccKf5Oq6HxrjrY4qAxrBDXuek=', ['xBzoYV7W/2NuWdQQrwal7xFbky5D/m3D5Y9aTtuwZPirvK4gx7Po5+VrfGm04BuHo7kwnZ3ZGfUDIXIoILm2ng==']]]])>
+    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['1234', 'my account', blindslist, [], [['type', 'mint']]]))
+    <Message('TRANSFER_TOKEN_ACCEPT',['1234', 'A message', [['sj17RxE1hfO06+oTgBs9Z7xLut/3NN+nHJbXSJYTks0=', ['jWUOkVfIulEvPjR4HfdxOtEF2vk3ss8vkKSL6aSd2w4Sj0vChSjtmiabkWdbxLTLth13dmigB0vBXDggjBzM7w==']], ['WbXTWO4M60oZ/LGY+sccKf5Oq6HxrjrY4qAxrBDXuek=', ['xBzoYV7W/2NuWdQQrwal7xFbky5D/m3D5Y9aTtuwZPirvK4gx7Po5+VrfGm04BuHo7kwnZ3ZGfUDIXIoILm2ng==']]]])>
 
     """
 
@@ -333,12 +333,16 @@ class TransferTokenRecipient(Protocol):
 
     def start(self,message):
         from entities import LockingError
-        #raise `message.data[:4]`
+        import base64
         
         options = {'type':'unknown'}
         if message.data:
-            transaction_id,target,blindslist,coins = message.data[:4]
+            encoded_transaction_id,target,blindslist,coins = message.data[:4]
             options.update(len(message.data)==5 and message.data[4] or [])
+            try:
+                transaction_id = base64.b64decode(encoded_transaction_id)
+            except TypeError:
+                return Message('PROTOCOL_ERROR', 'send again')
         if options['type'] == 'redeem':
 
             failures = []
@@ -355,29 +359,30 @@ class TransferTokenRecipient(Protocol):
                 if not mintKey or not coin.validate_with_CDD_and_MintKey(self.issuer.cdd, mintKey):
                     failures.append(coin)
             if failures:
-                return Message('TRANSFER_TOKEN_REJECT', [transaction_id, [], 
+                return Message('TRANSFER_TOKEN_REJECT', [encoded_transaction_id, [], 
                                [[coin.encodeField('key_identifier'), 'Error'] for coin in failures]])
 
             #and not double spent
             try:
-                self.issuer.dsdb.lock(transaction_id,coins,10) #FIXME: questionable time
+                self.issuer.dsdb.lock(transaction_id,coins,86400)
             except LockingError, e:
-                return Message('TRANSFER_TOKEN_REJECT', [transaction_id, [], [['What do we put here?', 'Error']]])
+                return Message('TRANSFER_TOKEN_REJECT', [encoded_transaction_id, [], [['What do we put here?', 'Error']]])
             
             # XXX transmit funds
             
             if not self.issuer.transferToTarget(target,coins):
+                self.issuer.dsdb.unlock(transaction_id)
                 return Message('PROTOCOL_ERROR', 'send again')
 
             #register them as spent
             try:
-                self.issuer.dsdb.spend(transaction_id,coins,10) #FIXME: questionable time
-            except:                
+                self.issuer.dsdb.spend(transaction_id,coins)
+            except LockingError, e: 
                 #Note: if we fail here, that means we have large problems, since the coins are locked
                 return Message('PROTOCOL_ERROR', 'send again')
 
             self.state = self.goodbye
-            return Message('TRANSFER_TOKEN_ACCEPT',sum(coins))
+            return Message('TRANSFER_TOKEN_ACCEPT',[encoded_transaction_id, sum(coins)])
         elif options['type'] == 'mint':
 
             #check that we have the keys
@@ -413,7 +418,7 @@ class TransferTokenRecipient(Protocol):
 
                 minted.append([key.encodeField('key_identifier'), this_set])
 
-            return Message('TRANSFER_TOKEN_ACCEPT', [transaction_id, 'A message', minted])
+            return Message('TRANSFER_TOKEN_ACCEPT', [encoded_transaction_id, 'A message', minted])
             
             #respond
             pass 
@@ -519,7 +524,7 @@ class fetchMintingKeyProtocol(Protocol):
 
     Make sure we are in the denomination branch
     >>> fmp.newState(fmp.getKey)
-    >>> fmp.state(Message('MINTING_KEY_FAILURE', [[1, '']]))
+    >>> fmp.state(Message('MINTING_KEY_FAILURE', [['1', '']]))
     <Message('GOODBYE',None)>
     
     Do a check

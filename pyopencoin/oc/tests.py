@@ -44,7 +44,7 @@ Test the transfer token protocol
 Client <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
 Server <Message('HANDSHAKE_ACCEPT',None)>
 Client <Message('TRANSFER_TOKEN_REQUEST',['...', 'myaccount', [], [[(...)], [(...)]], [['type', 'redeem']]])>
-Server <Message('TRANSFER_TOKEN_ACCEPT',3)>
+Server <Message('TRANSFER_TOKEN_ACCEPT',['...', 3])>
 Client <Message('GOODBYE',None)>
 Server <Message('GOODBYE',None)>
 Client <Message('finished',None)>
@@ -65,7 +65,7 @@ walletA <Message('COIN_SPEND',['...', [[(...)]], 'a book'])>
 walletB <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
 issuer <Message('HANDSHAKE_ACCEPT',None)>
 walletB <Message('TRANSFER_TOKEN_REQUEST',['...', 'my account', [], [[(...)]], [['type', 'redeem']]])>
-issuer <Message('TRANSFER_TOKEN_ACCEPT',1)>
+issuer <Message('TRANSFER_TOKEN_ACCEPT',['...', 1])>
 walletB <Message('GOODBYE',None)>
 issuer <Message('GOODBYE',None)>
 walletB <Message('finished',None)>
