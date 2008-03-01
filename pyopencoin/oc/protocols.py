@@ -289,6 +289,8 @@ class TransferTokenRecipient(Protocol):
     >>> ttr = TransferTokenRecipient(issuer)
     >>> coin1 = tests.coins[0][0].toPython() # denomination of 1
     >>> coin2 = tests.coins[1][0].toPython() # denomination of 2
+    
+    >>> coin3 = tests.coins[0][0].toPython() # denomination of 1
 
     This should not be accepted
     >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['1234', 'my account', [], ['foobar'], [['type', 'redeem']]]))    
@@ -298,21 +300,21 @@ class TransferTokenRecipient(Protocol):
     >>> malformed = copy.deepcopy(tests.coins[0][0])
     >>> malformed.signature = 'Not a valid signature'
     >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['1234', 'my account', [], [malformed.toPython()], [['type', 'redeem']]]))
-    <Message('TRANSFER_TOKEN_REJECT',['1234', [], [['sj17RxE1hfO06+oTgBs9Z7xLut/3NN+nHJbXSJYTks0=', 'Error']]])>
+    <Message('TRANSFER_TOKEN_REJECT',['1234', 'Token', 'See detail', ['Rejected']])>
 
     The unknown key_identifier should be rejected
     >>> malformed = copy.deepcopy(tests.coins[0][0])
     >>> malformed.key_identifier = 'Not a valid key identifier'
     >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['1234', 'my account', [], [malformed.toPython()], [['type', 'redeem']]]))
-    <Message('TRANSFER_TOKEN_REJECT',['1234', [], [['Tm90IGEgdmFsaWQga2V5IGlkZW50aWZpZXI=', 'Error']]])>
+    <Message('TRANSFER_TOKEN_REJECT',['1234', 'Token', 'See detail', ['Rejected']])>
 
     >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['1234', 'my account', [], [coin1, coin2], [['type', 'redeem']]]))
-    <Message('TRANSFER_TOKEN_ACCEPT',['1234', 3])>
+    <Message('TRANSFER_TOKEN_ACCEPT',['1234', '3'])>
 
     Try to double spend. Should not work.
     >>> ttr.state = ttr.start 
     >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['1234', 'my account', [], [coin1, coin2], [['type', 'redeem']]]))
-    <Message('TRANSFER_TOKEN_REJECT',['1234', [], [['What do we put here?', 'Error']]])>
+    <Message('TRANSFER_TOKEN_REJECT',['1234', 'Token', 'Invalid token', []])>
 
     >>> blank1 = containers.CurrencyBlank().fromPython(tests.coinA.toPython(nosig=1))
     >>> blank2 = containers.CurrencyBlank().fromPython(tests.coinB.toPython(nosig=1))
@@ -323,8 +325,12 @@ class TransferTokenRecipient(Protocol):
 
     >>> ttr.state = ttr.start
     >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['1234', 'my account', blindslist, [], [['type', 'mint']]]))
-    <Message('TRANSFER_TOKEN_ACCEPT',['1234', 'A message', [['sj17RxE1hfO06+oTgBs9Z7xLut/3NN+nHJbXSJYTks0=', ['jWUOkVfIulEvPjR4HfdxOtEF2vk3ss8vkKSL6aSd2w4Sj0vChSjtmiabkWdbxLTLth13dmigB0vBXDggjBzM7w==']], ['WbXTWO4M60oZ/LGY+sccKf5Oq6HxrjrY4qAxrBDXuek=', ['xBzoYV7W/2NuWdQQrwal7xFbky5D/m3D5Y9aTtuwZPirvK4gx7Po5+VrfGm04BuHo7kwnZ3ZGfUDIXIoILm2ng==']]]])>
+    <Message('TRANSFER_TOKEN_ACCEPT',['1234', [['sj17RxE1hfO06+oTgBs9Z7xLut/3NN+nHJbXSJYTks0=', ['jWUOkVfIulEvPjR4HfdxOtEF2vk3ss8vkKSL6aSd2w4Sj0vChSjtmiabkWdbxLTLth13dmigB0vBXDggjBzM7w==']], ['WbXTWO4M60oZ/LGY+sccKf5Oq6HxrjrY4qAxrBDXuek=', ['xBzoYV7W/2NuWdQQrwal7xFbky5D/m3D5Y9aTtuwZPirvK4gx7Po5+VrfGm04BuHo7kwnZ3ZGfUDIXIoILm2ng==']]]])>
 
+    Now, check to make sure the implemenation is good
+    >>> ttr.state = ttr.start
+    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST'))
+    <Message('PROTOCOL_ERROR','send again')>
     """
 
     def __init__(self,issuer):
@@ -336,13 +342,17 @@ class TransferTokenRecipient(Protocol):
         import base64
         
         options = {'type':'unknown'}
-        if message.data:
+
+        try:
             encoded_transaction_id,target,blindslist,coins = message.data[:4]
-            options.update(len(message.data)==5 and message.data[4] or [])
-            try:
-                transaction_id = base64.b64decode(encoded_transaction_id)
-            except TypeError:
-                return Message('PROTOCOL_ERROR', 'send again')
+            transaction_id = base64.b64decode(encoded_transaction_id)
+        except ValueError:
+            return Message('PROTOCOL_ERROR', 'send again')
+        except TypeError:
+            return Message('PROTOCOL_ERROR', 'send again')
+
+        options.update(len(message.data)==5 and message.data[4] or [])
+        
         if options['type'] == 'redeem':
 
             failures = []
@@ -358,15 +368,22 @@ class TransferTokenRecipient(Protocol):
                 mintKey = self.issuer.keyids.get(coin.key_identifier, None)
                 if not mintKey or not coin.validate_with_CDD_and_MintKey(self.issuer.cdd, mintKey):
                     failures.append(coin)
-            if failures:
-                return Message('TRANSFER_TOKEN_REJECT', [encoded_transaction_id, [], 
-                               [[coin.encodeField('key_identifier'), 'Error'] for coin in failures]])
+            
+            if failures: # We don't know exactly how, so give coin by coin information
+                details = []
+                for coin in coins:
+                    if coin not in failures:
+                        details.append('None')
+                    else:
+                        details.append('Rejected')
+                return Message('TRANSFER_TOKEN_REJECT', [encoded_transaction_id, 'Token',
+                               'See detail', details])
 
             #and not double spent
             try:
                 self.issuer.dsdb.lock(transaction_id,coins,86400)
             except LockingError, e:
-                return Message('TRANSFER_TOKEN_REJECT', [encoded_transaction_id, [], [['What do we put here?', 'Error']]])
+                return Message('TRANSFER_TOKEN_REJECT', [encoded_transaction_id, 'Token', 'Invalid token', []])
             
             # XXX transmit funds
             
@@ -382,7 +399,7 @@ class TransferTokenRecipient(Protocol):
                 return Message('PROTOCOL_ERROR', 'send again')
 
             self.state = self.goodbye
-            return Message('TRANSFER_TOKEN_ACCEPT',[encoded_transaction_id, sum(coins)])
+            return Message('TRANSFER_TOKEN_ACCEPT',[encoded_transaction_id, str(sum(coins))])
         elif options['type'] == 'mint':
 
             #check that we have the keys
@@ -406,7 +423,7 @@ class TransferTokenRecipient(Protocol):
                     failures.append(mintKey.encodeField('key_identifier'))
 
             if failures:
-                return Message('TRANSFER_TOKEN_REJECT', [transaction_id, 'Invalid key identifier', failures, []])
+                return Message('TRANSFER_TOKEN_REJECT', [encoded_transaction_id, 'Blind', 'Invalid key_identifier', []])
 
             #mint them immediately (the only thing we can do right now with the mint)
             minted = []
@@ -418,12 +435,12 @@ class TransferTokenRecipient(Protocol):
 
                 minted.append([key.encodeField('key_identifier'), this_set])
 
-            return Message('TRANSFER_TOKEN_ACCEPT', [encoded_transaction_id, 'A message', minted])
+            return Message('TRANSFER_TOKEN_ACCEPT', [encoded_transaction_id, minted])
             
             #respond
             pass 
         else:
-            return Message('NOT IMPLEMENTED YET')
+            return Message('TRANSFER_TOKEN_REJECT', ['Option', 'Rejected', []])
 
 
 
