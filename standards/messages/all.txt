@@ -176,6 +176,7 @@ IS:
                         'Invalid key_identifier'
                         'Revoked key'
                         'Invalid token'
+                        'Token already spent'
                         'See detail':
                             'None'
                             All options of Reason, except 'See detail'
