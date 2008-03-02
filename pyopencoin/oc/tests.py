@@ -58,7 +58,7 @@ Test the coin spend protocol.
 >>> t2 = ClientTest(issuer.listen,clientnick='walletB',servernick='issuer')
 >>> walletB.issuer_transport = t2
 >>> walletA.coins=[coin1]
->>> walletA.sendCoins(t,target='a book',coins = [coin1])
+>>> walletA.sendCoins(t, target='a book', amount=1)
 walletA <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
 walletB <Message('HANDSHAKE_ACCEPT',None)>
 walletA <Message('SUM_ANNOUNCE',['...', '1', 'a book'])>

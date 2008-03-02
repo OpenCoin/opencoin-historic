@@ -52,28 +52,43 @@ class Wallet(Entity):
         transport.setProtocol(protocol)
         transport.start()
 
-    def sendCoins(self,transport,target,amount=None,coins=None):
-        """sendCoins sends coins over a transport to a target of a certain amount or using given coins."""
-        # The coins argument for sendCoins is being phased out. Need to make the amount part work first though. 
-        if coins: #FIXME: phase this out
-            touse = coins
-            amount = sum(coins)
-        elif amount:
-            #FIXME: get coins
-            touse = None
-        else:
-            raise Exception()
+    def sendCoins(self,transport,target,amount=None):
+        """sendCoins sends coins over a transport to a target of a certain amount."""
+        if sum(self.coins) < amount:
+            raise UnableToDoError('Not enough tokens')
+
+        touse = []
+
+        denominations = {}
+        for coin in self.coins:
+            denominations.setdefault(coin.denomination, [])
+            denominations[coin.denomination].append(coin)
+
+        #FIXME: If we go to string/fraction amount, the sort will have to be changed
+        mysort = lambda x, y: int(x).__cmp__(int(y))
+        denomination_list = denominations.keys()
+        denomination_list.sort(mysort, reverse=True) # sort from high to low
+
+        for denomination in denomination_list:
+            while denomination >= amount:
+                if not denominations[denomination]: # no coins to use
+                    break # go to next coin
+                touse.append(denominations[denomination].pop())
+                amount = amount - denomination
+
+        if amount != 0: # we didn't have enough
+            raise UnableToDoError('Not enough tokens')
+        
+        for coin in touse: # Remove the coins to prevent accidental double spending
+            self.coins.remove(coin)
 
         protocol = protocols.CoinSpendSender(touse,target)
         transport.setProtocol(protocol)
         transport.start()
         protocol.newMessage(Message(None))
 
-        if protocol.state == protocol.finish:
-            # FIXME: remove coins
-            if not protocol.coins:
-                raise Exception()
-            pass
+        if protocol.state != protocol.finish:
+            self.coins.extend(touse)
 
     def listen(self,transport):
         """
