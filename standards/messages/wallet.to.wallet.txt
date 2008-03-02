@@ -3,98 +3,56 @@
 ********************
 
 =============
-= BLANK     =
-= COIN      =
+= SUM       =
+= TOKEN     =
 =============
 
-BLANK
+SUM
 -----
 
 A:
-  BLANK_PRESENT dsdb_keycertificate #hex_string(number_of_blanks)
-                blank1
-                blank2
+  SUM_ANNOUNCE  #base64(transaction_id)
+                standard identifier
+                currency identifier
+                amount
+                target (what exactly is the target? Should it be base64 encoded?)
         Prior:  Hello
-        Follow: BLANK_FAILURE
-                BLANK_REJECT
-                BLANK_ACCEPT
+        Follow: SUM_ACCEPT 
+                SUM_REJECT
 
 B:
-  BLANK_REJECT  #hex_string(number_of_failures)
-                #base64(encrypted serial of blank1) "Reason1"
-                #base64(encrypted serial of blank2) "Reason2"
-                    Reasons:
-                        Malformed blank
-                        Unknown issuer
-                            Note: Also used for an untrusted issuer
-        Prior:  BLANK_PRESENT
-        Follow: Goodbye
+  SUM_ACCEPT
+        Prior:  SUM_ANNOUNCE
+        Follow: TOKEN_REDEEM
                         
-  BLANK_REJECT  #hex_string(0) "reason"
-                    Reason:
-                        Cancelled
-                        Insufficient currency
-        Prior:  BLANK_PRESENT
+  SUM_REJECT
+        Prior:  SUM_ANNOUNCE
         Follow: Goodbye
                         
 
-  BLANK_FAILURE #hex_string(number_of_failures)
-                #base64(encrypted serial of blank1) "Reason1"
-                #base64(encrypted serial of blank2) "Reason2"
-                    Reasons:
-                        DSDB: Key ID of DSDB is unknown or expired      Permanant
-                        DSDB: Key ID of blank is unknown or expired     Permanant
-                        DSDB: Decryption of serial failed               Permanant
-                        DSDB: Serial already redeemed                   Permanant
-                        DSDB: Serial locked (not spent)                 Temporary
-        Prior:  BLANK_PRESENT
-        Follow: Goodbye
 
-  BLANK_FAILURE #hex_string(0) "reason"
-                    Reasons:
-                        Cancelled
-        Prior:  BLANK_PRESENT
-                BLANK_ACCEPT (Message from self)
-        Follow: Goodbye
-
-  BLANK_ACCEPT
-        Note:   After ACCEPT, a REJECT #hex_string(0) can be given to abort the transaction
-        Prior:  BLANK_PRESENT
-        Follow: COIN_REDEEM
-                BLANK_REJECT (Message from self)
-
-
-
-COINS
+TOKEN
 -----
 
 A:
-  COIN_REDEEM   #hex_string(number_of)
-                #base64(coin1)
-                #base64(coin2)
-        Prior:  BLANK_ACCEPT
-        Follow: COIN_REJECT
-                COIN_ACCEPT
+  TOKEN_REDEEM  list(token)
+        Prior:  SUM_ACCEPT
+        Follow: TOKEN_REJECT
+                TOKEN_ACCEPT
 
 B:
-  COIN_REJECT   #hex_string(number_of)
-                #base64(coin1) "Reason1"
-                #base64(coin2) "Reason2"
+  TOKEN_REJECT  type
+                list(detail-reason)|list()
                     Reasons:
-                        Invalid coin
-                        Unknown coin
-                            Note: Used when the coin we are given is different than the blank
-        Prior:  COIN_REDEEM
-        Follow: COIN_REDEEM
+                        'Rejected'
+                        'Invalid token'
+                        'See detail':
+                            'None'
+                            All options of Reason, except 'See detail'
+        Prior:  TOKEN_REDEEM
+        Follow: TOKEN_REDEEM
                 Goodbye
 
-  COIN_REJECT   #hex_string(0) "Reason"
-                    Reasons:
-                        *I can't think of anything valid*
-        Prior:  COIN_REDEEM
-        Follow: COIN_REDEEM
-                Goodbye
-
-  COIN_ACCEPT
-        Prior:  COIN_REDEEM
+  TOKEN_ACCEPT
+        Prior:  TOKEN_REDEEM
         Follow: Goodbye

@@ -4,8 +4,8 @@ Messages between any two parties of the network
 Wallet & Wallet         Wallet & IS 
 
 =============           =====================
-= BLANK     =           = MINT_KEY          =
-= COIN      =           = TRANSFER_TOKEN    =
+= SUM       =           = MINT_KEY          =
+= TOKEN     =           = TRANSFER_TOKEN    =
 =============           =====================
                         
     Prior: All messages between two entities that can occur directly before this one
@@ -22,101 +22,60 @@ Wallet & Wallet         Wallet & IS
 ********************
 
 =============
-= BLANK     =
-= COIN      =
+= SUM       =
+= TOKEN     =
 =============
 
-BLANK
+SUM
 -----
 
 A:
-  BLANK_PRESENT dsdb_keycertificate #hex_string(number_of_blanks)
-                blank1
-                blank2
+  SUM_ANNOUNCE  #base64(transaction_id)
+                standard identifier
+                currency identifier
+                amount
+                target (what exactly is the target? Should it be base64 encoded?)
         Prior:  Hello
-        Follow: BLANK_FAILURE
-                BLANK_REJECT
-                BLANK_ACCEPT
+        Follow: SUM_ACCEPT 
+                SUM_REJECT
 
 B:
-  BLANK_REJECT  #hex_string(number_of_failures)
-                #base64(encrypted serial of blank1) "Reason1"
-                #base64(encrypted serial of blank2) "Reason2"
-                    Reasons:
-                        Malformed blank
-                        Unknown issuer
-                            Note: Also used for an untrusted issuer
-        Prior:  BLANK_PRESENT
-        Follow: Goodbye
+  SUM_ACCEPT
+        Prior:  SUM_ANNOUNCE
+        Follow: TOKEN_REDEEM
                         
-  BLANK_REJECT  #hex_string(0) "reason"
-                    Reason:
-                        Cancelled
-                        Insufficient currency
-        Prior:  BLANK_PRESENT
+  SUM_REJECT
+        Prior:  SUM_ANNOUNCE
         Follow: Goodbye
                         
 
-  BLANK_FAILURE #hex_string(number_of_failures)
-                #base64(encrypted serial of blank1) "Reason1"
-                #base64(encrypted serial of blank2) "Reason2"
-                    Reasons:
-                        DSDB: Key ID of DSDB is unknown or expired      Permanant
-                        DSDB: Key ID of blank is unknown or expired     Permanant
-                        DSDB: Decryption of serial failed               Permanant
-                        DSDB: Serial already redeemed                   Permanant
-                        DSDB: Serial locked (not spent)                 Temporary
-        Prior:  BLANK_PRESENT
-        Follow: Goodbye
 
-  BLANK_FAILURE #hex_string(0) "reason"
-                    Reasons:
-                        Cancelled
-        Prior:  BLANK_PRESENT
-                BLANK_ACCEPT (Message from self)
-        Follow: Goodbye
-
-  BLANK_ACCEPT
-        Note:   After ACCEPT, a REJECT #hex_string(0) can be given to abort the transaction
-        Prior:  BLANK_PRESENT
-        Follow: COIN_REDEEM
-                BLANK_REJECT (Message from self)
-
-
-
-COIN
+TOKEN
 -----
 
 A:
-  COIN_REDEEM   #hex_string(number_of)
-                #base64(coin1)
-                #base64(coin2)
-        Prior:  BLANK_ACCEPT
-        Follow: COIN_REJECT
-                COIN_ACCEPT
+  TOKEN_REDEEM  list(token)
+        Prior:  SUM_ACCEPT
+        Follow: TOKEN_REJECT
+                TOKEN_ACCEPT
 
 B:
-  COIN_REJECT   #hex_string(number_of)
-                #base64(coin1) "Reason1"
-                #base64(coin2) "Reason2"
+  TOKEN_REJECT  type
+                list(detail-reason)|list()
                     Reasons:
-                        Invalid coin
-                        Unknown coin
-                            Note: Used when the coin we are given is different than the blank
-        Prior:  COIN_REDEEM
-        Follow: COIN_REDEEM
+                        'Rejected'
+                        'Invalid token'
+                        'See detail':
+                            'None'
+                            All options of Reason, except 'See detail'
+        Prior:  TOKEN_REDEEM
+        Follow: TOKEN_REDEEM
                 Goodbye
 
-  COIN_REJECT   #hex_string(0) "Reason"
-                    Reasons:
-                        *I can't think of anything valid*
-        Prior:  COIN_REDEEM
-        Follow: COIN_REDEEM
-                Goodbye
-
-  COIN_ACCEPT
-        Prior:  COIN_REDEEM
+  TOKEN_ACCEPT
+        Prior:  TOKEN_REDEEM
         Follow: Goodbye
+
 
 
 
@@ -137,7 +96,7 @@ MINT_KEY
 -----------
 
 Wallet:
-  MINT_KEY_FETCH_DENOMINATION   list(denomination, ...) #TIME(time)
+  MINT_KEY_FETCH_DENOMINATION   list(denomination, ...) TIME(time)|'0'
     Prior:  Hello
     Follow: MINT_KEY_PASS
             MINT_KEY_FAILURE
@@ -154,9 +113,10 @@ IS:
     Follow: Goodbye
             
   MINT_KEY_FAILURE  list(([denomination|#base64(key_identifier)], reason), ...)
-                    Reasons:
-                        Unknown denomination
-                        Unknown key_id
+				Reasons:
+					Unknown denomination
+					Unknown key_identifier
+					Revoked key_identifier
     Prior:  MINT_KEY_FETCH_DENOMINATION
             MINT_KEY_FETCH_KEYID
     Follow: Goodbye
@@ -169,67 +129,72 @@ TRANSFER_TOKEN
 Wallet:
   TRANSFER_TOKEN_REQUEST    #base64(transaction_id)
                             target
-                            list(i-don't-remember-what-this-could-be-for,...)
                             list((#base64(key_identifier), list(blind,...)),...)
-                            list(coin,...)
+                            list(token,...)
                             list(('type', type), (option, value),...)
-                            Types:
-                                'Redeem'
-                                'Exchange' (What does this one infer?)
+				Types:
+					'redeem'
+					'exchange'
+					'mint'
     Prior:  Hello
     Follow: TRANSFER_TOKEN_REJECT
             TRANSFER_TOKEN_ACCEPT
             TRANSFER_TOKEN_DELAY
             
-  TRANSFER_TOKEN_RESUME #base64(transaction_id)
+  TRANSFER_TOKEN_RESUME     #base64(transaction_id)
     Prior:  Hello
     Follow: TRANSFER_TOKEN_REJECT
             TRANSFER_TOKEN_ACCEPT
             TRANSFER_TOKEN_DELAY
                 
 IS:
-  TRANSFER_TOKEN_REJECT #base64(transaction_id)
-                        type
-                        reason
-                        list(reason-detail, reason-detail)
-                        Types:
-                            'Generic'
-                            'Option'
-                            'Blind'
-                            'Token'
-                        Reasons:
-                            Generic:
-                                'Rejected'
-                            Option:
-                                'Rejected'
-                                'Unknown option'
-                                'Incorrect type'
-                                'See detail':
-                                    'None'
-                                    All options of Reason, except 'See detail'
-                            Blind:
-                                'Rejected'
-                                'Unknown key_identifier'
-                                'Key too soon'
-                                'Key expired'
-                                'Unable to blind'
-                                'See detail':
-                                    'None'
-                                    All options of Reason, except 'See detail'
-                            Token:
-                                'Rejected'
-                                'Unknown key_identifier'
-                                'Key rejected' (we made the key invalid. ugh. what's the word?)
-                                'Improper token'
-                                'See detail':
-                                    'None'
-                                    All options of Reason, except 'See detail'
+  TRANSFER_TOKEN_REJECT     #base64(transaction_id)
+                            type
+                            reason
+                            list(reason-detail)|list()
+				Types:
+					'Generic'
+					'Option'
+					'Target'
+					'Token'
+					'Blind'
+				Reasons:
+					Generic:
+						'Rejected'
+					Option:
+						'Rejected'
+						'Unknown option'
+						'Incorrect type'
+						'See detail':
+							'None'
+							All options of Reason, except 'See detail'
+					Target:
+						'Rejected'
+						'IS-Reject' + Issuer specific rejection string
+					Token:
+						'Rejected'
+						'Invalid key_identifier'
+						'Revoked key'
+						'Invalid token'
+						'See detail':
+							'None'
+							All options of Reason, except 'See detail'
+					Blind:
+						'Rejected'
+						'Invalid key_identifier'
+						'Key too soon'
+						'Key expired'
+						'Revoked key'
+						'Unable to sign'
+						'See detail':
+							'None'
+							All options of Reason, except 'See detail'
     Prior:  TRANSFER_TOKEN_REQUEST
             TRANSFER_TOKEN_RESUME
     Follow: Goodbye
     
-  TRANSFER_TOKEN_ACCEPT #base64(transaction_id)
-                        list(signed_blind,...)
+  TRANSFER_TOKEN_ACCEPT     #base64(transaction_id)
+                            list(signed_blind,...)
     Prior:  TRANSFER_TOKEN_REQUEST
             TRANSFER_TOKEN_RESUME
     Follow: Goodbye
