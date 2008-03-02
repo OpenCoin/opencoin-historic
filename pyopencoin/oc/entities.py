@@ -27,7 +27,8 @@ class Wallet(Entity):
 
     def __init__(self):
         self.coins = []
-        self.waitingTransfers = []
+        self.waitingTransfers = {}
+        self.otherCoins = [] # Coins we received from another wallet, waiting to Redeem
         self.getTime = getTime
 
 
@@ -101,16 +102,71 @@ class Wallet(Entity):
         transport.start()
         protocol.newMessage(Message(None))
 
+        if type == 'mint':
+            if protocol.result == 1: # If set, we got a TRANSFER_TOKEN_ACCEPT
+                self.addTransferBlanks(protocol.transaction_id, blanks)
+                self.finishTransfer(protocol.transaction_id, protocol.blinds)
+            elif protocol.result == 2: #If set, we got a TRANSFER_TOKEN_DELAY
+                self.addTransferBlanks(protocol.transaction_id, blanks)
+        
+        elif type == 'exchange':
+            if protocol.result == 1: # If set, we got a TRANSFER_TOKEN_ACCEPT
+                self.addTransferBlanks(protocol.transaction_id, blanks)
+                self.finishTransfer(protocol.transaction_id, protocol.blinds)
+            elif protocol.result == 2: # If set, we got a TRANSFER_TOKEN_DELAY
+                self.addTransferBlanks(protocol.transaction_id, blanks)
+                self.removeCoins(coins)
 
+        elif type == 'redeem':
+            if protocol.result == 1: # If set, we got a TRANSFER_TOKEN_ACCEPT
+                self.removeCoins(coins)
+                
+        else:
+            raise NotImplementedError()
+                
     def handleIncomingCoins(self,coins,action,reason):
         transport = self.getIssuerTransport()
         if 1: #redeem
+            self.otherCoins.extend(coins) # Deposit them
             if transport:
                 self.transferTokens(transport,'my account',[],coins,'redeem')
         return 1
 
     def getIssuerTransport(self):
         return getattr(self,'issuer_transport',0)
+
+    def removeCoins(self, coins):
+        for c in coins:
+            try:
+                self.coins.remove(c)
+            except ValueError:
+                self.otherCoins.remove(c)
+
+    def addTransferBlanks(self, transaction_id, blanks):
+        self.waitingTransfers[transaction_id] = blanks
+
+    def finishTransfer(self, transaction_id, blinds):
+        """Finishes a transfer where we minted. Takes blinds and makes coins."""
+        #FIXME: What do we do if a coin is bad?
+        coins = []
+        blanks = self.waitingTransfers[transaction_id]
+
+        #FIXME: We need to make sure we atleast have the same number of blanks and blinds at the protocol level!
+        for i in range(len(blanks)):
+            blank = blanks[i]
+            blind = blinds[i]
+            try:
+                signature = blank.unblindSignature(blind)
+                coins.append(blank.newCoin(signature)) # FIXME: No error checking here
+            except NotImplementedError: #What errors can we get here. CryptoError of some sort...
+                pass
+                # Don't stop. We need to make as many valid coins as possible
+
+        for coin in coins:
+            if coin not in self.coins:
+                self.coins.append(coin)
+
+        del self.waitingTransfers[transaction_id]
 
 #################### Issuer ###############################
 

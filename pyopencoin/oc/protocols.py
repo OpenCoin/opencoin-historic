@@ -242,18 +242,16 @@ class TransferTokenSender(Protocol):
     <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
     >>> tts.state(Message('HANDSHAKE_ACCEPT'))
     <Message('TRANSFER_TOKEN_REQUEST',['...', 'my account', [], [[(...)], [(...)]], [['type', 'redeem']]])>
-    >>> tts.state(Message('TRANSFER_TOKEN_ACCEPT',[tts.transaction_id, []]))
+    >>> tts.state(Message('TRANSFER_TOKEN_ACCEPT',[tts.encoded_transaction_id, []]))
     <Message('GOODBYE',None)>
 
     """
 
-    # NOTE: transaction_id is kept in it's base64 form in this class
-    
     def __init__(self,target,blanks,coins,**kwargs):
         import base64
         from crypto import _r as Random
-        id = Random.getRandomString(128)
-        self.transaction_id = base64.b64encode(id)
+        self.transaction_id = Random.getRandomString(128)
+        self.encoded_transaction_id = base64.b64encode(self.transaction_id)
 
         self.target = target
         self.blanks = blanks
@@ -264,7 +262,7 @@ class TransferTokenSender(Protocol):
         self.state = self.initiateHandshake
    
     def firstStep(self,message):
-        data = [self.transaction_id,
+        data = [self.encoded_transaction_id,
                 self.target,
                 self.blanks,
                 self.coins]
@@ -277,9 +275,9 @@ class TransferTokenSender(Protocol):
         import base64
         try:
             if message.type == 'TRANSFER_TOKEN_ACCEPT':
-                transaction_id, blinds = message.data
+                encoded_transaction_id, blinds = message.data
             
-                if transaction_id != self.transaction_id:
+                if encoded_transaction_id != self.encoded_transaction_id:
                     return Message('PROTOCOL_ERROR', 'incorrect transaction_id')
             
                 if self.kwargs['type'] == 'exchange' or self.kwargs['type'] == 'mint':

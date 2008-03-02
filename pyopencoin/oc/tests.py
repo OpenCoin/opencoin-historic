@@ -40,6 +40,7 @@ Test the transfer token protocol
 >>> t = ClientTest(issuer.listen)
 >>> coin1 = coins[0][0] # denomination of 1
 >>> coin2 = coins[1][0] # denomination of 2
+>>> walletB.coins = [coin1, coin2]
 >>> walletB.transferTokens(t,'myaccount',[],[coin1, coin2],type='redeem')
 Client <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
 Server <Message('HANDSHAKE_ACCEPT',None)>
@@ -56,7 +57,8 @@ Test the coin spend protocol.
 >>> t = ClientTest(walletB.listen,clientnick='walletA',servernick='walletB')
 >>> t2 = ClientTest(issuer.listen,clientnick='walletB',servernick='issuer')
 >>> walletB.issuer_transport = t2
->>> walletA.sendCoins(t,amount=1,target='a book',coins = [coin1])
+>>> walletA.coins=[coin1]
+>>> walletA.sendCoins(t,target='a book',coins = [coin1])
 walletA <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
 walletB <Message('HANDSHAKE_ACCEPT',None)>
 walletA <Message('SUM_ANNOUNCE',['...', '1', 'a book'])>
