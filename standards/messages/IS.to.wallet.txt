@@ -28,10 +28,10 @@ IS:
     Follow: Goodbye
             
   MINT_KEY_FAILURE  list(([denomination|#base64(key_identifier)], reason), ...)
-				Reasons:
-					Unknown denomination
-					Unknown key_identifier
-					Revoked key_identifier
+                Reasons:
+                    Unknown denomination
+                    Unknown key_identifier
+                    Revoked key_identifier
     Prior:  MINT_KEY_FETCH_DENOMINATION
             MINT_KEY_FETCH_KEYID
     Follow: Goodbye
@@ -47,10 +47,10 @@ Wallet:
                             list((#base64(key_identifier), list(blind,...)),...)
                             list(token,...)
                             list(('type', type), (option, value),...)
-				Types:
-					'redeem'
-					'exchange'
-					'mint'
+                Types:
+                    'redeem'
+                    'exchange'
+                    'mint'
     Prior:  Hello
     Follow: TRANSFER_TOKEN_REJECT
             TRANSFER_TOKEN_ACCEPT
@@ -67,43 +67,43 @@ IS:
                             type
                             reason
                             list(reason-detail)|list()
-				Types:
-					'Generic'
-					'Option'
-					'Target'
-					'Token'
-					'Blind'
-				Reasons:
-					Generic:
-						'Rejected'
-					Option:
-						'Rejected'
-						'Unknown option'
-						'Incorrect type'
-						'See detail':
-							'None'
-							All options of Reason, except 'See detail'
-					Target:
-						'Rejected'
-						'IS-Reject' + Issuer specific rejection string
-					Token:
-						'Rejected'
-						'Invalid key_identifier'
-						'Revoked key'
-						'Invalid token'
-						'See detail':
-							'None'
-							All options of Reason, except 'See detail'
-					Blind:
-						'Rejected'
-						'Invalid key_identifier'
-						'Key too soon'
-						'Key expired'
-						'Revoked key'
-						'Unable to sign'
-						'See detail':
-							'None'
-							All options of Reason, except 'See detail'
+                Types:
+                    'Generic'
+                    'Option'
+                    'Target'
+                    'Token'
+                    'Blind'
+                Reasons:
+                    Generic:
+                        'Rejected'
+                    Option:
+                        'Rejected'
+                        'Unknown option'
+                        'Incorrect type'
+                        'See detail':
+                            'None'
+                            All options of Reason, except 'See detail'
+                    Target:
+                        'Rejected'
+                        'IS-Reject' + Issuer specific rejection string
+                    Token:
+                        'Rejected'
+                        'Invalid key_identifier'
+                        'Revoked key'
+                        'Invalid token'
+                        'See detail':
+                            'None'
+                            All options of Reason, except 'See detail'
+                    Blind:
+                        'Rejected'
+                        'Invalid key_identifier'
+                        'Key too soon'
+                        'Key expired'
+                        'Revoked key'
+                        'Unable to sign'
+                        'See detail':
+                            'None'
+                            All options of Reason, except 'See detail'
     Prior:  TRANSFER_TOKEN_REQUEST
             TRANSFER_TOKEN_RESUME
     Follow: Goodbye
@@ -115,10 +115,8 @@ IS:
     Follow: Goodbye
     
   TRANSFER_TOKEN_DELAY  #base64(transaction_id) "Message"
-                        Messages:
-                            **Haven't done this yet**
+                    Messages:
+                        **Haven't done this yet**
     Prior:  TRANSFER_TOKEN_REQUEST
             TRANSFER_TOKEN_RESUME
     Follow: Goodbye
-
-
