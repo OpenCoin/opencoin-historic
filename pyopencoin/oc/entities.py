@@ -183,6 +183,10 @@ class Wallet(Entity):
 
         del self.waitingTransfers[transaction_id]
 
+class UnableToDoError(Exception):
+    pass
+
+
 #################### Issuer ###############################
 
 class Issuer(Entity):
