@@ -73,53 +73,165 @@ class Wallet(Entity):
         ...     def write(self, info): print sum(self.protocol.coins) # Steal the values 
         
         >>> wallet = Wallet()
+        >>> test = lambda x: wallet.sendCoins(transport(), '', x)
 
         >>> from tests import coins
 
+        Okay. Do some simple checks to make sure things work at all
+        
         >>> wallet.coins = [coins[0][0]]
-        >>> wallet.sendCoins(transport(), '', 1)
+        >>> test(1)
         1
 
         >>> wallet.coins = [coins[0][0], coins[2][0]]
-        >>> wallet.sendCoins(transport(), '', 6)
+        >>> test(6)
         6
+
+        >>> wallet.coins = [coins[2][0], coins[0][0]]
+        >>> test(6)
+        6
+
+        Okay. Now we'll do some more advanced tests of the system. We start off with
+        a specifically selected group of coins:
+        3 coins of denomination 2
+        1 coin of denomination 5
+        1 coin of denomination 10
+        >>> test_coins = [coins[1][0], coins[1][1], coins[1][2], coins[2][0], coins[3][0]]
+        
+        >>> test_coins[0].denomination == test_coins[1].denomination == test_coins[2].denomination
+        True
+        >>> test_coins[0].denomination
+        2
+        >>> test_coins[3].denomination
+        5
+        >>> test_coins[4].denomination
+        10
+        >>> sum(test_coins)
+        21
+
+        Now, this group of coins has some specific properties. There are only certain ways to
+        get certain values of coins. We'll be testing 6, 11, 15, 16, 19, and 21
+
+        6 = 2 + 2 + 2
+        >>> wallet.coins = test_coins
+        >>> sum(wallet.coins)
+        21
+        >>> test(6)
+        6
+
+        11 = 5 + 2 + 2 + 2
+        >>> wallet.coins = test_coins
+        >>> test(11)
+        11
+
+        15 = 10 + 5
+        >>> wallet.coins = test_coins
+        >>> test(15)
+        15
+
+        16 = 10 + 2 + 2 + 2
+        >>> wallet.coins = test_coins
+        >>> test(16)
+        16
+
+        19 = 10 + 5 + 2 + 2
+        >>> wallet.coins = test_coins
+        >>> test(19)
+        19
+
+        21 = 10 + 5 + 2 + 2 + 2
+        >>> wallet.coins = [coins[1][0], coins[1][1], coins[1][2], coins[2][0], coins[3][0]]
+        >>> test(21)
+        21
 
         """
         if sum(self.coins) < amount:
             raise UnableToDoError('Not enough tokens')
 
-        touse = []
-
-        denominations = {}
+        denominations = {} # A dictionary of coins by denomination
+        denomination_list = [] # A list of the denomination of every coin
         for coin in self.coins:
             denominations.setdefault(coin.denomination, [])
             denominations[coin.denomination].append(coin)
+            denomination_list.append(coin.denomination)
+            
 
         #FIXME: If we go to string/fraction amount, the sort will have to be changed
         mysort = lambda x, y: int(x).__cmp__(int(y))
-        denomination_list = denominations.keys()
         denomination_list.sort(mysort, reverse=True) # sort from high to low
 
-        for denomination in denomination_list:
-            while denomination <= amount:
-                if not denominations[denomination]: # no coins to use
-                    break # go to next coin
-                touse.append(denominations[denomination].pop())
-                amount = amount - denomination
+        def another_split(piece_list, amount):
+            # piece list is full of pieces we can use
+            # others is full of pieces we can't use, but don't want to forget about yet
+            # use is full of pieces we are using right now
+            piece_list = piece_list[:] # Don't trash the real list
+            others = []
+            use = []
 
-        if amount != 0: # we didn't have enough
+            while piece_list or others or use:
+                if sum(use) == amount:
+                    return use
+
+                if sum(use) > amount:
+                    # What we want to do here is take the last piece off of use.
+                    # We put it in others
+                    # If there are no more pieces in use, we instead trash the piece
+                    # and continue on
+                    piece = use[-1] # the last piece
+                    use.remove(piece)
+
+                    if not use:
+                        # to save time, remove all of them:
+                        #while piece in others:
+                        #    others.remove(piece)
+                        #while piece in piece_list:
+                        #    piece_list.remove(piece)
+
+                        # combine others and use
+                        others.extend(piece_list)
+                        piece_list, others = others, [] # This conserves order
+
+                    else: # just add it to others
+                        others.append(piece)
+
+                else: # sum < amount
+                    if piece_list:
+                        use.append(piece_list[0])
+                        del piece_list[0]
+                    else:
+                        # Ran out of pieces. Move others to piece_list. Move the last use to others
+                        if not use: # If we are out of pieces entirely
+                            return []
+                        piece = use[-1]
+                        del use[-1]
+                        
+                        piece_list = others
+                        
+                        others = [piece]
+
+            return []
+
+        denominations_to_use = another_split(denomination_list, amount)
+
+        if not denominations_to_use:
             raise UnableToDoError('Not enough tokens')
-        
-        for coin in touse: # Remove the coins to prevent accidental double spending
+
+        to_use = []
+        for denomination in denominations_to_use:
+            to_use.append(denominations[denomination].pop()) # Make sure we remove the coins from denominations!
+
+        for coin in to_use: # Remove the coins to prevent accidental double spending
             self.coins.remove(coin)
 
-        protocol = protocols.CoinSpendSender(touse,target)
+        protocol = protocols.CoinSpendSender(to_use,target)
         transport.setProtocol(protocol)
         transport.start()
         protocol.newMessage(Message(None))
 
         if protocol.state != protocol.finish:
-            self.coins.extend(touse)
+            # If we didn't succeed, re-add the coins to the wallet.
+            # Of course, we may need to remint, so FIXME: look at this
+            self.coins.extend(to_use)
 
     def listen(self,transport):
         """
