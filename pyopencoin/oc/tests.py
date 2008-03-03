@@ -199,6 +199,22 @@ def addSignature(cont, hash_alg, sign_alg, signing_key, keyprint):
     return cont
 
 def makeMintKeys():
+    """makes MintKeys of denomination 1, 2, and 5.
+    >>> import base64
+    >>> mintkey1, mintkey2, mintkey5, mintkey10 = makeMintKeys()
+    
+    >>> base64.b64encode(mintkey1.signature.signature)
+    'l6viHZFCZSlYVRVXrawzb7MYPmgVbkuCbjot5giOiGWJ7PuiTUOFd5O/CTf5QRX6snrzQhLqImQ414Z2vNChcVBBu1zIslQ9Pxti1WW9EA0Z8akeQoWG11S4eqbwvbBHStO1uB6vGQAkR9g1zJvS+NG3vzF/vYnADtD5CQ4bpvg='
+
+    >>> base64.b64encode(mintkey2.signature.signature)
+    'iVcVpYvER6702tkYvqqdiOuugMKqhHAwln1jDLTk1sGyZPr0y5b1V/qqgYpJUBayZM/hRtWlN4NxiRQbISjU1ZGAZTmARYfU+MigCXbATZXaS1GjZjx2/gIZnTFHF9T6N6elTKTmqQdV0ZExjWZmHDmco0alwOKK9n+ta5o7pvs='
+    
+    >>> base64.b64encode(mintkey5.signature.signature)
+    'IJmSiWPoNOt+kMZle3Z/4Fex17l4D8Hq1tr1l01MCGWHS1+6syOxIIJ2giSQmPQlZRrTwRrbUOEblGs9K0G+e4OlbzB5CywDo6z9FDWSSnXqlEEEt4tYzzsAjqvhjPq3/i182J5sucb70ea+vrIj7Kll5V9JYAxMocgd16dXwDc='
+    
+    >>> base64.b64encode(mintkey10.signature.signature)
+    'nx5Jthxo4QMPTmyEui/TVyKyDxjCnhhJLeAbgYyl5tkk+VNNzdkBd7Ry/wCv5ijs8lSUTkPaQt/d3AVHlMxSTF93/5y1/vl47hFpAyclXlMkqagGuGrFSsnQYYqEnhnCcaAl6i9rBGcrQh4YYFA3fIVkkVa/fL2aIYpPpoMvKcg='
+    """
     from containers import MintKey
     import copy
     from calendar import timegm
@@ -207,75 +223,108 @@ def makeMintKeys():
     sign_alg = CDD.issuer_cipher_suite.signing
     blind_alg = CDD.issuer_cipher_suite.blinding
                                                   
+    def makeMintKey(denomination, public, private):
+        mintKey = MintKey(key_identifier=public.key_id(hash_alg),
+                          currency_identifier='http://opencent.net/OpenCent',
+                          denomination=denomination,
+                          not_before=timegm((2008,1,1,0,0,0)),
+                          key_not_after=timegm((2008,2,1,0,0,0)),
+                          coin_not_after=timegm((2008,4,1,0,0,0)),
+                          public_key=public)
+        addSignature(mintKey, hash_alg, sign_alg, CDD_private, CDD.signature.keyprint)
+
+        return mintKey
+
     private0 = keys512[0]
     public0 = private0.newPublicKeyPair()
-                                                  
-    mintKey0 = MintKey(key_identifier=public0.key_id(hash_alg),
-                      currency_identifier='http://opencent.net/OpenCent',
-                      denomination=1,
-                      not_before=timegm((2008,1,1,0,0,0)),
-                      key_not_after=timegm((2008,2,1,0,0,0)),
-                      coin_not_after=timegm((2008,4,1,0,0,0)),
-                      public_key=public0)
-    mintKey0 = addSignature(mintKey0, hash_alg, sign_alg, CDD_private, CDD.signature.keyprint) 
+    mintKey0 = makeMintKey(1, public0, private0)
 
     private1 = keys512[1]
     public1 = private1.newPublicKeyPair()
-                                                  
-    mintKey1 = MintKey(key_identifier=public1.key_id(hash_alg),
-                      currency_identifier='http://opencent.net/OpenCent',
-                      denomination=2,
-                      not_before=timegm((2008,1,1,0,0,0)),
-                      key_not_after=timegm((2008,2,1,0,0,0)),
-                      coin_not_after=timegm((2008,4,1,0,0,0)),
-                      public_key=public1)
-    mintKey1 = addSignature(mintKey1, hash_alg, sign_alg, CDD_private, CDD.signature.keyprint) 
+    mintKey1 = makeMintKey(2, public1, private1)
 
-    return (mintKey0, mintKey1)
+    private2 = keys512[2]
+    public2 = private2.newPublicKeyPair()
+    mintKey2 = makeMintKey(5, public2, private2)  
+
+    private3 = keys512[3]
+    public3 = private3.newPublicKeyPair()
+    mintKey3 = makeMintKey(10, public3, private3)  
+
+    return (mintKey0, mintKey1, mintKey2, mintKey3)
 
 mintKeys = makeMintKeys()
 
 def makeCoins():
+    """makes coins for testing
+    >>> coins = makeCoins()
+
+    >>> coins[0][0].validate_with_CDD_and_MintKey(CDD, mintKeys[0])
+    True
+    >>> coins[0][1].validate_with_CDD_and_MintKey(CDD, mintKeys[0])
+    True
+
+    >>> coins[1][0].validate_with_CDD_and_MintKey(CDD, mintKeys[1])
+    True
+    >>> coins[1][1].validate_with_CDD_and_MintKey(CDD, mintKeys[1])
+    True
+    >>> coins[1][2].validate_with_CDD_and_MintKey(CDD, mintKeys[1])
+    True
+    >>> coins[1][3].validate_with_CDD_and_MintKey(CDD, mintKeys[1])
+    True
+    >>> coins[1][4].validate_with_CDD_and_MintKey(CDD, mintKeys[1])
+    True
+
+    >>> coins[2][0].validate_with_CDD_and_MintKey(CDD, mintKeys[2])
+    True
+    >>> coins[2][1].validate_with_CDD_and_MintKey(CDD, mintKeys[2])
+    True
+    
+    >>> coins[3][0].validate_with_CDD_and_MintKey(CDD, mintKeys[3])
+    True
+    """ 
     from containers import CurrencyCoin
 
     hash_alg = CDD.issuer_cipher_suite.hashing
     sign_alg = CDD.issuer_cipher_suite.signing
-                                                  
+    
+    def makeCoin(serial, private_key, mint_key):
+        coin = CurrencyCoin(standard_identifier=CDD.standard_version,
+                            currency_identifier=CDD.currency_identifier,
+                            denomination=mint_key.denomination,
+                            key_identifier=mint_key.key_identifier,
+                            serial=serial)
+        coin.signature = sign_alg(private_key).sign(hash_alg(coin.content_part()).digest())
+        return coin
+     
     private0 = keys512[0]
     mintKey0 = mintKeys[0]
     
-    coin0_0 = CurrencyCoin(standard_identifier=CDD.standard_version,
-                           currency_identifier=CDD.currency_identifier,
-                           denomination=1,
-                           key_identifier=mintKey0.key_identifier,
-                           serial='abcdefghijklmnopqrstuvwxyz')
-    coin0_0.signature = sign_alg(private0).sign(hash_alg(coin0_0.content_part()).digest())
-    if not coin0_0.validate_with_CDD_and_MintKey(CDD, mintKey0):
-        raise Exception
-
-    coin0_1 = CurrencyCoin(standard_identifier=CDD.standard_version,
-                           currency_identifier=CDD.currency_identifier,
-                           denomination=1,
-                           key_identifier=mintKey0.key_identifier,
-                           serial='xxxxxxxxxxxxxxxxxxxxxxxxxx')
-    coin0_1.signature = sign_alg(private0).sign(hash_alg(coin0_1.content_part()).digest())
-    if not coin0_1.validate_with_CDD_and_MintKey(CDD, mintKey0):
-        raise Exception
+    coin0 = (makeCoin('abcdefghijklmnopqrstuvwxyz', private0, mintKey0),
+             makeCoin('xxxxxxxxxxxxxxxxxxxxxxxxxx', private0, mintKey0))
 
     private1 = keys512[1]
     mintKey1 = mintKeys[1]
 
-    coin1_0 = CurrencyCoin(standard_identifier=CDD.standard_version,
-                           currency_identifier=CDD.currency_identifier,
-                           denomination=2,
-                           key_identifier=mintKey1.key_identifier,
-                           serial='abcdefghijklmnopqrstuvwxyz')
-    coin1_0.signature = sign_alg(private1).sign(hash_alg(coin1_0.content_part()).digest())
-    if not coin1_0.validate_with_CDD_and_MintKey(CDD, mintKey1):
-        raise Exception
+    coin1 = (makeCoin('abcdefghijklmnopqrstuvwxyz', private1, mintKey1),
+             makeCoin('aaaaaaaaaaaaaaaaaaaaaaaaaa', private1, mintKey1),
+             makeCoin('bbbbbbbbbbbbbbbbbbbbbbbbbb', private1, mintKey1),
+             makeCoin('cccccccccccccccccccccccccc', private1, mintKey1),
+             makeCoin('dddddddddddddddddddddddddd', private1, mintKey1))
 
+    private2 = keys512[2]
+    mintKey2 = mintKeys[2]
 
-    return ((coin0_0, coin0_1), (coin1_0,))
+    coin2 = (makeCoin('abcdefghijklmnopqrstuvwxyz', private2, mintKey2),
+             makeCoin('xxxxxxxxxxxxxxxxxxxxxxxxxx', private2, mintKey2),
+             makeCoin('aaaaaaaaaaaaaaaaaaaaaaaaaa', private2, mintKey2))
+    
+    private3 = keys512[3]
+    mintKey3 = mintKeys[3]
+
+    coin3 = (makeCoin('abcdefghijklmnopqrstuvwxyz', private3, mintKey3),)
+
+    return (coin0, coin1, coin2, coin3)
 
 coins = makeCoins()
 
@@ -285,11 +334,13 @@ is_private_key = CDD_private
 CDD = CDD
 mint_private_key1 = keys512[0]
 mint_private_key2 = keys512[1]
+mint_private_key3 = keys512[2]
 mint_key1 = mintKeys[0]
 mint_key2 = mintKeys[1]
+mint_key3 = mintKeys[2] #denomination of 5
 coinA = coins[0][0] # mint_key1
 coinB = coins[0][1] # mint_key1
-coinC = coins[1][0]  # mint_key2
+coinC = coins[1][0] # mint_key2
 
 
 #entities

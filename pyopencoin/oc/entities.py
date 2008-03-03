@@ -140,6 +140,7 @@ class Wallet(Entity):
             raise NotImplementedError()
                 
     def handleIncomingCoins(self,coins,action,reason):
+        # FIXME: What are action and reason for?
         transport = self.getIssuerTransport()
         if 1: #redeem
             self.otherCoins.extend(coins) # Deposit them
@@ -464,7 +465,7 @@ class DSDB:
                 elif lock[0] == 'Locked':
                     # XXX: This implements lazy unlocking. Possible DoS attack vector
                     # Active unlocking would remove the if statement
-                    if lock[1] >= self.getTime(): # FIXME: This statement passes tests but is wrong. 
+                    if lock[1] > self.getTime(): # If the lock hasn't expired 
                         tokens = []
                         reason = 'Token locked'
                         break
@@ -595,7 +596,7 @@ class Mint:
         except KeyError, reason:
             raise MintError("KeyError: %s" % reason)
         
-        if mintKey.verify_time(self.getTime())[0]:
+        if mintKey.verify_time(self.getTime())[0]: # if can_sign
             signature = signer.sign(blind)
             return signature
         else:
