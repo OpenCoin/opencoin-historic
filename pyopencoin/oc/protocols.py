@@ -204,7 +204,7 @@ class CoinSpendRecipient(Protocol):
             transaction_id,coins,target  = message.data
             try:
                 coins = [containers.CurrencyCoin().fromPython(c) for c in coins]
-            except:
+            except Exception:
                 return Message('PROTOCOL_ERROR', 'send again')
             
             if transaction_id != self.transaction_id:
@@ -386,7 +386,7 @@ class TransferTokenRecipient(Protocol):
             #check if coins are 'well-formed'
             try:
                 coins = [containers.CurrencyCoin().fromPython(c) for c in coins]
-            except:
+            except Exception:
                 return Message('PROTOCOL_ERROR', 'send again')
 
             #check if they are valid

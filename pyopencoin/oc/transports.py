@@ -67,7 +67,7 @@ class SocketServerTransport(Transport):
             except Exception, e:
                 try:
                     self.write(Message('WrongFormat',str(e)))
-                except:
+                except Exception:
                     pass
         self.conn.close()
 

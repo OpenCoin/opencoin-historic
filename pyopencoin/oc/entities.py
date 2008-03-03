@@ -53,7 +53,38 @@ class Wallet(Entity):
         transport.start()
 
     def sendCoins(self,transport,target,amount=None):
-        """sendCoins sends coins over a transport to a target of a certain amount."""
+        """sendCoins sends coins over a transport to a target of a certain amount.
+        
+        We need to be careful to try every possible working combination of coins to
+        to an amount. To test, we muck in the internals of the coin sending to make
+        sure that we get the right coins. (Note: This would be easier if we just
+        had a function to get the coins for an amount.)
+
+        To test the functionality we steal the transport, and when a message occurs,
+        we steal the tokens directly out of the protocol. This is highly dependant
+        on the internal details of CoinSpendSender and the transport/protocol
+        relationship.
+
+        >>> class transport:
+        ...     def setProtocol(self, protocol): 
+        ...         protocol.transport = self
+        ...         self.protocol = protocol
+        ...     def start(self): pass
+        ...     def write(self, info): print sum(self.protocol.coins) # Steal the values 
+        
+        >>> wallet = Wallet()
+
+        >>> from tests import coins
+
+        >>> wallet.coins = [coins[0][0]]
+        >>> wallet.sendCoins(transport(), '', 1)
+        1
+
+        >>> wallet.coins = [coins[0][0], coins[2][0]]
+        >>> wallet.sendCoins(transport(), '', 6)
+        6
+
+        """
         if sum(self.coins) < amount:
             raise UnableToDoError('Not enough tokens')
 
@@ -70,7 +101,7 @@ class Wallet(Entity):
         denomination_list.sort(mysort, reverse=True) # sort from high to low
 
         for denomination in denomination_list:
-            while denomination >= amount:
+            while denomination <= amount:
                 if not denominations[denomination]: # no coins to use
                     break # go to next coin
                 touse.append(denominations[denomination].pop())

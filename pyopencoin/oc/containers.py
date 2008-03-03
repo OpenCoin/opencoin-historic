@@ -564,7 +564,7 @@ class CurrencyBase(Container):
     def getValue(self):
         try:
             return int(self.denomination)
-        except:
+        except Exception:
             pass  
 
     def sameCurrency(self, other):
