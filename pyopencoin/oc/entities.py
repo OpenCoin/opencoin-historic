@@ -158,6 +158,18 @@ class Wallet(Entity):
         Traceback (most recent call last):
         UnableToDoError: Not enough tokens
 
+        Okay. Now we want to make sure we don't lose coins if there is an exception
+        that occurs.
+
+        >>> test = lambda x: wallet.sendCoins('foo', '', x)
+        >>> wallet.coins = test_coins
+        >>> test(21)
+        Traceback (most recent call last):
+        AttributeError: 'str' object has no attribute ...
+
+        >>> wallet.coins == test_coins
+        True
+
         """
         if sum(self.coins) < amount:
             raise UnableToDoError('Not enough tokens')
@@ -199,6 +211,9 @@ class Wallet(Entity):
             # if we are here, we don't have a set of coins that works
             return []
 
+        if sum(denomination_list) != sum(self.coins):
+            raise Exception('denomination_list and self.coins differ!')
+
         denominations_to_use = my_split(denomination_list, amount)
 
         if not denominations_to_use:
@@ -211,10 +226,15 @@ class Wallet(Entity):
         for coin in to_use: # Remove the coins to prevent accidental double spending
             self.coins.remove(coin)
 
-        protocol = protocols.CoinSpendSender(to_use,target)
-        transport.setProtocol(protocol)
-        transport.start()
-        protocol.newMessage(Message(None))
+        try:
+            protocol = protocols.CoinSpendSender(to_use,target)
+            transport.setProtocol(protocol)
+            transport.start()
+            protocol.newMessage(Message(None))
+        except: # Catch everything. Losing coins is death. We re-raise anyways.
+            # If we had an error at the protocol or transport layer, make sure we don't lose the coins
+            self.coins.extend(to_use)
+            raise
 
         if protocol.state != protocol.finish:
             # If we didn't succeed, re-add the coins to the wallet.
