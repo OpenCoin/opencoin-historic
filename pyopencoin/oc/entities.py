@@ -144,6 +144,20 @@ class Wallet(Entity):
         >>> test(21)
         21
 
+        Okay. Some things we can't do.
+
+        8 = Impossible
+        >>> wallet.coins = test_coins
+        >>> test(8)
+        Traceback (most recent call last):
+        UnableToDoError: Not enough tokens
+
+        22 = Impossible
+        >>> wallet.coins = test_coins
+        >>> test(22)
+        Traceback (most recent call last):
+        UnableToDoError: Not enough tokens
+
         """
         if sum(self.coins) < amount:
             raise UnableToDoError('Not enough tokens')
@@ -160,58 +174,33 @@ class Wallet(Entity):
         mysort = lambda x, y: int(x).__cmp__(int(y))
         denomination_list.sort(mysort, reverse=True) # sort from high to low
 
-        def another_split(piece_list, amount):
-            # piece list is full of pieces we can use
-            # others is full of pieces we can't use, but don't want to forget about yet
-            # use is full of pieces we are using right now
-            piece_list = piece_list[:] # Don't trash the real list
-            others = []
-            use = []
+        def my_split(piece_list, sum):
 
-            while piece_list or others or use:
-                if sum(use) == amount:
-                    return use
+            #print piece_list, sum
+            # delete all coins greater than sum
+            my_list = [p for p in piece_list if p <= sum]
+            my_list.sort(reverse=True)
 
-                if sum(use) > amount:
-                    # What we want to do here is take the last piece off of use.
-                    # We put it in others
-                    # If there are no more pieces in use, we instead trash the piece
-                    # and continue on
-                    piece = use[-1] # the last piece
-                    use.remove(piece)
+            while not my_list == [] :
+                test_piece = my_list[0]
+                if test_piece == sum : 
+                    return [test_piece]
+                my_list.remove(test_piece)
+                test_partition = my_split(my_list, sum - test_piece)
 
-                    if not use:
-                        # to save time, remove all of them:
-                        #while piece in others:
-                        #    others.remove(piece)
-                        #while piece in piece_list:
-                        #    piece_list.remove(piece)
+                if test_partition == [] :
+                    #print "AIIH"
+                    # damned, partitioning the rest failed, so remove all pieces of this size
+                    my_list = [p for p in my_list if p < test_piece]
+                else :
+                    #print "test_partition: ", test_partition
+                    test_partition.append(test_piece)
+                    return test_partition
 
-                        # combine others and use
-                        others.extend(piece_list)
-                        piece_list, others = others, [] # This conserves order
-
-                    else: # just add it to others
-                        others.append(piece)
-
-                else: # sum < amount
-                    if piece_list:
-                        use.append(piece_list[0])
-                        del piece_list[0]
-                    else:
-                        # Ran out of pieces. Move others to piece_list. Move the last use to others
-                        if not use: # If we are out of pieces entirely
-                            return []
-                        piece = use[-1]
-                        del use[-1]
-                        
-                        piece_list = others
-                        
-                        others = [piece]
-
+            # if we are here, we're toasted:
             return []
 
-        denominations_to_use = another_split(denomination_list, amount)
+        denominations_to_use = my_split(denomination_list, amount)
 
         if not denominations_to_use:
             raise UnableToDoError('Not enough tokens')

@@ -298,13 +298,13 @@ def makeCoins():
         return coin
      
     private0 = keys512[0]
-    mintKey0 = mintKeys[0]
+    mintKey0 = mintKeys[0] # Denomination of 1
     
     coin0 = (makeCoin('abcdefghijklmnopqrstuvwxyz', private0, mintKey0),
              makeCoin('xxxxxxxxxxxxxxxxxxxxxxxxxx', private0, mintKey0))
 
     private1 = keys512[1]
-    mintKey1 = mintKeys[1]
+    mintKey1 = mintKeys[1] # Denomination of 2
 
     coin1 = (makeCoin('abcdefghijklmnopqrstuvwxyz', private1, mintKey1),
              makeCoin('aaaaaaaaaaaaaaaaaaaaaaaaaa', private1, mintKey1),
@@ -313,14 +313,14 @@ def makeCoins():
              makeCoin('dddddddddddddddddddddddddd', private1, mintKey1))
 
     private2 = keys512[2]
-    mintKey2 = mintKeys[2]
+    mintKey2 = mintKeys[2] # Denomination of 5
 
     coin2 = (makeCoin('abcdefghijklmnopqrstuvwxyz', private2, mintKey2),
              makeCoin('xxxxxxxxxxxxxxxxxxxxxxxxxx', private2, mintKey2),
              makeCoin('aaaaaaaaaaaaaaaaaaaaaaaaaa', private2, mintKey2))
     
     private3 = keys512[3]
-    mintKey3 = mintKeys[3]
+    mintKey3 = mintKeys[3] # Denomination of 10
 
     coin3 = (makeCoin('abcdefghijklmnopqrstuvwxyz', private3, mintKey3),)
 
