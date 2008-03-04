@@ -50,6 +50,29 @@ Client <Message('GOODBYE',None)>
 Server <Message('GOODBYE',None)>
 Client <Message('finished',None)>
 
+Test the transfer token protocol with an exchange
+>>> issuer = makeIssuer()
+>>> t = ClientTest(issuer.listen)
+>>> coin1 = coins[0][0] # denomination of 1
+>>> coin2 = coins[1][0] # denomination of 2
+>>> walletB.coins = [coin1, coin2]
+>>> blank1 = makeBlank(mintKeys[0], serial='abcdefghijklmnopqrstuvwxyz', blind_factor='a'*26)
+>>> blank2 = makeBlank(mintKeys[0], serial='aaaaaaaaaaaaaaaaaaaaaaaaaa', blind_factor='b'*26)
+>>> blank3 = makeBlank(mintKeys[0], serial='bbbbbbbbbbbbbbbbbbbbbbbbbb', blind_factor='c'*26)
+>>> blanks = [blank1, blank2, blank3]
+>>> import base64
+>>> blinds = [[mintKeys[0].encodeField('key_identifier'), [base64.b64encode(b.blind_blank(CDD, mintKeys[0])) for b in blanks]]]
+
+#FIXME: This causes infinite recursion
+#>>> walletB.transferTokens(t, '', blinds, [coin1, coin2], type='exchange')
+Client <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
+Server <Message('HANDSHAKE_ACCEPT',None)>
+Client <Message('TRANSFER_TOKEN_REQUEST',['...', 'myaccount', [['...', ['...', '...', '...']]], [[(...)], [(...)]], [['type', 'redeem']]])>
+Server <Message('TRANSFER_TOKEN_ACCEPT',['...', [['...', ['...', '...', '...']]]])>
+Client <Message('GOODBYE',None)>
+Server <Message('GOODBYE',None)>
+Client <Message('finished',None)>
+
 
 Test the coin spend protocol.
 
@@ -329,6 +352,21 @@ def makeCoins():
 
 coins = makeCoins()
 
+def makeBlank(mintKey, serial=None, blind_factor=None):
+    from containers import CurrencyBlank
+    blank = CurrencyBlank(standard_identifier=CDD.standard_identifier,
+                          currency_identifier=CDD.currency_identifier,
+                          denomination=mintKey.denomination,
+                          serial=serial,
+                          key_identifier=mintKey.key_identifier)
+    if not serial:
+        blank.generateSerial()
+
+    if blind_factor:
+        blank.original_blind_blank = blank.blind_blank
+        blank.blind_blank = lambda cdd, mintKey: blank.original_blind_blank(cdd, mintKey, blind_factor)
+
+    return blank
 
 #summary of containers
 is_private_key = CDD_private
@@ -352,8 +390,8 @@ def makeIssuer():
     >>> issuer = makeIssuer()
     '''
     issuer = entities.Issuer()
-    issuer.signedKeys = {1:[mint_key1],
-                         2:[mint_key2]}
+    issuer.signedKeys = {'1':[mint_key1],
+                         '2':[mint_key2]}
     issuer.keyids = {mint_key1.key_identifier:mint_key1, 
                      mint_key2.key_identifier:mint_key2}
 

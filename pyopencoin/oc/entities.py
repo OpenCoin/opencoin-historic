@@ -742,6 +742,7 @@ class Mint:
         self.sign_algs[mintKey.key_identifier] = sign_alg
         
     def signNow(self, key_identifier, blind):
+        from crypto import CryptoError
         try:
             sign_alg = self.sign_algs[key_identifier]
             signing_key = self.privatekeys[key_identifier]
@@ -752,7 +753,10 @@ class Mint:
             raise MintError("KeyError: %s" % reason)
         
         if mintKey.verify_time(self.getTime())[0]: # if can_sign
-            signature = signer.sign(blind)
+            try:
+                signature = signer.sign(blind)
+            except CryptoError, reason:
+                raise MintError("CryptoError: %s" % reason)
             return signature
         else:
             raise MintError("MintKey not valid for minting")

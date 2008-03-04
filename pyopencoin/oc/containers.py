@@ -795,11 +795,11 @@ class CurrencyBlank(CurrencyBase):
         self.blind_factor = kwargs.get('blind_factor', None)
 
     def generateSerial(self): 
-        import crypto
+        from crypto import _r as Random
         if self.serial:
             raise Exception('Cannot generate a new serial when the serial is set.')
         
-        self.serial = crypto._r.getRandomString(128)
+        self.serial = Random.getRandomString(128)
 
     def blind_blank(self, cdd, mint_key, blind_factor=None):
         """Returns the blinded value of the hash of the coin for signing."""
