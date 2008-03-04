@@ -28,10 +28,9 @@ ToDo
    - licence of this document?
    - "Introduction"
    - replace "COIN_SPEND" with "TRANSFER_TOKEN"
-   - decide whether the protocol atoms are tokens or lists of tokens
    - throw out reduntant "TRANSFER_TOKEN" explanatoins
    - add authentication and authorization, at least for "target"
-     when mintig
+     when minting
    - add mandatory trusted channel (Bluetooth, TLS)
 
 
@@ -106,24 +105,7 @@ Table of Contents
 
   
   Questions:
-  * CDD? (What does this question mean?)
-
-* issuer creates DSDB keypair (pD,sD)
-
-  {
-    key identifier   = base64(hash(pD))
-    not_before       = TIME(...)
-    not_after        = TIME(...)
-    cipher           = ENCRYPTION-ALG
-    public key       = base64(pD)
-
-    issuer           = base64(hash(pM))
-    signature        = base64(sig(sM, hash(content part)))
-
-    signer           = base64(hash(pM))
-    signature        = base64(sig(sM, hash(content part)))
-  }   
-
+  * CDD?
 
 * issuer fires up issuer service (=IS) at <opencoin://issuer.opencent.net:8002>
 
@@ -162,7 +144,7 @@ IS:
   Keep (r, blank, blind) in mind. 
   
 
-3.3.5 "TRANSFER_TOKEN": A generic wallet-issuer request
+t 3.3.5 "TRANSFER_TOKEN": A generic wallet-issuer request
 
 The atom for this transaction is a list of tokens - if one of the tokens /blanks
 fail, the whole transaction fails.
@@ -198,7 +180,7 @@ fail, the whole transaction fails.
   where "reason" may be some general failure like "500 minting not available".
   If the request is accepted with no delay, IS answers
 
-    TRANSFER_TOKEN_ACCEPT( transaction_id, message, list_of_singed_blinds)
+    TRANSFER_TOKEN_ACCEPT( transaction_id, message, list_of_signed_blinds)
 
   (with list_of_singed_blinds empty if no minting was required)
   If minting was requested and acccepted but postponed, IS answers
@@ -307,6 +289,7 @@ Note:
   
     A:      COIN_SPEND( transaction_id, list(token1, ...) )
 
+* The atom for a COIN_SPEND is the entire list of tokens
 
 * Wallet Bob checks if the sum of their values matches the announced sum, if 
   they are valid and (if the former tests do not fail) tries itself to spent

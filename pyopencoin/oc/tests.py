@@ -7,7 +7,7 @@
 >>> issuer.createKey(keylength=512)
 
 >>> CDD.toJson()
-'[["standard_version","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["short_currency_identifier","OC"],["issuer_service_location","opencoin://issuer.opencent.net:8002"],["denominations",[1,2,5,10,20,50,100,200,500,1000]],["issuer_cipher_suite",["RSASigningAlgorithm","RSABlindingAlgorithm","SHA256HashingAlgorithm"]],["issuer_public_master_key","sloGu4+P4rslyC4RiAJrZbG0Z90FwEV88eW1JnNv7BDU33+uIhi2G0f/XL+AoUwmF1VsdhQhzEtGNVjnlx0TViWgqvrYX6AqB1/R3zYP9+JnuIIyHiyS+Z+Y3uoB0sLMD+dvHcDRo7cbb+ZNAvlcPoQ4Hb3+tuxwBMmVkZMaOu8=,AQAB"],["signature",[["keyprint","hxz5pRwS+RFp88qQliXYm3R5uNighktwxqEh4RMOuuk="],["signature","fmgREXeLvrziaPMFa4/KNR9aNda4DZPO+6noROTlbNVX+7ht2Gp/58t6V5eO9HUD2yOWLmVvOlLfVIwmC8PJDefRhMC7ZYt/5tw9ydtiD/zBJzzHGPnK6akB1l2/bkBHEQPXm0PmTFfY5qH069CK0HxzCOj7O6uYFOUqg9slQek="]]]]'
+'[["standard_identifier","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["short_currency_identifier","OC"],["issuer_service_location","opencoin://issuer.opencent.net:8002"],["denominations",["1","2","5","10","20","50","100","200","500","1000"]],["issuer_cipher_suite",["RSASigningAlgorithm","RSABlindingAlgorithm","SHA256HashingAlgorithm"]],["options",[]],["issuer_public_master_key","sloGu4+P4rslyC4RiAJrZbG0Z90FwEV88eW1JnNv7BDU33+uIhi2G0f/XL+AoUwmF1VsdhQhzEtGNVjnlx0TViWgqvrYX6AqB1/R3zYP9+JnuIIyHiyS+Z+Y3uoB0sLMD+dvHcDRo7cbb+ZNAvlcPoQ4Hb3+tuxwBMmVkZMaOu8=,AQAB"],["signature",[["keyprint","hxz5pRwS+RFp88qQliXYm3R5uNighktwxqEh4RMOuuk="],["signature","fifLuwjQXpviAD6ruHXaW09HipPNmrX41n125Ku+AAplbNDMHs/+jCRQGwJ4yMyk0hNsX/Idqhm3ckebZAujync03mWMRA4pZEMLmYdkjLsOSdw7YoPFO2+Ah5GILnGB4WRm3L1q9yeaCCrjuoZO135vUV1ykUl7k2LBOKMxw4A="]]]]'
 
 Lets test without having any keys in the mint
 
@@ -102,12 +102,13 @@ def generateCDD():
     
     public_key = private_key.newPublicKeyPair()
 
-    cdd = containers.CDD(standard_version='http://opencoin.org/OpenCoinProtocol/1.0',
+    cdd = containers.CDD(standard_identifier='http://opencoin.org/OpenCoinProtocol/1.0',
                          currency_identifier = 'http://opencent.net/OpenCent',
                          short_currency_identifier = 'OC',
                          issuer_service_location = 'opencoin://issuer.opencent.net:8002',
-                         denominations = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000],
+                         denominations = ['1', '2', '5', '10', '20', '50', '100', '200', '500', '1000'],
                          issuer_cipher_suite = ics,
+                         options = [],
                          issuer_public_master_key = public_key)
 
     signature = containers.Signature(keyprint=ics.hashing(str(public_key)).digest(),
@@ -204,16 +205,16 @@ def makeMintKeys():
     >>> mintkey1, mintkey2, mintkey5, mintkey10 = makeMintKeys()
     
     >>> base64.b64encode(mintkey1.signature.signature)
-    'l6viHZFCZSlYVRVXrawzb7MYPmgVbkuCbjot5giOiGWJ7PuiTUOFd5O/CTf5QRX6snrzQhLqImQ414Z2vNChcVBBu1zIslQ9Pxti1WW9EA0Z8akeQoWG11S4eqbwvbBHStO1uB6vGQAkR9g1zJvS+NG3vzF/vYnADtD5CQ4bpvg='
+    'YaVpcSavYfEwKuoaR3PPsSMBD3c2bMSP4iHdHAUKqmOFrb5qgrNPhLwPNAeSZe6qoLB09bIFVFFW46Xv+FzZ3WghmlRmtKD+LFV9+2xu/jXAjwi+VqSFwjLjttbxSbeYWce6IiWKlklHBBZ2zwXY5CP2QqZ6Zt5i0HE6fEM8KRU='
 
     >>> base64.b64encode(mintkey2.signature.signature)
-    'iVcVpYvER6702tkYvqqdiOuugMKqhHAwln1jDLTk1sGyZPr0y5b1V/qqgYpJUBayZM/hRtWlN4NxiRQbISjU1ZGAZTmARYfU+MigCXbATZXaS1GjZjx2/gIZnTFHF9T6N6elTKTmqQdV0ZExjWZmHDmco0alwOKK9n+ta5o7pvs='
+    'Es5my5lRwFVYx49EVMJwZPgoXC00QBFCvS0H0MRC+rxCufY+s59ivai20+aTjq+cO5hslEIE4L3ne0bMpNliG2d4XP9fuLCggGbtzrCLEAt6GLS9xEzIsk0EbGAxLxceL28zJTJHQqZm1pRKHbH0Gv5pxZmMx3AmGB80uOCjdBU='
     
     >>> base64.b64encode(mintkey5.signature.signature)
-    'IJmSiWPoNOt+kMZle3Z/4Fex17l4D8Hq1tr1l01MCGWHS1+6syOxIIJ2giSQmPQlZRrTwRrbUOEblGs9K0G+e4OlbzB5CywDo6z9FDWSSnXqlEEEt4tYzzsAjqvhjPq3/i182J5sucb70ea+vrIj7Kll5V9JYAxMocgd16dXwDc='
+    'epNc+/Nq3lshowLTi4tue26m0ED62cue95vqvMSllDtV4cBZ23YCEDGD8aHmcJZ7bB12MCE/lAWO6aR4FQDfyc1U6LAbuOuuAERnZhaDc9ZKWvamn3uPvjV3722vje4P6Ic2sbJ+ch7NItrmdktnG4Vap88iIAPCnWl/zivZUWA='
     
     >>> base64.b64encode(mintkey10.signature.signature)
-    'nx5Jthxo4QMPTmyEui/TVyKyDxjCnhhJLeAbgYyl5tkk+VNNzdkBd7Ry/wCv5ijs8lSUTkPaQt/d3AVHlMxSTF93/5y1/vl47hFpAyclXlMkqagGuGrFSsnQYYqEnhnCcaAl6i9rBGcrQh4YYFA3fIVkkVa/fL2aIYpPpoMvKcg='
+    'EwgUD6dZVkIEw8ALyVAIkSQLqbfzdNEMD3cYIZZHZ3TuxoKtvT3RG9NnN+PhWKH956ehNmbyVVOLqmEABMIi+3CXLGhkO2YqVCW9619gAF5S/UaYRVE+ijWcAYbAWoBestRhirnBEEBvBcFRk1rQJx8IqEzBMyUk//UbvcneVog='
     """
     from containers import MintKey
     import copy
@@ -229,7 +230,7 @@ def makeMintKeys():
                           denomination=denomination,
                           not_before=timegm((2008,1,1,0,0,0)),
                           key_not_after=timegm((2008,2,1,0,0,0)),
-                          coin_not_after=timegm((2008,4,1,0,0,0)),
+                          token_not_after=timegm((2008,4,1,0,0,0)),
                           public_key=public)
         addSignature(mintKey, hash_alg, sign_alg, CDD_private, CDD.signature.keyprint)
 
@@ -237,19 +238,19 @@ def makeMintKeys():
 
     private0 = keys512[0]
     public0 = private0.newPublicKeyPair()
-    mintKey0 = makeMintKey(1, public0, private0)
+    mintKey0 = makeMintKey('1', public0, private0)
 
     private1 = keys512[1]
     public1 = private1.newPublicKeyPair()
-    mintKey1 = makeMintKey(2, public1, private1)
+    mintKey1 = makeMintKey('2', public1, private1)
 
     private2 = keys512[2]
     public2 = private2.newPublicKeyPair()
-    mintKey2 = makeMintKey(5, public2, private2)  
+    mintKey2 = makeMintKey('5', public2, private2)  
 
     private3 = keys512[3]
     public3 = private3.newPublicKeyPair()
-    mintKey3 = makeMintKey(10, public3, private3)  
+    mintKey3 = makeMintKey('10', public3, private3)  
 
     return (mintKey0, mintKey1, mintKey2, mintKey3)
 
@@ -289,7 +290,7 @@ def makeCoins():
     sign_alg = CDD.issuer_cipher_suite.signing
     
     def makeCoin(serial, private_key, mint_key):
-        coin = CurrencyCoin(standard_identifier=CDD.standard_version,
+        coin = CurrencyCoin(standard_identifier=CDD.standard_identifier,
                             currency_identifier=CDD.currency_identifier,
                             denomination=mint_key.denomination,
                             key_identifier=mint_key.key_identifier,

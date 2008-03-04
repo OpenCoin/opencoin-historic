@@ -351,7 +351,7 @@ class TransferTokenRecipient(Protocol):
 
     >>> ttr.state = ttr.start
     >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['1234', 'my account', blindslist, [], [['type', 'mint']]]))
-    <Message('TRANSFER_TOKEN_ACCEPT',['1234', [['sj17RxE1hfO06+oTgBs9Z7xLut/3NN+nHJbXSJYTks0=', ['jWUOkVfIulEvPjR4HfdxOtEF2vk3ss8vkKSL6aSd2w4Sj0vChSjtmiabkWdbxLTLth13dmigB0vBXDggjBzM7w==']], ['WbXTWO4M60oZ/LGY+sccKf5Oq6HxrjrY4qAxrBDXuek=', ['xBzoYV7W/2NuWdQQrwal7xFbky5D/m3D5Y9aTtuwZPirvK4gx7Po5+VrfGm04BuHo7kwnZ3ZGfUDIXIoILm2ng==']]]])>
+    <Message('TRANSFER_TOKEN_ACCEPT',['1234', [['sj17RxE1hfO06+oTgBs9Z7xLut/3NN+nHJbXSJYTks0=', ['Do0el3uxdyFMF8NdXtowBLBOxXM0r7xR9hXkaZWEhPUBQCe8yaYGO09wnxrWEVFlt0r9M6bCZxKtzNGDGw3/XQ==']], ['WbXTWO4M60oZ/LGY+sccKf5Oq6HxrjrY4qAxrBDXuek=', ['dTnL8yTkdelG9fW//ZoKzUl7LTjBXiElaHkfyMLgVetEM7pmEzfcdfRWhm2PP3IhnkZ8CmAR1uOJ99rJ+XBASA==']]]])>
 
     Now, check to make sure the implemenation is good
     >>> ttr.state = ttr.start

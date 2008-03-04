@@ -1,4 +1,6 @@
-import base64,json
+import base64
+import json
+import types
 
 class Container(object):
     r"""A generic container, handles serializing
@@ -257,17 +259,18 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
     ...                              blinding=crypto.RSABlindingAlgorithm,
     ...                              hashing=crypto.SHA256HashingAlgorithm)
     
-    >>> cdd = CDD(standard_version = 'http://opencoin.org/OpenCoinProtocol/1.0',
+    >>> cdd = CDD(standard_identifier = 'http://opencoin.org/OpenCoinProtocol/1.0',
     ...           currency_identifier = 'http://opencent.net/OpenCent', 
     ...           short_currency_identifier = 'OC', 
     ...           issuer_service_location = 'opencoin://issuer.opencent.net:8002', 
-    ...           denominations = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000], 
+    ...           denominations = ['1', '2', '5', '10', '20', '50', '100', '200', '500', '1000'], 
     ...           issuer_cipher_suite = ics, 
+    ...           options = [],
     ...           issuer_public_master_key = crypto.RSAKeyPair(e=17L,n=3233L))
 
     >>> j = cdd.content_part()
     >>> j
-    '[["standard_version","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["short_currency_identifier","OC"],["issuer_service_location","opencoin://issuer.opencent.net:8002"],["denominations",[1,2,5,10,20,50,100,200,500,1000]],["issuer_cipher_suite",["RSASigningAlgorithm","RSABlindingAlgorithm","SHA256HashingAlgorithm"]],["issuer_public_master_key","DKE=,EQ=="]]'
+    '[["standard_identifier","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["short_currency_identifier","OC"],["issuer_service_location","opencoin://issuer.opencent.net:8002"],["denominations",["1","2","5","10","20","50","100","200","500","1000"]],["issuer_cipher_suite",["RSASigningAlgorithm","RSABlindingAlgorithm","SHA256HashingAlgorithm"]],["options",[]],["issuer_public_master_key","DKE=,EQ=="]]'
  
     >>> cdd2 = CDD().fromJson(j)
     >>> cdd2 == cdd
@@ -277,7 +280,7 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
     >>> cdd2.signature = sig
 
     >>> cdd2.toJson()
-    '[["standard_version","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["short_currency_identifier","OC"],["issuer_service_location","opencoin://issuer.opencent.net:8002"],["denominations",[1,2,5,10,20,50,100,200,500,1000]],["issuer_cipher_suite",["RSASigningAlgorithm","RSABlindingAlgorithm","SHA256HashingAlgorithm"]],["issuer_public_master_key","DKE=,EQ=="],["signature",[["keyprint","XQ=="],["signature","Vg=="]]]]'
+    '[["standard_identifier","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["short_currency_identifier","OC"],["issuer_service_location","opencoin://issuer.opencent.net:8002"],["denominations",["1","2","5","10","20","50","100","200","500","1000"]],["issuer_cipher_suite",["RSASigningAlgorithm","RSABlindingAlgorithm","SHA256HashingAlgorithm"]],["options",[]],["issuer_public_master_key","DKE=,EQ=="],["signature",[["keyprint","XQ=="],["signature","Vg=="]]]]'
     
     
     And now, lets play with a really signed CDD
@@ -303,12 +306,13 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
 
     from crypto import encodeCryptoContainer, decodeCryptoContainer, decodeRSAKeyPair
     
-    fields = ['standard_version', 
+    fields = ['standard_identifier', 
               'currency_identifier', 
               'short_currency_identifier', 
               'issuer_service_location', 
               'denominations', 
               'issuer_cipher_suite', 
+              'options',
               'issuer_public_master_key']
 
     codecs = {'issuer_cipher_suite':{'encode':encodeCryptoContainer,'decode':decodeCryptoContainer},
@@ -347,10 +351,10 @@ class MintKey(ContainerWithSignature):
 
     >>> mintKey = MintKey(key_identifier=key_id,
     ...                   currency_identifier='http://opencent.net/OpenCent',
-    ...                   denomination=1,
+    ...                   denomination="1",
     ...                   not_before=timegm((2008,1,1,0,0,0)),
     ...                   key_not_after=timegm((2008,2,1,0,0,0)),
-    ...                   coin_not_after=timegm((2008,4,1,0,0,0)),
+    ...                   token_not_after=timegm((2008,4,1,0,0,0)),
     ...                   public_key=public)
                           
     >>> hash_alg = CDD.issuer_cipher_suite.hashing
@@ -368,7 +372,7 @@ class MintKey(ContainerWithSignature):
     True
 
     >>> mintKey.toJson()
-    '[["key_identifier","..."],["currency_identifier","http://opencent.net/OpenCent"],["denomination",1],["not_before","2008-01-01T00:00:00Z"],["key_not_after","2008-02-01T00:00:00Z"],["coin_not_after","2008-04-01T00:00:00Z"],["public_key","..."],["signature",[["keyprint","hxz5pRwS+RFp88qQliXYm3R5uNighktwxqEh4RMOuuk="],["signature","..."]]]]'
+    '[["key_identifier","..."],["currency_identifier","http://opencent.net/OpenCent"],["denomination","1"],["not_before","2008-01-01T00:00:00Z"],["key_not_after","2008-02-01T00:00:00Z"],["token_not_after","2008-04-01T00:00:00Z"],["public_key","..."],["signature",[["keyprint","hxz5pRwS+RFp88qQliXYm3R5uNighktwxqEh4RMOuuk="],["signature","..."]]]]'
 
     Well, we are going to test that verify_with_CDD works now. We've already
     built helper a helper function, addSignatureAndVerify. The reason
@@ -443,7 +447,7 @@ class MintKey(ContainerWithSignature):
               'denomination', 
               'not_before', 
               'key_not_after', 
-              'coin_not_after',
+              'token_not_after',
               'public_key']
 
     from crypto import decodeRSAKeyPair
@@ -452,11 +456,13 @@ class MintKey(ContainerWithSignature):
               'public_key':{'encode':str,'decode':decodeRSAKeyPair},
               'not_before':{'encode':encodeTime,'decode':decodeTime},
               'key_not_after':{'encode':encodeTime,'decode':decodeTime},
-              'coin_not_after':{'encode':encodeTime,'decode':decodeTime}}
+              'token_not_after':{'encode':encodeTime,'decode':decodeTime}}
 
     def __init__(self, **kwargs):
         ContainerWithSignature.__init__(self, **kwargs)
         self.keytype = kwargs.get('keytype', None)
+        if self.denomination and not isinstance(self.denomination, types.StringType):
+            raise Exception('Tried to set a denomination that was not a string')
 
     def verify_with_CDD(self, currency_description_document):
         """verify_with_CDD verifies the mint key against the CDD ensuring valid values 
@@ -490,7 +496,7 @@ class MintKey(ContainerWithSignature):
         """Whether the container is valid at time. Returns a tuple of (can_mint, can_redeem)."""
 
         can_mint = time >= self.not_before and time <= self.key_not_after
-        can_redeem = time >= self.not_before and time <= self.coin_not_after
+        can_redeem = time >= self.not_before and time <= self.token_not_after
 
         return (can_mint, can_redeem)
 
@@ -499,7 +505,7 @@ class CurrencyBase(Container):
     """The base class for the currency types.
     
     Test the adding of currencies
-    >>> b = CurrencyBase(standard_version = 'http://opencoin.org/OpenCoinProtocol/1.0',
+    >>> b = CurrencyBase(standard_identifier = 'http://opencoin.org/OpenCoinProtocol/1.0',
     ...                 currency_identifier = 'http://opencent.net/OpenCent',
     ...                 denomination = '1',
     ...                 key_identifier = 'keyid',
@@ -520,7 +526,7 @@ class CurrencyBase(Container):
     3
 
     Test proper encoding/decoding of key_identifier and serial
-    >>> b = CurrencyBase(standard_version = 'http://opencoin.org/OpenCoinProtocol/1.0',
+    >>> b = CurrencyBase(standard_identifier = 'http://opencoin.org/OpenCoinProtocol/1.0',
     ...                 currency_identifier = 'http://opencent.net/OpenCent',
     ...                 denomination = '1',
     ...                 key_identifier = 'a',
@@ -528,7 +534,7 @@ class CurrencyBase(Container):
 
     >>> j = b.toJson()
     >>> j
-    '[["standard_identifier",null],["currency_identifier","http://opencent.net/OpenCent"],["denomination","1"],["key_identifier","YQ=="],["serial","Yg=="]]'
+    '[["standard_identifier","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["denomination","1"],["key_identifier","YQ=="],["serial","Yg=="]]'
 
     >>> b == CurrencyBase().fromJson(j)
     True
@@ -586,7 +592,7 @@ class CurrencyBase(Container):
         if not mint_key.verify_with_CDD(cdd):
             return False
 
-        if self.standard_identifier != cdd.standard_version:
+        if self.standard_identifier != cdd.standard_identifier:
             return False
 
         if self.currency_identifier != mint_key.currency_identifier:
@@ -620,7 +626,7 @@ class CurrencyBlank(CurrencyBase):
 
     >>> blank = CurrencyBlank(standard_identifier='http://OpenCoin/1.0/',
     ...                       currency_identifier='http://OpenCent',
-    ...                       denomination=1,
+    ...                       denomination='1',
     ...                       key_identifier='cent')
 
     >>> blank.toJson()
@@ -631,7 +637,7 @@ class CurrencyBlank(CurrencyBase):
     >>> blank.serial = '123'
 
     >>> blank.toJson()
-    '[["standard_identifier","http://OpenCoin/1.0/"],["currency_identifier","http://OpenCent"],["denomination",1],["key_identifier","Y2VudA=="],["serial","MTIz"]]'
+    '[["standard_identifier","http://OpenCoin/1.0/"],["currency_identifier","http://OpenCent"],["denomination","1"],["key_identifier","Y2VudA=="],["serial","MTIz"]]'
 
     >>> blank.serial = None
     >>> blank.generateSerial()
@@ -664,10 +670,10 @@ class CurrencyBlank(CurrencyBase):
     
     >>> mintKey1 = MintKey(key_identifier=public1.key_id(hash_alg),
     ...                   currency_identifier='http://opencent.net/OpenCent',
-    ...                   denomination=1,
+    ...                   denomination='1',
     ...                   not_before=timegm((2008,1,1,0,0,0)),
     ...                   key_not_after=timegm((2008,2,1,0,0,0)),
-    ...                   coin_not_after=timegm((2008,4,1,0,0,0)),
+    ...                   token_not_after=timegm((2008,4,1,0,0,0)),
     ...                   public_key=public1)
     >>> mintKey1 = addSignature(mintKey1, hash_alg, sign_alg, CDD_private, CDD.signature.keyprint) 
 
@@ -678,10 +684,10 @@ class CurrencyBlank(CurrencyBase):
     >>> public5 = private5.newPublicKeyPair()
     >>> mintKey5 = MintKey(key_identifier=public5.key_id(hash_alg),
     ...                   currency_identifier='http://opencent.net/OpenCent',
-    ...                   denomination=5,
+    ...                   denomination='5',
     ...                   not_before=timegm((2008,1,1,0,0,0)),
     ...                   key_not_after=timegm((2008,2,1,0,0,0)),
-    ...                   coin_not_after=timegm((2008,4,1,0,0,0)),
+    ...                   token_not_after=timegm((2008,4,1,0,0,0)),
     ...                   public_key=public5)
     >>> mintKey5 = addSignature(mintKey5, hash_alg, sign_alg, CDD_private, CDD.signature.keyprint) 
 
@@ -689,30 +695,30 @@ class CurrencyBlank(CurrencyBase):
     True
     
     FIXME XXX A blank references a standard identifier, and a CDD uses a standard version!
-    >>> blank = CurrencyBlank(standard_identifier=CDD.standard_version,
+    >>> blank = CurrencyBlank(standard_identifier=CDD.standard_identifier,
     ...                       currency_identifier=CDD.currency_identifier,
-    ...                       denomination=1,
+    ...                       denomination='1',
     ...                       key_identifier=mintKey1.key_identifier,
     ...                       serial='abcdefghijklmnopqrstuvwxyz')
 
     >>> blank.toJson()
-    '[["standard_identifier","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["denomination",1],["key_identifier","sj17RxE1hfO06+oTgBs9Z7xLut/3NN+nHJbXSJYTks0="],["serial","YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXo="]]'
+    '[["standard_identifier","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["denomination","1"],["key_identifier","sj17RxE1hfO06+oTgBs9Z7xLut/3NN+nHJbXSJYTks0="],["serial","YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXo="]]'
 
     >>> blank.content_part() == blank.toJson()
     True
 
     >>> blind_value = blank.blind_blank(CDD, mintKey1, blind_factor='blind factor')
     >>> base64.b64encode(blind_value)
-    'Ni+1wlpQxCL+zDhK4K2KKfq1MgeX5+t2VXIuP2qhqe4nw3OZGphOW30/jZfmlBuLUFomdIc7g4iRwRF34D7gCQ=='
+    'FtDSI1eT2FsXK+R/zJVk9mGTRan4KQsogVmSMFts3kVrdV4y3mkIuYEaZ3B0ZP491rqR0QtIlVEAYf8sQNgbhQ=='
     
     Do some magic as the mint
     >>> blind_sig = sign_alg(private1).sign(blind_value)
     >>> base64.b64encode(blind_sig)
-    'BaH8tyK3D6qg3UaxIZ7zVRWee7vMsBMbkO1ZboeMEWr+rjE0P1JvqyAUp6G/Q5XB6DJ4+Li2xM9d2DJiB+VR5Q=='
+    'ZEDz4RHVwUByR+QXwgZcNeIyg9T3hAgxl0taabVKjbv0DbxTmHYK9fgqlCtBSAvmNntk03DMKrIPpaLuAV3UcA=='
 
     >>> clear_sig = blank.unblind_signature(blind_sig)
     >>> base64.b64encode(clear_sig)
-    'cK8f0bus8nP73pbNP/8Hm+7WojucymlijU1ERmR2Z0WMs44PVpqxnj81ZuBy8ojEA8xepFaEQScSENcoHz26dQ=='
+    'HIck+fim0TkjVupU1AeKpuSGN1CxLnDmT2jpBHMZSgdpYhKE90XoAsQVznljEn4NTXvRs5cXslWUNvcUeAuv2A=='
 
     Check for the same signature
     >>> clear_sig == sign_alg(private1).sign(hash_alg(blank.content_part()).digest())
@@ -723,7 +729,7 @@ class CurrencyBlank(CurrencyBase):
     True
 
     >>> coin.toJson()
-    '[["standard_identifier","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["denomination",1],["key_identifier","sj17RxE1hfO06+oTgBs9Z7xLut/3NN+nHJbXSJYTks0="],["serial","YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXo="],["signature","cK8f0bus8nP73pbNP/8Hm+7WojucymlijU1ERmR2Z0WMs44PVpqxnj81ZuBy8ojEA8xepFaEQScSENcoHz26dQ=="]]'
+    '[["standard_identifier","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["denomination","1"],["key_identifier","sj17RxE1hfO06+oTgBs9Z7xLut/3NN+nHJbXSJYTks0="],["serial","YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXo="],["signature","HIck+fim0TkjVupU1AeKpuSGN1CxLnDmT2jpBHMZSgdpYhKE90XoAsQVznljEn4NTXvRs5cXslWUNvcUeAuv2A=="]]'
 
     >>> coin2 = blank.newCoin(clear_sig, CDD, mintKey1)
     
@@ -748,29 +754,29 @@ class CurrencyBlank(CurrencyBase):
     AttributeError: ...
 
     Test other blank functions.
-    >>> blank2 = CurrencyBlank(standard_identifier=CDD.standard_version,
+    >>> blank2 = CurrencyBlank(standard_identifier=CDD.standard_identifier,
     ...                       currency_identifier=CDD.currency_identifier,
-    ...                       denomination=1,
+    ...                       denomination='1',
     ...                       key_identifier=mintKey1.key_identifier,
     ...                       serial='abcdefghijklmnopqrstuvwxyz')
     >>> blank2.setBlind(blind_alg, mintKey1.public_key, 'blind factor')
     >>> base64.b64encode(blank2.unblind_signature(blind_sig))
-    'cK8f0bus8nP73pbNP/8Hm+7WojucymlijU1ERmR2Z0WMs44PVpqxnj81ZuBy8ojEA8xepFaEQScSENcoHz26dQ=='
+    'HIck+fim0TkjVupU1AeKpuSGN1CxLnDmT2jpBHMZSgdpYhKE90XoAsQVznljEn4NTXvRs5cXslWUNvcUeAuv2A=='
 
-    >>> blank3 = CurrencyBlank(standard_identifier=CDD.standard_version,
+    >>> blank3 = CurrencyBlank(standard_identifier=CDD.standard_identifier,
     ...                       currency_identifier=CDD.currency_identifier,
-    ...                       denomination=1,
+    ...                       denomination='1',
     ...                       key_identifier=mintKey1.key_identifier,
     ...                       serial='abcdefghijklmnopqrstuvwxyz',
     ...                       blind_factor='blind factor')
     >>> blank3.setBlind(blind_alg, mintKey1.public_key)
     >>> base64.b64encode(blank3.unblind_signature(blind_sig))
-    'cK8f0bus8nP73pbNP/8Hm+7WojucymlijU1ERmR2Z0WMs44PVpqxnj81ZuBy8ojEA8xepFaEQScSENcoHz26dQ=='
+    'HIck+fim0TkjVupU1AeKpuSGN1CxLnDmT2jpBHMZSgdpYhKE90XoAsQVznljEn4NTXvRs5cXslWUNvcUeAuv2A=='
 
     And this is the normal and standard way to make a blank and blind
-    >>> blank4 = CurrencyBlank(standard_identifier=CDD.standard_version,
+    >>> blank4 = CurrencyBlank(standard_identifier=CDD.standard_identifier,
     ...                       currency_identifier=CDD.currency_identifier,
-    ...                       denomination=1,
+    ...                       denomination='1',
     ...                       key_identifier=mintKey1.key_identifier)
     >>> blank4.generateSerial()
     >>> blind_value4 = blank4.blind_blank(CDD, mintKey1)
@@ -859,20 +865,20 @@ class CurrencyCoin(CurrencyBase):
     
     >>> mintKey = mintKeys[0]
 
-    >>> signature = 'cK8f0bus8nP73pbNP/8Hm+7WojucymlijU1ERmR2Z0WMs44PVpqxnj81ZuBy8ojEA8xepFaEQScSENcoHz26dQ=='
+    >>> signature = 'HIck+fim0TkjVupU1AeKpuSGN1CxLnDmT2jpBHMZSgdpYhKE90XoAsQVznljEn4NTXvRs5cXslWUNvcUeAuv2A=='
 
-    >>> coin = CurrencyCoin(standard_identifier=CDD.standard_version,
+    >>> coin = CurrencyCoin(standard_identifier=CDD.standard_identifier,
     ...                     currency_identifier=CDD.currency_identifier,
-    ...                     denomination=1,
+    ...                     denomination='1',
     ...                     key_identifier=mintKey.key_identifier,
     ...                     serial='abcdefghijklmnopqrstuvwxyz',
     ...                     signature=base64.b64decode(signature))
 
     >>> coin.toJson()
-    '[["standard_identifier","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["denomination",1],["key_identifier","sj17RxE1hfO06+oTgBs9Z7xLut/3NN+nHJbXSJYTks0="],["serial","YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXo="],["signature","cK8f0bus8nP73pbNP/8Hm+7WojucymlijU1ERmR2Z0WMs44PVpqxnj81ZuBy8ojEA8xepFaEQScSENcoHz26dQ=="]]'
+    '[["standard_identifier","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["denomination","1"],["key_identifier","sj17RxE1hfO06+oTgBs9Z7xLut/3NN+nHJbXSJYTks0="],["serial","YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXo="],["signature","HIck+fim0TkjVupU1AeKpuSGN1CxLnDmT2jpBHMZSgdpYhKE90XoAsQVznljEn4NTXvRs5cXslWUNvcUeAuv2A=="]]'
 
     >>> coin.content_part()
-    '[["standard_identifier","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["denomination",1],["key_identifier","sj17RxE1hfO06+oTgBs9Z7xLut/3NN+nHJbXSJYTks0="],["serial","YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXo="]]'
+    '[["standard_identifier","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["denomination","1"],["key_identifier","sj17RxE1hfO06+oTgBs9Z7xLut/3NN+nHJbXSJYTks0="],["serial","YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXo="]]'
 
     >>> coin2 = CurrencyCoin().fromJson(coin.toJson())
     >>> coin2 == coin

@@ -101,11 +101,11 @@ class Wallet(Entity):
         >>> test_coins[0].denomination == test_coins[1].denomination == test_coins[2].denomination
         True
         >>> test_coins[0].denomination
-        2
+        '2'
         >>> test_coins[3].denomination
-        5
+        '5'
         >>> test_coins[4].denomination
-        10
+        '10'
         >>> sum(test_coins)
         21
 
@@ -211,13 +211,17 @@ class Wallet(Entity):
             # if we are here, we don't have a set of coins that works
             return []
 
-        if sum(denomination_list) != sum(self.coins):
+        int_denomination_list = [int(d) for d in denomination_list]
+
+        if sum(int_denomination_list) != sum(self.coins):
             raise Exception('denomination_list and self.coins differ!')
 
-        denominations_to_use = my_split(denomination_list, amount)
+        denominations_to_use = my_split(int_denomination_list, amount)
 
         if not denominations_to_use:
             raise UnableToDoError('Not enough tokens')
+
+        denominations_to_use = [str(d) for d in denominations_to_use]
 
         to_use = []
         for denomination in denominations_to_use:
