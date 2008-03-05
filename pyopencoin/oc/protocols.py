@@ -352,18 +352,37 @@ class TransferTokenSender(Protocol):
 
         elif message.type == 'TRANSFER_TOKEN_REJECT':
             try:
-                encoded_transaction_id, reason = message.data
+                encoded_transaction_id, type, reason, reason_detail = message.data
             except ValueError:
+                return ProtocolErrorMessage('TTRj')
+
+            if not isinstance(encoded_transaction_id, types.StringType):
+                return ProtocolErrorMessage('TTRj')
+            
+            if not isinstance(type, types.StringType):
+                return ProtocolErrorMessage('TTRj')
+            if not type:
                 return ProtocolErrorMessage('TTRj')
 
             if not isinstance(reason, types.StringType):
                 return ProtocolErrorMessage('TTRj')
+            if not reason:
+                return ProtocolErrorMessage('TTRj')
+            
+            if not isinstance(reason_detail, types.ListType):
+                return ProtocolErrorMessage('TTRj')
+            
 
             # Decode the transaction_id
             try:
                 transcation_id = base64.b64decode(encoded_transaction_id)
             except TypeError:
                 return ProtocolErrorMessage('TTRj')
+
+            # Do checking of reason_detail
+            if reason == 'See detail' and not reason_detail:
+                return ProtocolErrorMessage('TTRj')
+
 
             # Start checking things
             if transaction_id != self.transaction_id:
