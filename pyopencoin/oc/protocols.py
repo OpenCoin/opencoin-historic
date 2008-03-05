@@ -380,9 +380,17 @@ class TransferTokenSender(Protocol):
                 return ProtocolErrorMessage('TTRj')
 
             # Do checking of reason_detail
-            if reason == 'See detail' and not reason_detail:
-                return ProtocolErrorMessage('TTRj')
-
+            # If reason is see dtail, reason_detail is a list with
+            # entries, otherwise, reason_detail is an empty list
+            if reason == 'See detail':
+                if not reason_detail:
+                    return ProtocolErrorMessage('TTRj')
+            else:
+                if reason_detail:
+                    return ProtocolErrorMessage('TTRj')
+            
+            # Any checking of specific reasons for validity should be also
+            # be done, but reason_detail is always empty 
 
             # Start checking things
             if transaction_id != self.transaction_id:

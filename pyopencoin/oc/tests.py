@@ -2,7 +2,9 @@
 >>> from entities import Wallet, Issuer
 >>> from transports import ServerTestTransport, ClientTest
 >>> walletA = Wallet()
+>>> walletA.addCDD(CDD)
 >>> walletB = Wallet()
+>>> walletB.addCDD(CDD)
 >>> issuer = Issuer()
 >>> issuer.createKey(keylength=512)
 

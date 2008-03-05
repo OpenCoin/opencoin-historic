@@ -26,16 +26,21 @@ class Wallet(Entity):
     "A Wallet"
 
     def __init__(self):
-        self.coins = []
-        self.waitingTransfers = {}
+        self.coins = [] # The coins in the wallet
+        self.waitingTransfers = {} # The transfers we have done a TRANSFER_TOKEN_REQUEST on
+                                   # FIXME: What is the format? key is transaction_id, probably..
         self.otherCoins = [] # Coins we received from another wallet, waiting to Redeem
-        self.getTime = getTime
-        self.keyids = {}
+        self.getTime = getTime # The getTime function
+        self.keyids = {} # MintKeys by key_identifier
+        self.cdds = {} # CDDs by CurrencyIdentifier
 
-        #FIXME: I'm doing bad stuff again to get the CDD
-        import tests
-        self.CDD = tests.CDD
 
+    def addCDD(self, CDD):
+        """addCDD adds a CDD to the wallet's CDDs. The CDDs are not trusted, just stored."""
+        if self.cdds.has_key(CDD.currency_identifier):
+            raise Exception('Tried to add a CDD twice!')
+        
+        self.cdds[CDD.currency_identifier] = CDD
 
     def fetchMintingKey(self,transport,denominations):
         protocol = protocols.fetchMintingKeyProtocol(denominations)
@@ -53,6 +58,7 @@ class Wallet(Entity):
         protocol.newMessage(Message(None))
 
     def receiveMoney(self,transport):
+        """receiveMoney sets up the wallet to receive tokens from another wallet."""
         protocol = protocols.WalletRecipientProtocol(self)
         transport.setProtocol(protocol)
         transport.start()
@@ -268,17 +274,30 @@ class Wallet(Entity):
 
 
     def confirmReceiveCoins(self,walletid,sum,target):
+        """confirmReceiveCoins verifies with the user the transaction can occur.
+
+        confirmReceiveCoins returns 'trust' if they accept the transaction with a certain
+        wallet for a sum regarding a target.
+        """
         return 'trust'
 
 
     def transferTokens(self, transport, target, blanks, coins, type):
+        """transferTokens performs a TOKEN_TRANSFER with a issuer.
+
+        if blanks are provided, transferTokens performs all checks to convert
+        the tokens to blinds and unblind the signatures when complete.
+        """
         import base64
         blinds = []
         keydict = {}
 
+        if blanks:
+            cdd = self.cdds[blanks[0].currency_identifier] # all blanks are the same currency
+
         for blank in blanks:
             li = keydict.setdefault(blank.encodeField('key_identifier'), [])
-            li.append(base64.b64encode(blank.blind_blank(self.CDD, self.keyids[blank.key_identifier])))
+            li.append(base64.b64encode(blank.blind_blank(cdd, self.keyids[blank.key_identifier])))
 
         for key_id in keydict:
             blinds.append([key_id, keydict[key_id]])
@@ -311,6 +330,11 @@ class Wallet(Entity):
             raise NotImplementedError()
                 
     def handleIncomingCoins(self,coins,action,reason):
+        """handleIncomingCoins is a bridge between receiving coins from a wallet and redeeming.
+
+        it seems to be anther part of receiveCoins. Basically, given some coins, it attempts to
+        redeem them with the IS.
+        """
         # FIXME: What are action and reason for?
         transport = self.getIssuerTransport()
         if 1: #redeem
@@ -323,6 +347,11 @@ class Wallet(Entity):
         return getattr(self,'issuer_transport',0)
 
     def removeCoins(self, coins):
+        """removeCoins removes a set of coins from self.coins or self.otherCoins
+
+        This is used so we can cleanly remove coins after a redemption. Coins being
+        used for a redemption may come from the wallet itself or from another wallet.
+        """
         for c in coins:
             try:
                 self.coins.remove(c)
@@ -334,22 +363,36 @@ class Wallet(Entity):
 
     def finishTransfer(self, transaction_id, blinds):
         """Finishes a transfer where we minted. Takes blinds and makes coins."""
+        from containers import BlankError
+
         #FIXME: What do we do if a coin is bad?
         coins = []
         blanks = self.waitingTransfers[transaction_id]
 
+        # We have no way of being sure we have the same amount of blanks and blinds afaict.
+        # We'll try to make as many coins as we can, then error
+        shortest = min(len(blanks), len(blinds))
+
+        cdd = self.cdds[blanks[0].currency_identifier] # all blanks have the same CDD in a transaction
+
         #FIXME: We need to make sure we atleast have the same number of blanks and blinds at the protocol level!
-        for i in range(len(blanks)):
+        for i in range(shortest):
             blank = blanks[i]
             blind = blinds[i]
             try:
                 signature = blank.unblind_signature(blind)
-                coins.append(blank.newCoin(signature)) # FIXME: No error checking here
-            except NotImplementedError: #What errors can we get here. CryptoError of some sort...
-                pass
-                # Don't stop. We need to make as many valid coins as possible
+            except CryptoError:
+                # Skip this one, go to the next
+                continue
+                
+            mintKey = self.keyids[blank.key_identifier]
 
-        #FIXME: We should verify the coins
+            try:
+                coins.append(blank.newCoin(signature, cdd, mintKey))
+            except BlankError:
+                # Skip this one, go to the next
+                continue
+
         for coin in coins:
             if coin not in self.coins:
                 self.coins.append(coin)

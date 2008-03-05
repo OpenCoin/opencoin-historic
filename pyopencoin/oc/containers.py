@@ -740,17 +740,14 @@ class CurrencyBlank(CurrencyBase):
     in arguments where the coin will not be checked when we want it to.
     >>> coin3 = blank.newCoin(clear_sig, CDD, mintKey5)
     Traceback (most recent call last):
-        ...
-    Exception: New coin does not validate!
+    BlankError: New coin does not validate!
 
     >>> coin4 = blank.newCoin(clear_sig, CDD)
     Traceback (most recent call last):
-        ...
     AttributeError: ...
 
     >>> coin5 = blank.newCoin(clear_sig, mint_key=mintKey1)
     Traceback (most recent call last):
-        ...
     AttributeError: ...
 
     Test other blank functions.
@@ -845,9 +842,13 @@ class CurrencyBlank(CurrencyBase):
         if currency_description_document or mint_key:
             if not coin.validate_with_CDD_and_MintKey(currency_description_document, 
                                                          mint_key):
-                raise Exception('New coin does not validate!')
+                raise BlankError('New coin does not validate!')
         
         return coin
+
+class BlankError(Exception):
+    """BlankError is when a Blank cannot become a coin."""
+    pass
         
 class CurrencyCoin(CurrencyBase):
     """The CurrencyCoin. 
