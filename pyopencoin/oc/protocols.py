@@ -283,7 +283,9 @@ class TransferTokenSender(Protocol):
 
     def goodbye(self,message):
         import base64
+
         if message.type == 'TRANSFER_TOKEN_ACCEPT':
+
             try:
                 encoded_transaction_id, blinds = message.data
             except ValueError:
@@ -295,20 +297,28 @@ class TransferTokenSender(Protocol):
                 if not isinstance(blind, types.StringType):
                     return ProtocolErrorMessage('TTA')
         
-            if encoded_transaction_id != self.encoded_transaction_id:
+            # decode the blinds
+            try:
+                self.blinds = [base64.b64decode(blind) for blind in blinds]
+            except TypeError:
+                return ProtocolErrorMessage('TTA')
+
+            #decode transaction_id
+            try:
+                transaction_id = base64.b64decode(encoded_transaction_id)
+            except TypeError:
+                return ProtocolErrorMessage('TTA')
+
+            # Start checking things
+            if transaction_id != self.transaction_id:
+                #FIXME: Wrong message, I think. We don't really have a way to handle this.
                 return Message('PROTOCOL_ERROR', 'incorrect transaction_id')
         
+
             if self.kwargs['type'] == 'exchange' or self.kwargs['type'] == 'mint':
-                if len(blinds) == 0:
-                    raise Exception('a')
+                if not blinds:
                     return ProtocolErrorMessage('TTA')
 
-                try:
-                    self.blinds = [base64.b64decode(blind) for blind in blinds]
-                except TypeError:
-                    raise Exception('b')
-                    return ProtocolErrorMessage('TTA')
-                
             else:
                 if len(blinds) != 0:
                     raise Exception('c')
@@ -325,7 +335,15 @@ class TransferTokenSender(Protocol):
             if not isinstance(reason, types.StringType):
                 return ProtocolErrorMessage('TTD')
 
-            if encoded_transaction_id != self.encoded_transaction_id:
+            # Decode the transaction_id
+            try:
+                transaction_id = base64.b64decode(encoded_transaction_id)
+            except TypeError:
+                return ProtocolErrorMessage('TTD')
+
+            # Start checking things
+            if transaction_id != self.transaction_id:
+                #FIXME: This seems like a wrong message....
                 return ProtocolErrorMessage('TTD')
 
             # FIXME Do some things here, after we work out how delays work
@@ -341,7 +359,15 @@ class TransferTokenSender(Protocol):
             if not isinstance(reason, types.StringType):
                 return ProtocolErrorMessage('TTRj')
 
-            if encoded_transaction_id != self.encoded_transaction_id:
+            # Decode the transaction_id
+            try:
+                transcation_id = base64.b64decode(encoded_transaction_id)
+            except TypeError:
+                return ProtocolErrorMessage('TTRj')
+
+            # Start checking things
+            if transaction_id != self.transaction_id:
+                #FIXME: I don't like using this message for this..
                 return ProtocolErrorMessage('TTRj')
 
             # FIXME: Do something here?
@@ -349,6 +375,7 @@ class TransferTokenSender(Protocol):
             self.result = 0
 
         elif message.type == 'PROTOCOL_ERROR':
+            #FIXME: self.state=self.finish is hackish. Does it do what we want?
             self.state = self.finish
             return Message('GOODBYE')
 
@@ -435,12 +462,9 @@ class TransferTokenRecipient(Protocol):
         
         if message.type == 'TRANSFER_TOKEN_REQUEST':
             try:
-                encoded_transaction_id,target,blindslist,coins, options_list = message.data
-                transaction_id = base64.b64decode(encoded_transaction_id)
-            except ValueError:
-                return ProtocolErrorMessage('TTRq17')
+                encoded_transaction_id, target, blindslist, coins, options_list = message.data
             except TypeError:
-                return ProtocolErrorMessage('TTRq18')
+                return ProtocolErrorMessage('TTRq17')
 
             if not isinstance(target, types.StringType):
                 return ProtocolErrorMessage('TTRq1')
@@ -468,6 +492,12 @@ class TransferTokenRecipient(Protocol):
                         return ProtocolErrorMessage('TTRq7')
                 if len(b) == 0:
                     return ProtocolErrorMessage('TTRq14')
+
+            # Decode transaction_id
+            try:
+                transaction_id = base64.b64decode(encoded_transaction_id)
+            except TypeError:
+                return ProtocolErrorMessage('TTRq18')
 
             # Convert blindslist
             try:
@@ -503,13 +533,14 @@ class TransferTokenRecipient(Protocol):
                 if not isinstance(val, types.StringType):
                     return ProtocolErrorMessage('TTRq13')
 
+            # Decipher options
             options = {}
-
             options.update(options_list)
 
             if not options.has_key('type'):
                 return Message('TRANSFER_TOKEN_REJECT', 'Options', 'Reject', [])
             
+            # Start doing things
             if options['type'] == 'redeem':
 
                 failures = []
@@ -693,12 +724,20 @@ class TransferTokenRecipient(Protocol):
 
 
             else:
+                #FIXME: This could rightfully be a PROTOCOL_ERROR, since we don't have a 'type' that we like.
+                # -or- maybe we should check to see if we set it, and if we didn't then do a PROTOCOL_ERROR
                 return Message('TRANSFER_TOKEN_REJECT', ['Option', 'Rejected', []])
 
         elif message.type == 'TRANSFER_TOKEN_RESUME':
             encoded_transaction_id = message.data
 
             if not isinstance(encoded_transaction_id, types.StringType):
+                return ProtocolErrorMessage('TTRs')
+
+            # Decode transaction_id
+            try:
+                transaction_id = base64.b64decode(encoded_transaction_id)
+            except TypeError:
                 return ProtocolErrorMessage('TTRs')
 
             # FIXME: actually handle TRANSFER_TOKEN_RESUMES
@@ -860,50 +899,85 @@ class fetchMintingKeyProtocol(Protocol):
         """Gets the actual key"""
 
         if message.type == 'MINTING_KEY_PASS':
+
             if not isinstance(message.data, types.ListType):
-                return Message('PROTOCOL_ERROR', 'send again')
+                return ProtocolErrorMessage('MKP1')
             
             if len(message.data) == 0: # Nothing in the message
-                return Message('PROTOCOL_ERROR','send again')
+                return ProtocolErrorMessage('MKP2')
 
-            for key in message.data:
-                try:
-                    keycert = containers.MintKey().fromPython(key)
-                    self.keycerts.append(keycert)
-                except Exception, reason:
-                    return Message('PROTOCOL_ERROR','send again')
+            try:
+                keys = [containers.MintKey().fromPython(key) for key in message.data]
+            except AttributeError: #FIXME: Correct error?
+                return ProtocolErrorMessage('MKP3')
+            except TypeError:
+                return ProtocolErrorMessage('MKP4')
+            except IndexError:
+                return ProtocolErrorMessage('MKP5')
+
+            #TODO: Check to make sure we got the keys we asked for, probably?
+
+            self.keycerts.extend(keys)
             
             self.newState(self.finish)
             return Message('GOODBYE')
                 
 
         elif message.type == 'MINTING_KEY_FAILURE':
-            try:
-                self.reasons = []
-                if self.denominations: # Was a denomination search
-                    for reasonlist in message.data:
-                        denomination, reason = reasonlist
-                            
-                        #FIXME: Should we make sure valid reason?
-                        self.reasons.append((denomination, reason))
+            reasons = message.data
 
-                else: # Was a key_identifier search
-                    import base64
-                    for reasonlist in message.data:
-                        key, reason = reasonlist
-                            
-                        #FIXME: Should we make sure valid reason?
+            if not isinstance(reasons, types.ListType):
+                return ProtocolErrorMessage('MKF1')
+            if not reasons:
+                return ProtocolErrorMessage('MKF2')
+
+            for reasonlist in reasons:
+                if not isinstance(reasonlist, types.ListType):
+                    return ProtocolErrormessage('MKF3')
+
+                try:
+                    key, rea = reasonlist
+                except ValueError:
+                    return ProtocolErrorMessage('MKF4')
+
+                if not isinstance(key, types.StringType):
+                    return ProtocolErrorMessage('MKF5')
+                if not isinstance(rea, types.StringType):
+                    return ProtocolErrorMessage('MKF6')
+
+                # Do not do any conversions of keyid/denomination at this time. Have
+                # to wait to do it after we know which set we have
+
+            self.reasons = []
+            if self.denominations: # Was a denomination search
+                for reasonlist in message.data:
+                    denomination, reason = reasonlist
+                        
+                    #FIXME: Should we make sure valid reason?
+                    #FIXME: Did we even ask for this denomination?
+                    self.reasons.append((denomination, reason))
+
+            else: # Was a key_identifier search
+                import base64
+                for reasonlist in message.data:
+                    key, reason = reasonlist
+                        
+                    #FIXME: Should we make sure valid reason?
+                    #FIXME: Did we even ask for this denomination
+                    # Note: Explicit b64decode here
+                    try:
                         self.reasons.append((base64.b64decode(key), reason))
-            except TypeError:
-                return Message('PROTOCOL_ERROR', 'send again')
-            except ValueError:
-                return Message('PROTOCOL_ERROR', 'send again')
+                    except TypeError:
+                        return ProtocolErrorMessage('MKF9')
 
             self.newState(self.finish)
             return Message('GOODBYE')
         
+        elif message.type == 'PROTOCOL_ERROR':
+            pass
+
         else:
-            return Message('PROTOCOL_ERROR','send again')
+            return ProtocolErrorMessage('fetchMintingKeyProtocol')
 
 
 
@@ -968,6 +1042,7 @@ class giveMintingKeyProtocol(Protocol):
 
         errors = []
         keys = []
+
         if message.type == 'MINTING_KEY_FETCH_DENOMINATION':
             try:
                 denominations, time = message.data
@@ -1002,6 +1077,7 @@ class giveMintingKeyProtocol(Protocol):
                     errors.append([denomination, 'Unknown denomination'])
         
         elif message.type == 'MINTING_KEY_FETCH_KEYID':                
+
             import base64
 
             encoded_keyids = message.data
@@ -1014,6 +1090,7 @@ class giveMintingKeyProtocol(Protocol):
                 if not isinstance(encoded_keyid, types.StringType):
                     return ProtocolErrorMessage('MKFK3')
             
+            # Decode keyids
             try:
                 keyids = [base64.b64decode(keyid) for keyid in encoded_keyids]
             except TypeError:
