@@ -63,7 +63,7 @@ class Protocol:
         self.newState(self.firstStep)
         return Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})
 
-#ProtocolErrorMessage = lambda x: Message('PROTOCOL_ERROR', 'send again%s' % x)
+#ProtocolErrorMessage = lambda x: Message('PROTOCOL_ERROR', 'send again %s' % x)
 ProtocolErrorMessage = lambda x: Message('PROTOCOL_ERROR', 'send again')
 
 class answerHandshakeProtocol(Protocol):
@@ -438,9 +438,9 @@ class TransferTokenRecipient(Protocol):
                 encoded_transaction_id,target,blindslist,coins, options_list = message.data
                 transaction_id = base64.b64decode(encoded_transaction_id)
             except ValueError:
-                return Message('PROTOCOL_ERROR', 'send again')
+                return ProtocolErrorMessage('TTRq17')
             except TypeError:
-                return Message('PROTOCOL_ERROR', 'send again')
+                return ProtocolErrorMessage('TTRq18')
 
             if not isinstance(target, types.StringType):
                 return ProtocolErrorMessage('TTRq1')
@@ -469,12 +469,24 @@ class TransferTokenRecipient(Protocol):
                 if len(b) == 0:
                     return ProtocolErrorMessage('TTRq14')
 
+            # Convert blindslist
+            try:
+                blindslist = [[base64.b64decode(key), [base64.b64decode(bl) for bl in blinds]] for key, blinds in blindslist]
+            except TypeError:
+                return ProtocolErrorMessage('TTRq15')
+
             if not isinstance(coins, types.ListType):
                 return ProtocolErrorMessage('TTRq8')
             
             for coin in coins:
                 if not isinstance(coin, types.ListType):
                     return ProtocolErrorMessage('TTRq9')
+
+            #convert coins
+            try:
+                coins = [containers.CurrencyCoin().fromPython(c) for c in coins]
+            except AttributeError: #FIXME: Right error?
+                return ProtocolErrorMessage('TTRq16')
 
             if not isinstance(options_list, types.ListType):
                 return ProtocolErrorMessage('TTRq10')
@@ -502,13 +514,7 @@ class TransferTokenRecipient(Protocol):
 
                 failures = []
 
-                #check if coins are 'well-formed'
-                try:
-                    coins = [containers.CurrencyCoin().fromPython(c) for c in coins]
-                except Exception:
-                    return Message('PROTOCOL_ERROR', 'send again')
-
-                #check if they are valid
+                #check if coins are valid
                 for coin in coins:
                     mintKey = self.issuer.keyids.get(coin.key_identifier, None)
                     if not mintKey or not coin.validate_with_CDD_and_MintKey(self.issuer.cdd, mintKey):
@@ -535,14 +541,14 @@ class TransferTokenRecipient(Protocol):
                 
                 if not self.issuer.transferToTarget(target,coins):
                     self.issuer.dsdb.unlock(transaction_id)
-                    return Message('PROTOCOL_ERROR', 'send again')
+                    return ProtocolErrorMessage('TTRq19')
 
                 #register them as spent
                 try:
                     self.issuer.dsdb.spend(transaction_id,coins)
                 except LockingError, e: 
                     #Note: if we fail here, that means we have large problems, since the coins are locked
-                    return Message('PROTOCOL_ERROR', 'send again')
+                    return ProtocolErrorMessage('TTRq20')
 
                 self.state = self.goodbye
                 return Message('TRANSFER_TOKEN_ACCEPT',[encoded_transaction_id, []])
@@ -556,8 +562,7 @@ class TransferTokenRecipient(Protocol):
             elif options['type'] == 'mint':
 
                 #check that we have the keys
-                import base64
-                blinds = [[self.issuer.keyids[base64.b64decode(keyid)], [base64.b64decode(b) for b in blinds]] for keyid, blinds in blindslist]
+                blinds = [[self.issuer.keyids[keyid], blinds] for keyid, blinds in blindslist]
 
                 #check the MintKeys for validity
                 timeNow = self.issuer.getTime()
@@ -576,7 +581,7 @@ class TransferTokenRecipient(Protocol):
 
                 #check target
                 if not self.issuer.debitTarget(target,blindslist):
-                    return Message('PROTOCOL_ERROR', 'send again')
+                    return ProtocolErrorMessage('TTRq20')
 
 
                 #mint them immediately (the only thing we can do right now with the mint)
@@ -596,13 +601,7 @@ class TransferTokenRecipient(Protocol):
 
                 failures = []
 
-                #check if coins are 'well-formed'
-                try:
-                    coins = [containers.CurrencyCoin().fromPython(c) for c in coins]
-                except Exception:
-                    return Message('PROTOCOL_ERROR', 'send again')
-
-                #check if they are valid
+                #check if coins are valid
                 for coin in coins:
                     mintKey = self.issuer.keyids.get(coin.key_identifier, None)
                     try: 
@@ -631,9 +630,7 @@ class TransferTokenRecipient(Protocol):
 
                 #check that we have the keys
                 import base64
-                blinds = []
-                for encoded_keyid, encoded_blinds in blindslist:
-                    blinds.append([self.issuer.keyids[base64.b64decode(encoded_keyid)], [base64.b64decode(b) for b in encoded_blinds]])
+                blinds = [[self.issuer.keyids[keyid], blinds] for keyid, blinds in blindslist]
 
                 #check target
                 if not self.issuer.debitTarget(target,blindslist):
@@ -927,9 +924,9 @@ class giveMintingKeyProtocol(Protocol):
     True
 
     >>> gmp.newState(gmp.giveKey)
-    >>> m = gmp.state(Message('MINTING_KEY_FETCH_KEYID',[pub1.key_identifier]))
-    >>> m == Message('MINTING_KEY_PASS',[pub1.toPython()])
-    True
+    >>> m = gmp.state(Message('MINTING_KEY_FETCH_KEYID',[pub1.encodeField('key_identifier')]))
+    >>> m
+    <Message('MINTING_KEY_PASS',[...])>
 
     >>> gmp.newState(gmp.giveKey)
     >>> gmp.state(Message('MINTING_KEY_FETCH_DENOMINATION',[['2'], '0']))
@@ -937,8 +934,8 @@ class giveMintingKeyProtocol(Protocol):
    
 
     >>> gmp.newState(gmp.giveKey)
-    >>> gmp.state(Message('MINTING_KEY_FETCH_KEYID',['non existant id']))
-    <Message('MINTING_KEY_FAILURE',[['non existant id', 'Unknown key_identifier']])>
+    >>> gmp.state(Message('MINTING_KEY_FETCH_KEYID',['NonExistantIDxxx']))
+    <Message('MINTING_KEY_FAILURE',[['NonExistantIDxxx', 'Unknown key_identifier']])>
 
     >>> gmp.newState(gmp.giveKey)
     >>> gmp.state(Message('bla','blub'))
@@ -1005,25 +1002,29 @@ class giveMintingKeyProtocol(Protocol):
                     errors.append([denomination, 'Unknown denomination'])
         
         elif message.type == 'MINTING_KEY_FETCH_KEYID':                
+            import base64
 
-            keyids = message.data
+            encoded_keyids = message.data
             
-            if not isinstance(keyids, types.ListType):
-                return ProtocolErrorMessage('MKFK')
-            if not keyids:
-                return ProtocolErrorMessage('MKFK')
+            if not isinstance(encoded_keyids, types.ListType):
+                return ProtocolErrorMessage('MKFK1')
+            if not encoded_keyids:
+                return ProtocolErrorMessage('MKFK2')
+            for encoded_keyid in encoded_keyids:
+                if not isinstance(encoded_keyid, types.StringType):
+                    return ProtocolErrorMessage('MKFK3')
+            
+            try:
+                keyids = [base64.b64decode(keyid) for keyid in encoded_keyids]
+            except TypeError:
+                return ProtocolErrorMessage('MKFK4')
+
             for keyid in keyids:
-                if not isinstance(keyid, types.StringType):
-                    return ProtocolErrorMessage('MKFK')
-
-            #FIXME: base64 decode the keyids
-
-            for keyid in message.data:
                 try:
                     key = self.issuer.getKeyById(keyid)
                     keys.append(key)
                 except 'KeyFetchError':                
-                    errors.append([keyid, 'Unknown key_identifier'])
+                    errors.append([base64.b64encode(keyid), 'Unknown key_identifier'])
         
         else:
             return Message('PROTOCOL_ERROR', 'send again')
