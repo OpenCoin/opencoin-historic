@@ -52,23 +52,24 @@ Client <Message('finished',None)>
 
 Test the transfer token protocol with an exchange
 >>> issuer = makeIssuer()
+>>> import calendar
+>>> issuer.getTime = issuer.mint.getTime = lambda: calendar.timegm((2008,01,31,0,0,0))
 >>> t = ClientTest(issuer.listen)
 >>> coin1 = coins[0][0] # denomination of 1
 >>> coin2 = coins[1][0] # denomination of 2
 >>> walletB.coins = [coin1, coin2]
+>>> walletB.keyids = {mintKeys[0].key_identifier: mintKeys[0]}
 >>> blank1 = makeBlank(mintKeys[0], serial='abcdefghijklmnopqrstuvwxyz', blind_factor='a'*26)
 >>> blank2 = makeBlank(mintKeys[0], serial='aaaaaaaaaaaaaaaaaaaaaaaaaa', blind_factor='b'*26)
 >>> blank3 = makeBlank(mintKeys[0], serial='bbbbbbbbbbbbbbbbbbbbbbbbbb', blind_factor='c'*26)
 >>> blanks = [blank1, blank2, blank3]
 >>> import base64
->>> blinds = [[mintKeys[0].encodeField('key_identifier'), [base64.b64encode(b.blind_blank(CDD, mintKeys[0])) for b in blanks]]]
 
-#FIXME: This causes infinite recursion
-#>>> walletB.transferTokens(t, '', blinds, [coin1, coin2], type='exchange')
+>>> walletB.transferTokens(t, 'myaccount', blanks, walletB.coins, type='exchange')
 Client <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
 Server <Message('HANDSHAKE_ACCEPT',None)>
-Client <Message('TRANSFER_TOKEN_REQUEST',['...', 'myaccount', [['...', ['...', '...', '...']]], [[(...)], [(...)]], [['type', 'redeem']]])>
-Server <Message('TRANSFER_TOKEN_ACCEPT',['...', [['...', ['...', '...', '...']]]])>
+Client <Message('TRANSFER_TOKEN_REQUEST',['...', 'myaccount', [['...', ['...', '...', '...']]], [[(...)], [(...)]], [['type', 'exchange']]])>
+Server <Message('TRANSFER_TOKEN_ACCEPT',['...', ['...', '...', '...']])>
 Client <Message('GOODBYE',None)>
 Server <Message('GOODBYE',None)>
 Client <Message('finished',None)>
@@ -77,6 +78,7 @@ Client <Message('finished',None)>
 Test the coin spend protocol.
 
 >>> issuer = makeIssuer()
+>>> issuer.getTime = issuer.mint.getTime = lambda: calendar.timegm((2008,01,31,0,0,0))
 >>> t = ClientTest(walletB.listen,clientnick='walletA',servernick='walletB')
 >>> t2 = ClientTest(issuer.listen,clientnick='walletB',servernick='issuer')
 >>> walletB.issuer_transport = t2
@@ -390,8 +392,10 @@ def makeIssuer():
     >>> issuer = makeIssuer()
     '''
     issuer = entities.Issuer()
+
     issuer.signedKeys = {'1':[mint_key1],
                          '2':[mint_key2]}
+
     issuer.keyids = {mint_key1.key_identifier:mint_key1, 
                      mint_key2.key_identifier:mint_key2}
 

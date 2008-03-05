@@ -30,6 +30,11 @@ class Wallet(Entity):
         self.waitingTransfers = {}
         self.otherCoins = [] # Coins we received from another wallet, waiting to Redeem
         self.getTime = getTime
+        self.keyids = {}
+
+        #FIXME: I'm doing bad stuff again to get the CDD
+        import tests
+        self.CDD = tests.CDD
 
 
     def fetchMintingKey(self,transport,denominations):
@@ -266,8 +271,19 @@ class Wallet(Entity):
         return 'trust'
 
 
-    def transferTokens(self,transport,target,blanks,coins,type):
-        protocol = protocols.TransferTokenSender(target,blanks,coins,type=type)
+    def transferTokens(self, transport, target, blanks, coins, type):
+        import base64
+        blinds = []
+        keydict = {}
+
+        for blank in blanks:
+            li = keydict.setdefault(blank.encodeField('key_identifier'), [])
+            li.append(base64.b64encode(blank.blind_blank(self.CDD, self.keyids[blank.key_identifier])))
+
+        for key_id in keydict:
+            blinds.append([key_id, keydict[key_id]])
+
+        protocol = protocols.TransferTokenSender(target, blinds, coins, type=type)
         transport.setProtocol(protocol)
         transport.start()
         protocol.newMessage(Message(None))
@@ -327,12 +343,13 @@ class Wallet(Entity):
             blank = blanks[i]
             blind = blinds[i]
             try:
-                signature = blank.unblindSignature(blind)
+                signature = blank.unblind_signature(blind)
                 coins.append(blank.newCoin(signature)) # FIXME: No error checking here
             except NotImplementedError: #What errors can we get here. CryptoError of some sort...
                 pass
                 # Don't stop. We need to make as many valid coins as possible
 
+        #FIXME: We should verify the coins
         for coin in coins:
             if coin not in self.coins:
                 self.coins.append(coin)

@@ -256,14 +256,14 @@ class TransferTokenSender(Protocol):
 
     """
 
-    def __init__(self,target,blanks,coins,**kwargs):
+    def __init__(self, target, blinds, coins, **kwargs):
         import base64
         from crypto import _r as Random
         self.transaction_id = Random.getRandomString(128)
         self.encoded_transaction_id = base64.b64encode(self.transaction_id)
 
         self.target = target
-        self.blanks = blanks
+        self.blinds = blinds
         self.coins = [c.toPython() for c in coins]
         self.kwargs = kwargs
 
@@ -273,7 +273,7 @@ class TransferTokenSender(Protocol):
     def firstStep(self,message):
         data = [self.encoded_transaction_id,
                 self.target,
-                self.blanks,
+                self.blinds,
                 self.coins]
         if self.kwargs:
             data.append([list(i) for i in self.kwargs.items()])                
@@ -315,6 +315,7 @@ class TransferTokenSender(Protocol):
                 self.result = 1
 
             elif message.type == 'TRANSFER_TOKEN_REJECT':
+                raise Exception('Got a TRANSFER_TOKEN_REJECT. Causes an infinite loop in the wrong place. data: %s' % message.data)
                 encoded_transaction_id, reason = message.data
 
                 if encoded_transaction_id != self.encoded_transaction_id:
@@ -323,6 +324,9 @@ class TransferTokenSender(Protocol):
                 # FIXME: Do something here?
 
                 self.result = 0
+
+            elif message.type == 'PROTOCOL_ERROR':
+                return Message('GOODBYE')
 
             else:
                 return ProtocolErrorMessage()
@@ -380,7 +384,7 @@ class TransferTokenRecipient(Protocol):
 
     >>> ttr.state = ttr.start
     >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['1234', 'my account', blindslist, [], [['type', 'mint']]]))
-    <Message('TRANSFER_TOKEN_ACCEPT',['1234', [['sj17RxE1hfO06+oTgBs9Z7xLut/3NN+nHJbXSJYTks0=', ['Do0el3uxdyFMF8NdXtowBLBOxXM0r7xR9hXkaZWEhPUBQCe8yaYGO09wnxrWEVFlt0r9M6bCZxKtzNGDGw3/XQ==']], ['WbXTWO4M60oZ/LGY+sccKf5Oq6HxrjrY4qAxrBDXuek=', ['dTnL8yTkdelG9fW//ZoKzUl7LTjBXiElaHkfyMLgVetEM7pmEzfcdfRWhm2PP3IhnkZ8CmAR1uOJ99rJ+XBASA==']]]])>
+    <Message('TRANSFER_TOKEN_ACCEPT',['1234', ['Do0el3uxdyFMF8NdXtowBLBOxXM0r7xR9hXkaZWEhPUBQCe8yaYGO09wnxrWEVFlt0r9M6bCZxKtzNGDGw3/XQ==', 'dTnL8yTkdelG9fW//ZoKzUl7LTjBXiElaHkfyMLgVetEM7pmEzfcdfRWhm2PP3IhnkZ8CmAR1uOJ99rJ+XBASA==']])>
 
     Now, check to make sure the implementation is good
     >>> ttr.state = ttr.start
@@ -396,7 +400,7 @@ class TransferTokenRecipient(Protocol):
     >>> ttr = TransferTokenRecipient(issuer)
     >>> ttr.state = ttr.start
     >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['1234', '', blind, [coin1], [['type', 'exchange']]]))
-    <Message('TRANSFER_TOKEN_ACCEPT',['1234', [['sj17RxE1hfO06+oTgBs9Z7xLut/3NN+nHJbXSJYTks0=', ['UIo2KtqK/6JqSWbtFFVR14fOjnzwr4tDiY/6kOnQ0h92EewY2vJBV2XaS43wK3RsNFg0sHzNh3v2BVDFV8cDvQ==']]]])>
+    <Message('TRANSFER_TOKEN_ACCEPT',['1234', ['UIo2KtqK/6JqSWbtFFVR14fOjnzwr4tDiY/6kOnQ0h92EewY2vJBV2XaS43wK3RsNFg0sHzNh3v2BVDFV8cDvQ==']])>
 
     """
 
@@ -411,7 +415,7 @@ class TransferTokenRecipient(Protocol):
         options = {'type':'unknown'}
 
         try:
-            encoded_transaction_id,target,blindslist,coins = message.data[:4]
+            encoded_transaction_id,target,blindslist,coins, options_list = message.data
             transaction_id = base64.b64decode(encoded_transaction_id)
         except ValueError:
             return Message('PROTOCOL_ERROR', 'send again')
@@ -501,8 +505,8 @@ class TransferTokenRecipient(Protocol):
                     signature = self.issuer.mint.signNow(key.key_identifier, blind)
                     this_set.append(base64.b64encode(signature))
 
-                minted.append([key.encodeField('key_identifier'), this_set])
-
+                minted.extend(this_set)
+                
             return Message('TRANSFER_TOKEN_ACCEPT', [encoded_transaction_id, minted])
             
         elif options['type'] == 'exchange':
@@ -545,7 +549,9 @@ class TransferTokenRecipient(Protocol):
 
             #check that we have the keys
             import base64
-            blinds = [[self.issuer.keyids[base64.b64decode(keyid)], [base64.b64decode(b) for b in blinds]] for keyid, blinds in blindslist]
+            blinds = []
+            for encoded_keyid, encoded_blinds in blindslist:
+                blinds.append([self.issuer.keyids[base64.b64decode(encoded_keyid)], [base64.b64decode(b) for b in encoded_blinds]])
 
             #check target
             if not self.issuer.debitTarget(target,blindslist):
@@ -574,6 +580,7 @@ class TransferTokenRecipient(Protocol):
                 total += int(b[0].denomination) * len(b[1])
 
             if total != sum(coins):
+                raise Exception('total: %s, sum: %s' % (total, sum(coins)))
                 self.issuer.dsdb.unlock(transaction_id)
                 return Message('TRANSFER_TOKEN_REJECT', [encoded_transaction_id, 'Generic', 'Rejected', []])
 
@@ -590,7 +597,7 @@ class TransferTokenRecipient(Protocol):
                         return Message('TRANSFER_TOKEN_REJECT', [encoded_transaction_id, 'Blind', 'Unable to sign', []])
                     this_set.append(base64.b64encode(signature))
 
-                minted.append([key.encodeField('key_identifier'), this_set])
+                minted.extend(this_set)
 
             # And now, we have verified the coins are valid, they aren't double spent, and we've minted.
 
