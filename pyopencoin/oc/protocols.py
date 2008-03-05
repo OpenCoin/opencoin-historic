@@ -977,10 +977,25 @@ class giveMintingKeyProtocol(Protocol):
             except ValueError: # catch tuple unpack errors
                 return Message('PROTOCOL_ERROR', 'send again')
 
+            if not isinstance(denominations, types.ListType):
+                return ProtocolErrorMessage('MKFD')
+            if not denominations: # no denominations sent
+                return ProtocolErrorMessage('MKFD')
+            for denomination in denominations:
+                if not isinstance(denomination, types.StringType):
+                    return ProtocolErrorMessage('MKFD')
+
+            if not isinstance(time, types.StringType):
+                return ProtocolErrorMessage('MKFD')
+
+
             if time == '0':
                 time = self.issuer.getTime()
             else:
-                time = containers.decodeTime(time)
+                try:
+                    time = containers.decodeTime(time)
+                except ValueError:
+                    return ProtocolErrorMessage('MKFD')
                 
             for denomination in denominations:
                 try:
@@ -990,6 +1005,19 @@ class giveMintingKeyProtocol(Protocol):
                     errors.append([denomination, 'Unknown denomination'])
         
         elif message.type == 'MINTING_KEY_FETCH_KEYID':                
+
+            keyids = message.data
+            
+            if not isinstance(keyids, types.ListType):
+                return ProtocolErrorMessage('MKFK')
+            if not keyids:
+                return ProtocolErrorMessage('MKFK')
+            for keyid in keyids:
+                if not isinstance(keyid, types.StringType):
+                    return ProtocolErrorMessage('MKFK')
+
+            #FIXME: base64 decode the keyids
+
             for keyid in message.data:
                 try:
                     key = self.issuer.getKeyById(keyid)
