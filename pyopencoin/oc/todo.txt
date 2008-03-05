@@ -1,0 +1,6 @@
+- support delayed minting
+- wallets should be able to receive in offline modus 
+- persistence
+
+- graphical clients
+- 

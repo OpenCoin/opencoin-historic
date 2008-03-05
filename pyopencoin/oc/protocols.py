@@ -447,17 +447,22 @@ class TransferTokenRecipient(Protocol):
 
             if not isinstance(blindslist, types.ListType):
                 return ProtocolErrorMessage('TTRq2')
+
             for blind in blindslist:
+            
                 if not isinstance(blind, types.ListType):
                     return ProtocolErrorMessage('TTRq3')
                 try:
                     key, b = blind
                 except ValueError:
                     return ProtocolErrorMessage('TTRq4')
+                
                 if not isinstance(key, types.StringType):
                     return ProtocolErrorMessage('TTRq5')
+                
                 if not isinstance(b, types.ListType):
                     return ProtocolErrorMessage('TTRq6')
+                
                 for blindstring in b:
                     if not isinstance(blindstring, types.StringType):
                         return ProtocolErrorMessage('TTRq7')
@@ -466,19 +471,23 @@ class TransferTokenRecipient(Protocol):
 
             if not isinstance(coins, types.ListType):
                 return ProtocolErrorMessage('TTRq8')
+            
             for coin in coins:
                 if not isinstance(coin, types.ListType):
                     return ProtocolErrorMessage('TTRq9')
 
             if not isinstance(options_list, types.ListType):
                 return ProtocolErrorMessage('TTRq10')
+            
             for options in options_list:
                 try:
                     key, val = options
                 except ValueError:
                     return ProtocolErrorMessage('TTRq11')
+            
                 if not isinstance(key, types.StringType):
                     return ProtocolErrorMessage('TTRq12')
+                
                 if not isinstance(val, types.StringType):
                     return ProtocolErrorMessage('TTRq13')
 
@@ -517,6 +526,7 @@ class TransferTokenRecipient(Protocol):
 
                 #and not double spent
                 try:
+                    #XXX have adjustable time for lock
                     self.issuer.dsdb.lock(transaction_id,coins,86400)
                 except LockingError, e:
                     return Message('TRANSFER_TOKEN_REJECT', [encoded_transaction_id, 'Token', 'Invalid token', []])
@@ -537,15 +547,17 @@ class TransferTokenRecipient(Protocol):
                 self.state = self.goodbye
                 return Message('TRANSFER_TOKEN_ACCEPT',[encoded_transaction_id, []])
 
+
+            # exchange uses basically mint and redeem (or a modified form thereof)
+            # XXX refactor to not have duplicate code
+            
+
+
             elif options['type'] == 'mint':
 
                 #check that we have the keys
                 import base64
                 blinds = [[self.issuer.keyids[base64.b64decode(keyid)], [base64.b64decode(b) for b in blinds]] for keyid, blinds in blindslist]
-
-                #check target
-                if not self.issuer.debitTarget(target,blindslist):
-                    return Message('PROTOCOL_ERROR', 'send again')
 
                 #check the MintKeys for validity
                 timeNow = self.issuer.getTime()
@@ -561,6 +573,11 @@ class TransferTokenRecipient(Protocol):
 
                 if failures:
                     return Message('TRANSFER_TOKEN_REJECT', [encoded_transaction_id, 'Blind', 'Invalid key_identifier', []])
+
+                #check target
+                if not self.issuer.debitTarget(target,blindslist):
+                    return Message('PROTOCOL_ERROR', 'send again')
+
 
                 #mint them immediately (the only thing we can do right now with the mint)
                 minted = []
