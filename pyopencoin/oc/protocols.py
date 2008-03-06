@@ -944,6 +944,8 @@ class fetchMintingKeyProtocol(Protocol):
 
             #TODO: Check to make sure we got the keys we asked for, probably?
 
+            # Note: keycerts stores the value of the MintKeys. They get checked by the
+            # wallet explicitly
             self.keycerts.extend(keys)
             
             self.newState(self.finish)
@@ -1012,7 +1014,9 @@ class giveMintingKeyProtocol(Protocol):
     """An issuer hands out a key. The other side of fetchMintingKeyProtocol.
     >>> from entities import Issuer
     >>> issuer = Issuer()
-    >>> issuer.createKey(keylength=512)
+    >>> issuer.createMasterKey(keylength=512)
+    >>> issuer.makeCDD(currency_identifier='http://opencent.net/OpenCent2', denominations=['1', '2'],
+    ...                short_currency_identifier='OC', options=[], issuer_service_location='here')
     >>> now = 0; later = 1; much_later = 2
     >>> pub1 = issuer.createSignedMintKey('1', now, later, much_later)
     >>> gmp = giveMintingKeyProtocol(issuer)
@@ -1020,9 +1024,8 @@ class giveMintingKeyProtocol(Protocol):
     >>> gmp.state(Message('HANDSHAKE',{'protocol': 'opencoin 1.0'}))
     <Message('HANDSHAKE_ACCEPT',None)>
 
-    >>> m = gmp.state(Message('MINTING_KEY_FETCH_DENOMINATION',[['1'], '0']))
-    >>> m == Message('MINTING_KEY_PASS',[pub1.toPython()])
-    True
+    >>> gmp.state(Message('MINTING_KEY_FETCH_DENOMINATION',[['1'], '0']))
+    <Message('MINTING_KEY_PASS',[[('key_identifier', '...'), ('currency_identifier', 'http://opencent.net/OpenCent2'), ('denomination', '1'), ('not_before', '...T...Z'), ('key_not_after', '...T...Z'), ('token_not_after', '...T...Z'), ('public_key', '...,...'), ['signature', [('keyprint', '...'), ('signature', '...')]]]])>
 
     >>> gmp.newState(gmp.giveKey)
     >>> m = gmp.state(Message('MINTING_KEY_FETCH_KEYID',[pub1.encodeField('key_identifier')]))

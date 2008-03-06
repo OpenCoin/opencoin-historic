@@ -42,11 +42,27 @@ class Wallet(Entity):
         
         self.cdds[CDD.currency_identifier] = CDD
 
-    def fetchMintingKey(self,transport,denominations):
-        protocol = protocols.fetchMintingKeyProtocol(denominations)
+    def fetchMintingKey(self, transport, denominations=None, keyids=None, time=None):
+        protocol = protocols.fetchMintingKeyProtocol(denominations=denominations, keyids=keyids, time=time)
         transport.setProtocol(protocol)
         transport.start()
         protocol.newMessage(Message(None))
+
+        # Get the keys direct from the protcool.
+        retreivedKeys = protocol.keycerts
+
+        for key in retreivedKeys:
+            try:
+                cdd = self.cdds[key.currency_identifier]
+            except KeyError:
+                continue # try the other currencies
+
+            if not self.keyids.has_key(key.key_identifier):
+                if key.verify_with_CDD(cdd):
+                    self.keyids[key.key_identifier] = key
+                else:
+                    raise Exception('CDD: %s\n\nMintKey: %s' % (cdd, key))
+                    raise Exception('Got a bad key')
 
     def sendMoney(self,transport):
         "Sends some money to the given transport."
@@ -409,7 +425,7 @@ class Issuer(Entity):
     """An isser
 
     >>> i = Issuer()
-    >>> i.createKey(keylength=256)
+    >>> i.createMasterKey(keylength=256)
     >>> #i.keys.public()
     >>> #i.keys
     >>> #str(i.keys)
@@ -434,32 +450,64 @@ class Issuer(Entity):
         except (KeyError, IndexError):            
             raise 'KeyFetchError'
     
+    
     def getKeyById(self,keyid):
         try:
             return self.keyids[keyid]
         except KeyError:            
             raise 'KeyFetchError'
 
-    def createKey(self,keylength=1024):
+    
+    def createMasterKey(self,keylength=1024):
         import crypto
-        masterKey = crypto.createRSAKeyPair(keylength, public=False)
+
+        self.key_alg = crypto.createRSAKeyPair
+
+        masterKey = self.key_alg(keylength, public=False)
         self.masterKey = masterKey
 
+
+    def makeCDD(self, currency_identifier, short_currency_identifier, denominations, 
+                issuer_service_location, options):
+
+        from containers import CDD, Signature
+        import crypto
         
+        ics = crypto.CryptoContainer(signing=crypto.RSASigningAlgorithm,
+                                     blinding=crypto.RSABlindingAlgorithm,
+                                     hashing=crypto.SHA256HashingAlgorithm)
+
+        public_key = self.masterKey.newPublicKeyPair()
+        
+        cdd = CDD(standard_identifier='http://opencoin.org/OpenCoinProtocol/1.0',
+                  currency_identifier=currency_identifier,
+                  short_currency_identifier=short_currency_identifier,
+                  denominations=denominations,
+                  options=options,
+                  issuer_cipher_suite=ics,
+                  issuer_service_location=issuer_service_location,
+                  issuer_public_master_key = public_key)
+
+
+        signature = Signature(keyprint=ics.hashing(str(public_key)).digest(),
+                              signature=ics.signing(self.masterKey).sign(ics.hashing(cdd.content_part()).digest()))
+
+        cdd.signature = signature
      
-    def createSignedMintKey(self,denomination, not_before, key_not_after, coin_not_after, signing_key=None, size=1024):
+        self.cdd = cdd
+
+    def createSignedMintKey(self,denomination, not_before, key_not_after, token_not_after, signing_key=None, size=1024):
         """Have the Mint create a new key and sign the public key."""
 
-        #Note: I'm assuming RSA/SHA256. It should really use the CDD defined ones
-        #      hmm. And it needs the CDD for the currency_identifier
-        
+        if denomination not in self.cdd.denominations:
+            raise Exception('Trying to create a bad denomination')
        
         if not signing_key:
             signing_key = self.masterKey
 
-        import crypto
-        hash_alg = crypto.SHA256HashingAlgorithm
-        key_alg = crypto.createRSAKeyPair
+        hash_alg = self.cdd.issuer_cipher_suite.hashing
+        sign_alg = self.cdd.issuer_cipher_suite.signing
+        key_alg = self.key_alg
 
         public = self.mint.createNewKey(hash_alg, key_alg, size)
 
@@ -467,14 +515,13 @@ class Issuer(Entity):
         
         import containers
         mintKey = containers.MintKey(key_identifier=keyid,
-                                     currency_identifier='http://...Cent/',
+                                     currency_identifier=self.cdd.currency_identifier,
                                      denomination=denomination,
                                      not_before=not_before,
                                      key_not_after=key_not_after,
-                                     coin_not_after=coin_not_after,
+                                     token_not_after=token_not_after,
                                      public_key=public)
 
-        sign_alg = crypto.RSASigningAlgorithm
         signer = sign_alg(signing_key)
         hashed_content = hash_alg(mintKey.content_part()).digest()
         sig = containers.Signature(keyprint = signing_key.key_id(hash_alg),
@@ -484,8 +531,8 @@ class Issuer(Entity):
         
         
         self.signedKeys.setdefault(denomination, []).append(mintKey)
-        #self.signedKeys[mintKey.denomination].append(mintKey)
         self.keyids[keyid] = mintKey
+
         return mintKey
 
     def giveMintingKey(self,transport):

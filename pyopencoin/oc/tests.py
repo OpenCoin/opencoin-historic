@@ -2,11 +2,14 @@
 >>> from entities import Wallet, Issuer
 >>> from transports import ServerTestTransport, ClientTest
 >>> walletA = Wallet()
->>> walletA.addCDD(CDD)
 >>> walletB = Wallet()
->>> walletB.addCDD(CDD)
 >>> issuer = Issuer()
->>> issuer.createKey(keylength=512)
+>>> issuer.createMasterKey(keylength=512)
+>>> issuer.makeCDD(currency_identifier='http://opencent.net/OpenCent', denominations=['1', '2'],
+...                short_currency_identifier='OC', options=[], issuer_service_location='here')
+
+>>> walletA.addCDD(issuer.cdd)
+>>> walletB.addCDD(issuer.cdd)
 
 >>> CDD.toJson()
 '[["standard_identifier","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["short_currency_identifier","OC"],["issuer_service_location","opencoin://issuer.opencent.net:8002"],["denominations",["1","2","5","10","20","50","100","200","500","1000"]],["issuer_cipher_suite",["RSASigningAlgorithm","RSABlindingAlgorithm","SHA256HashingAlgorithm"]],["options",[]],["issuer_public_master_key","sloGu4+P4rslyC4RiAJrZbG0Z90FwEV88eW1JnNv7BDU33+uIhi2G0f/XL+AoUwmF1VsdhQhzEtGNVjnlx0TViWgqvrYX6AqB1/R3zYP9+JnuIIyHiyS+Z+Y3uoB0sLMD+dvHcDRo7cbb+ZNAvlcPoQ4Hb3+tuxwBMmVkZMaOu8=,AQAB"],["signature",[["keyprint","hxz5pRwS+RFp88qQliXYm3R5uNighktwxqEh4RMOuuk="],["signature","fifLuwjQXpviAD6ruHXaW09HipPNmrX41n125Ku+AAplbNDMHs/+jCRQGwJ4yMyk0hNsX/Idqhm3ckebZAujync03mWMRA4pZEMLmYdkjLsOSdw7YoPFO2+Ah5GILnGB4WRm3L1q9yeaCCrjuoZO135vUV1ykUl7k2LBOKMxw4A="]]]]'
@@ -407,8 +410,10 @@ def makeIssuer():
     issuer.mint.privatekeys = {mint_key1.key_identifier: mint_private_key1,
                                mint_key2.key_identifier: mint_private_key2}
 
-    issuer.keys = is_private_key
+    issuer.masterKey = is_private_key
+
     issuer.cdd = CDD
+
     return issuer
 
 if __name__ == "__main__":

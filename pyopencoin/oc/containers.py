@@ -93,7 +93,7 @@ class Container(object):
         
         self.codecs[fieldname] = {'encode':encoder,'decode':decoder}
 
-    def toPython(self):
+    def toPython(self, extranames=False):
         return [(fieldname,self.encodeField(fieldname)) for fieldname in self.fields]
 
     def fromPython(self,data):
@@ -112,14 +112,17 @@ class Container(object):
         return "%s={%s}" % (self.content_id,content)
 
     def toJson(self, extranames=False):
-        return json.write(self.toPython())
+        return json.write(self.toPython(extranames))
 
     def fromJson(self,text):
         return self.fromPython(json.read(text))
 
     def __eq__(self,other):
         #return self.__dict__== other.__dict__
-        return self.content_part() == other.content_part()
+        if hasattr(self, 'content_part') and hasattr(other, 'content_part'):
+            return self.content_part() == other.content_part()
+        else:
+            return False
 
 
 def encodeTime(seconds):
@@ -169,10 +172,10 @@ class ContainerWithSignature(Container):
     >>> test1_j
     '[["string","hello"],["number","QA=="]]'
 
-    >>> test1.toPython()
+    >>> test1.toPython(False)
     [('string', 'hello'), ('number', 'QA==')]
 
-    >>> test2 = TestContainer().fromPython(test1.toPython())
+    >>> test2 = TestContainer().fromPython(test1.toPython(False))
     >>> test2 == test1
     True
 
@@ -215,27 +218,31 @@ class ContainerWithSignature(Container):
         self.signature = kwargs.get('signature')
 
 
-    def toJson(self,extranames=True):
-        if extranames:
-            if self.jsontext:
-                return self.jsontext
-            else:
-                data = self.toPython()
-                data.append(['signature',self.signature.toPython()])
-                self.jsontext = json.write(data)
-                return self.jsontext
-        else:       
-            return json.write(self.toPython())
+    def toPython(self, extranames=True):
+        if not extranames:
+            return [(fieldname,self.encodeField(fieldname)) for fieldname in self.fields]
+        else:
+            fields = [(fieldname, self.encodeField(fieldname)) for fieldname in self.fields]
+            fields.append(['signature', self.signature.toPython()])
+            return fields
+
+    def fromPython(self, data):
+        i = 0
+        for fieldname in self.fields:
+            setattr(self,fieldname,self.decodeField(fieldname,data[i][1]))
+            i += 1
+        
+        if len(data) - 1 == len(self.fields) and data[i][0] == 'signature':
+            s = Signature()
+            self.signature = s.fromPython(data[i][1])
+            
+        return self
+
+    def toJson(self, extranames=True):
+        return json.write(self.toPython(extranames))
 
     def fromJson(self,text):
-        data = json.read(text)
-        if len(data) == len(self.fields) + 1 and data[-1][0] == 'signature':
-            s = Signature()
-            self.signature = s.fromPython(data[-1][1])
-            self.jsontext = text
-        return self.fromPython(data)
-
-
+        return self.fromPython(json.read(text))
 
     def verifySignature(self, signature_algorithm, hashing_algorithm, key):
 
@@ -283,16 +290,10 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
     '[["standard_identifier","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["short_currency_identifier","OC"],["issuer_service_location","opencoin://issuer.opencent.net:8002"],["denominations",["1","2","5","10","20","50","100","200","500","1000"]],["issuer_cipher_suite",["RSASigningAlgorithm","RSABlindingAlgorithm","SHA256HashingAlgorithm"]],["options",[]],["issuer_public_master_key","DKE=,EQ=="],["signature",[["keyprint","XQ=="],["signature","Vg=="]]]]'
     
     
-    And now, lets play with a really signed CDD
-    >>> private_key, public_key = crypto.createRSAKeyPair(1024)
-
-    >>> public_key.hasPrivate()
-    False
-    
     >>> from tests import CDD as test_cdd
 
     >>> test_j = test_cdd.toJson()
-    
+
     >>> test_cdd2 = CDD().fromJson(test_j)
     >>> test_cdd2 == test_cdd
     True
