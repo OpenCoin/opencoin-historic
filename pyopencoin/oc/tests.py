@@ -91,9 +91,9 @@ Test the coin spend protocol.
 >>> walletA.sendCoins(t, target='a book', amount=1)
 walletA <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
 walletB <Message('HANDSHAKE_ACCEPT',None)>
-walletA <Message('SUM_ANNOUNCE',['...', '1', 'a book'])>
+walletA <Message('SUM_ANNOUNCE',['...', '...', '...', '1', 'a book'])>
 walletB <Message('SUM_ACCEPT',None)>
-walletA <Message('COIN_SPEND',['...', [[(...)]], 'a book'])>
+walletA <Message('TOKEN_SPEND',['...', [[(...)]], 'a book'])>
 walletB <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
 issuer <Message('HANDSHAKE_ACCEPT',None)>
 walletB <Message('TRANSFER_TOKEN_REQUEST',['...', 'my account', [], [[(...)]], [['type', 'redeem']]])>
@@ -101,7 +101,7 @@ issuer <Message('TRANSFER_TOKEN_ACCEPT',['...', []])>
 walletB <Message('GOODBYE',None)>
 issuer <Message('GOODBYE',None)>
 walletB <Message('finished',None)>
-walletB <Message('COIN_ACCEPT',None)>
+walletB <Message('TOKEN_ACCEPT',None)>
 walletA <Message('GOODBYE',None)>
 walletB <Message('GOODBYE',None)>
 walletA <Message('finished',None)>

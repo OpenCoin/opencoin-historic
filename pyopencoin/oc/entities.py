@@ -89,7 +89,7 @@ class Wallet(Entity):
 
         To test the functionality we steal the transport, and when a message occurs,
         we steal the tokens directly out of the protocol. This is highly dependant
-        on the internal details of CoinSpendSender and the transport/protocol
+        on the internal details of TokenSpendSender and the transport/protocol
         relationship.
 
         >>> class transport:
@@ -258,7 +258,7 @@ class Wallet(Entity):
             self.coins.remove(coin)
 
         try:
-            protocol = protocols.CoinSpendSender(to_use,target)
+            protocol = protocols.TokenSpendSender(to_use,target)
             transport.setProtocol(protocol)
             transport.start()
             protocol.newMessage(Message(None))
@@ -284,7 +284,7 @@ class Wallet(Entity):
         <Message('Receipt',None)>
         """
         protocol = protocols.answerHandshakeProtocol(sendMoney=protocols.WalletRecipientProtocol(self),
-                                                     SUM_ANNOUNCE=protocols.CoinSpendRecipient(self))
+                                                     SUM_ANNOUNCE=protocols.TokenSpendRecipient(self))
         transport.setProtocol(protocol)
         transport.start()
 
@@ -561,10 +561,6 @@ class Issuer(Entity):
 
     def debitTarget(self,target,blinds):
         return True
-
-    def getNow(self):
-        import time
-        return time.time()
 
 class KeyFetchError(Exception):
     pass

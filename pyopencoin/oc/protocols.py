@@ -101,19 +101,19 @@ class answerHandshakeProtocol(Protocol):
 # Spoken bewteen two wallets to transfer coins / tokens                       #
 ###############################################################################
 
-class CoinSpendSender(Protocol):
+class TokenSpendSender(Protocol):
     """
     >>> from tests import coins
     >>> coin1 = coins[0][0]
     >>> coin2 = coins[1][0]
-    >>> css = CoinSpendSender([coin1,coin2],'foobar')
+    >>> css = TokenSpendSender([coin1,coin2],'foobar')
     >>> css.state(Message(None))
     <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
     >>> css.state(Message('HANDSHAKE_ACCEPT'))
     <Message('SUM_ANNOUNCE',['...', '3', 'foobar'])>
     >>> css.state(Message('SUM_ACCEPT'))
-    <Message('COIN_SPEND',['...', [[(...)], [(...)]], 'foobar'])>
-    >>> css.state(Message('COIN_ACCEPT'))
+    <Message('TOKEN_SPEND',['...', [[(...)], [(...)]], 'foobar'])>
+    >>> css.state(Message('TOKEN_ACCEPT'))
     <Message('GOODBYE',None)>
     >>> css.state(Message('Really?'))
     <Message('finished',None)>
@@ -134,7 +134,11 @@ class CoinSpendSender(Protocol):
 
     def firstStep(self,message):       
         self.state = self.spendCoin
+        standard_identifier = self.coins[0].standard_identifier # All the coins are
+        currency_identifier = self.coins[0].currency_identifier # same currency & CDD
         return Message('SUM_ANNOUNCE',[self.encoded_transaction_id,
+                                       standard_identifier,
+                                       currency_identifier,
                                        str(self.amount),
                                        self.target])
 
@@ -143,28 +147,39 @@ class CoinSpendSender(Protocol):
         if message.type == 'SUM_ACCEPT':
             self.state = self.goodbye            
             jsonCoins = [c.toPython() for c in self.coins]
-            return Message('COIN_SPEND',[self.encoded_transaction_id,
-                                         jsonCoins,
-                                         self.target])
+            return Message('TOKEN_SPEND',[self.encoded_transaction_id,
+                                          jsonCoins,
+                                          self.target])
+        elif message.type == 'PROTOCOL_ERROR':
+            pass
+
+        else:
+            return ProtocolErrorMessage('TokenSpendSender')
 
     def goodbye(self,message):
-        if message.type == 'COIN_ACCEPT':
+        if message.type == 'TOKEN_ACCEPT':
             self.state = self.finish
             return Message('GOODBYE')
 
+        elif message.type == 'PROTOCOL_ERROR':
+            pass
 
-class CoinSpendRecipient(Protocol):
+        else:
+            return ProtocolErrorMessage('TokenSpendSender')
+
+
+class TokenSpendRecipient(Protocol):
     """
     >>> import entities
     >>> from tests import coins
     >>> coin1 = coins[0][0].toPython() # Denomination of 1
     >>> coin2 = coins[1][0].toPython() # Denomination of 2
     >>> w = entities.Wallet()
-    >>> csr = CoinSpendRecipient(w)
-    >>> csr.state(Message('SUM_ANNOUNCE',['1234','3','a book']))
+    >>> csr = TokenSpendRecipient(w)
+    >>> csr.state(Message('SUM_ANNOUNCE',['1234','standard', 'currency', '3','a book']))
     <Message('SUM_ACCEPT',None)>
-    >>> csr.state(Message('COIN_SPEND',['1234', [coin1, coin2], 'a book']))
-    <Message('COIN_ACCEPT',None)>
+    >>> csr.state(Message('TOKEN_SPEND',['1234', [coin1, coin2], 'a book']))
+    <Message('TOKEN_ACCEPT',None)>
     >>> csr.state(Message('Goodbye',None))
     <Message('GOODBYE',None)>
     >>> csr.state(Message('foobar'))
@@ -182,56 +197,117 @@ class CoinSpendRecipient(Protocol):
         import base64
 
         if message.type == 'SUM_ANNOUNCE':
-            self.encoded_transaction_id = message.data[0]
-            self.transaction_id = base64.b64decode(self.encoded_transaction_id)
-            self.sum = int(message.data[1])
-            self.target = message.data[2]
+            try:
+                encoded_transaction_id, standard_identifier, currency_identifier, amount, self.target = message.data
+            except ValueError:
+                return ProtocolErrorMessage('SA')
+
+            if not isinstance(encoded_transaction_id, types.StringType):
+                return ProtocolErrorMessage('SA')
+
+            if not isinstance(standard_identifier, types.StringType):
+                return ProtocolErrorMessage('SA')
+
+            if not isinstance(currency_identifier, types.StringType):
+                return ProtocolErrorMessage('SA')
+
+            if not isinstance(amount, types.StringType):
+                return ProtocolErrorMessage('SA')
+
+            if not isinstance(self.target, types.StringType):
+                return ProtocolErrorMessage('SA')
+
+            # Decode the transaction_id
+            try:
+                self.transaction_id = base64.b64decode(encoded_transaction_id)
+            except TypeError:
+                return ProtocolErrorMessage('SA')
+            
+            # Setup sum
+            self.sum = int(amount)
+
+            # And do stuff
             #get some feedback from interface somehow
             action = self.wallet.confirmReceiveCoins('the other wallet id',self.sum,self.target)
+
             if action == 'reject':
-                self.state = self.goodby                
+                self.state = self.goodbye 
                 return Message('SUM_REJECT')
+
             else:
                 self.action = action
                 self.state = self.handleCoins
                 return Message('SUM_ACCEPT')
+
+        elif message.type == 'PROTOCOL_ERROR':
+            pass
+
         else:
-            self.state = self.goodbye
-            return Message('Expected something else')
+            return ProtocolErrorMessage('TokenSpendRecipient')
 
     def handleCoins(self,message):
-        if message.type == 'COIN_SPEND':
-            
-            #be conservative
-            result = Message('COIN_REJECT','default')
-            
-            encoded_transaction_id,coins,target  = message.data
-            try:
-                coins = [containers.CurrencyCoin().fromPython(c) for c in coins]
-            except Exception:
-                return Message('PROTOCOL_ERROR', 'send again')
+        import base64
 
-            # This catches if we have coins without all the fields
+        if message.type == 'TOKEN_SPEND':
             try:
-                [c.toPython() for c in coins]
-            except AttributeError:
-                return Message('COIN_REJECT', 'transaction_id')
+                encoded_transaction_id, tokens, target = message.data
+            except ValueError:
+                return ProtocolErrorMessage('TS')
+
+            if not isinstance(encoded_transaction_id, types.StringType):
+                return ProtocolErrorMessage('TS')
+
             
-            if encoded_transaction_id != self.encoded_transaction_id:
-                result = Message('COIN_REJECT','transaction_id')
+            if not isinstance(tokens, types.ListType):
+                return ProtocolErrorMessage('TS')
             
-            elif sum(coins) != self.sum:
-                result = Message('COIN_REJECT','wrong sum')
+            if not tokens: # We require tokens
+                return ProtocolErrorMessage('TS')
+            for token in tokens:
+                if not isinstance(token, types.ListType):
+                    return ProtocolErrorMessage('TS')
+
+            # Convert transaction_id
+            try:
+                transaction_id = base64.b64decode(encoded_transaction_id)
+            except TypeError:
+                return ProtocolErrorMessage('TS')
+
+            # Convert the tokens
+            try:
+                tokens = [containers.CurrencyCoin().fromPython(c) for c in tokens]
+            except AttributeError: #FIXME: this is the wrong error, I'm pretty sure
+                return ProtocolErrorMessage('TS')
+
+            
+            # And now do things
+
+            #be conservative
+            result = Message('TOKEN_REJECT','default')
+            
+            if transaction_id != self.transaction_id:
+                #FIXME: is the a PROTOCOL_ERROR?
+                result = Message('TOKEN_REJECT','Rejected')
+            
+            elif sum(tokens) != self.sum:
+                result = Message('TOKEN_REJECT','Rejected')
             
             elif target != self.target:
-                result = Message('COIN_REJECT','wrong target')
+                result = Message('TOKEN_REJECT','Rejected')
             
             elif self.action in ['redeem','exchange','trust']:
-                out = self.wallet.handleIncomingCoins(coins,self.action,target)
+                out = self.wallet.handleIncomingCoins(tokens,self.action,target)
                 if out:
-                    result = Message('COIN_ACCEPT')
-        self.state = self.goodbye
-        return result
+                    result = Message('TOKEN_ACCEPT')
+
+            self.state = self.goodbye
+            return result
+
+        elif message.type == 'PROTOCOL_ERROR':
+            pass
+
+        else:
+            return ProtocolErrorMessage('TokenSendRecipient')
 
 
 

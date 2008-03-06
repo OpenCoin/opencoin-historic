@@ -198,9 +198,10 @@ class ContainerWithSignature(Container):
     >>> test5_j
     '[["string","hello"],["number","QA=="],["signature",[["keyprint","MA=="],["signature","Kg=="]]]]'
 
-    This test is quirky and non-sensical with signatures
-    #>>> test5.toPython()
-    #>>> TestContainer().fromPython(test5.toPython()) <- this will be without signature :/
+    >>> test5.toPython()
+    [('string', 'hello'), ('number', 'QA=='), ['signature', [('keyprint', 'MA=='), ('signature', 'Kg==')]]]
+    >>> TestContainer().fromPython(test5.toPython()).toPython()
+    [('string', 'hello'), ('number', 'QA=='), ['signature', [('keyprint', 'MA=='), ('signature', 'Kg==')]]]
 
     >>> test6 = TestContainer().fromJson(test1.content_part())
     >>> test6.signature = signature
@@ -299,6 +300,10 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
     True
 
     >>> test_cdd2.signature == test_cdd.signature
+    True
+
+    >>> test_cdd3 = CDD().fromPython(test_cdd.toPython())
+    >>> test_cdd3 == test_cdd
     True
 
     >>> test_cdd.verify_self()
@@ -417,6 +422,9 @@ class MintKey(ContainerWithSignature):
 
     Just to make sure we didn't mess up something on the way...
     >>> mintKey.verify_with_CDD(CDD)
+    True
+
+    >>> mintKey == MintKey().fromPython(mintKey.toPython())
     True
 
     Okay. We'll test verify_time now. It returns (can_mint, can_redeem)
