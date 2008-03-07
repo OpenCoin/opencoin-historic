@@ -125,7 +125,11 @@ class Fraction:
         return self.num == other.num and self.den == other.den
 
     def __cmp__(self, other):
-        if not isinstance(other, Fraction):
+        import types
+        if type(other) == types.FloatType:
+            return cmp(self.float(),other)
+
+        elif not isinstance(other, Fraction):
             other = Fraction(other)
 
         common = lcm(self.den, other.den)
@@ -146,7 +150,9 @@ class Fraction:
 
     def __hash__(self):
         return str(self).__hash__()
-
+    
+    def float(self):
+        return float(self.num)/float(self.den)
 
 class ZeroDenominatorError(Exception):
     """A fraction with a zero denominator cannot be computed."""
