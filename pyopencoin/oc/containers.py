@@ -125,6 +125,13 @@ class Container(object):
             return False
 
 
+    def serialize(self):
+        import pickle,base64
+        return base64.b64encode(pickle.dumps(self))
+
+
+
+
 def encodeTime(seconds):
     #FIXME: this breaks if we are greater than whatever the epoc is (usually 2038)
     import time

@@ -1,6 +1,9 @@
+- working socket transport
+- testing socket transports
+- IS to handle different types of request
+- persistence
+- graphical clients
+- formalize cdd options
 - support delayed minting
 - wallets should be able to receive in offline modus 
-- persistence
-
-- graphical clients
-- 
+- wallets auto-exchanging tokens that are about to expire

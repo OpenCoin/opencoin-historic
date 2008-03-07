@@ -15,6 +15,11 @@ class Entity(object):
     def fromJson(self,text):
         return self.fromPython(json.read(text))
 
+
+    def serialize(self):
+        import pickle,base64
+        return base64.b64encode(pickle.dumps(self))        
+
 ##################### time ################################
 def getTime():
     import time
