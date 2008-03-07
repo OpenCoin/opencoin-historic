@@ -110,6 +110,46 @@ walletA <Message('finished',None)>
 
 >>> coinB.validate_with_CDD_and_MintKey(CDD,mint_key1)
 True
+
+
+
+
+
+Okay. Test some fraction things.
+>>> walletA = Wallet()
+>>> walletB = Wallet()
+>>> issuer = Issuer()
+>>> issuer.createMasterKey(keylength=512)
+>>> denomination_str = ['1/1000', '1/500', '1/300', '1/200', '1/100', '1/50', '1/30', '1/25', '1/20', '1/10', '1/5', '1/3', '1/2', '1', '2', '3', '5', '10', '20', '30', '50', '100', '200', '300', '500', '1000']
+>>> denominations = [Fraction(d) for d in denomination_str]
+>>> issuer.makeCDD(currency_identifier='http://opencent.net/FractionCent', denominations=denominations,
+...                short_currency_identifier='FC', options=[], issuer_service_location='here')
+
+>>> walletA.addCDD(issuer.cdd)
+>>> walletB.addCDD(issuer.cdd)
+
+>>> issuer.cdd.toJson()
+'[["standard_identifier","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/FractionCent"],["short_currency_identifier","FC"],["issuer_service_location","here"],["denominations",["1/1000","1/500","1/300","1/200","1/100","1/50","1/30","1/25","1/20","1/10","1/5","1/3","1/2","1","2","3","5","10","20","30","50","100","200","300","500","1000"]],["issuer_cipher_suite",["RSASigningAlgorithm","RSABlindingAlgorithm","SHA256HashingAlgorithm"]],["options",[]],["issuer_public_master_key","..."],["signature",[["keyprint","..."],["signature","..."]]]]'
+
+>>> now = 0; later = 1; much_later = 2
+>>> mk = issuer.createSignedMintKey(Fraction('1'), now, later, much_later)
+>>> mk = issuer.createSignedMintKey(Fraction('2'), now, later, much_later)
+>>> mk = issuer.createSignedMintKey(Fraction('3'), now, later, much_later)
+>>> mk = issuer.createSignedMintKey(Fraction('1/2'), now, later, much_later)
+>>> mk = issuer.createSignedMintKey(Fraction('1/3'), now, later, much_later)
+>>> mk = issuer.createSignedMintKey(Fraction('1/5'), now, later, much_later)
+>>> mk = issuer.createSignedMintKey(Fraction('1/10'), now, later, much_later)
+>>> mk = issuer.createSignedMintKey(Fraction('5'), now, later, much_later)
+>>> mk = issuer.createSignedMintKey(Fraction('10'), now, later, much_later)
+>>> t = ClientTest(issuer.giveMintingKey)
+>>> walletA.fetchMintingKey(t,denominations=[Fraction('1/10')])
+Client <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
+Server <Message('HANDSHAKE_ACCEPT',None)>
+Client <Message('MINTING_KEY_FETCH_DENOMINATION',[['1/10'], '0'])>
+Server <Message('MINTING_KEY_PASS',[[...]])>
+Client <Message('GOODBYE',None)>
+Server <Message('GOODBYE',None)>
+Client <Message('finished',None)>
 """
 
 

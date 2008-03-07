@@ -150,6 +150,7 @@ def decodeFractionList(l):
     return [decodeFraction(s) for s in l]
 
 class Signature(Container):
+    import base64
     """The signature container (a combination of the keyprint and signature fields.
     
     >>> s = Signature(keyprint='0',signature='*')
