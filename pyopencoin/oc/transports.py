@@ -50,26 +50,67 @@ class SocketServerTransport(Transport):
         import socket
         self.runserver = 1
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        #s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
         s.bind((self.addr, self.port))
         s.listen(1)
         self.socket = s
         self.init_conn()
         while self.runserver:
+            read = ''
             data = self.conn.recv(2048)
-            if len(data) == 0:
-                self.init_conn()
+            while data:
+                data  = data.replace('\r','')
+                read = read + data
+                
+                # Read through, trying to find a full message.
+                position = 0
+                found = 0
+                quotes = False
+                braces = 0
+                for c in read:
+                    if c == '"':
+                        quotes = not quotes
+
+                    elif c == '[':
+                        if not quotes:
+                            braces = braces + 1
+
+                    elif c == ']':
+                        if not quotes:
+                            braces = braces - 1
+                            if braces == 0:
+                                found = position
+                                break
+
+                    position = position + 1
+
+                if found:
+                    try:
+                        m = Message(jsontext=read[:found + 1])
+                    except Exception, e:
+                        raise
+                    else:
+                        read = read[found + 1:]
+
+                    try:
+                        self.newMessage(m)
+                    except Exception, e:
+                        raise
+    
+
+                # The socket may already be closed. Check.
+                if not self.conn:
+                    break
+
+                # read more information
                 data = self.conn.recv(2048)
-            data  = data.replace('\r','')
-            try:
-                m = Message(jsontext=data)
-                self.newMessage(m)
-            except Exception, e:
-                try:
-                    self.write(Message('WrongFormat',str(e)))
-                except Exception:
-                    pass
-        self.conn.close()
+
+            # No more data, the connection is closed. Close the socket
+            if self.conn:
+                self.conn.close()
+
+            # connection closed. wait for the next connection
+            self.init_conn()
+            
 
     def init_conn(self):
         conn, addr = self.socket.accept()
@@ -82,15 +123,17 @@ class SocketServerTransport(Transport):
         self.conn.send(message.toJson())
         if message.type == 'finished':
             self.conn.close()
+            self.conn = None
            
-            self.runserver = 0
-            self.socket.close()
+            # FIXME: randomly commented out
+            #self.runserver = 0
+            #self.socket.close()
+            
             #self.init_conn()
             #self.protocol.state = self.protocol.start
 
 
 class SocketClientTransport(Transport):
-    'Commented out while offline'
     """
     >>> import entities
     >>> w = entities.Wallet()
@@ -110,15 +153,64 @@ class SocketClientTransport(Transport):
         
     def write(self,message):   
         self.socket.send(message.toJson())
+
         if message.type == 'finished':
             self.socket.close()
+            self.socket = None
             return
+        
         else:            
+            print 'Message.type: %s' % message.type
+            read = ''
             data = self.socket.recv(2048)
-            if self.debug:
-                print message
-            self.newMessage(Message(jsontext=data))
-            
+            while data:
+                data = data.replace('\r','')
+                read = read + data
+                
+                # Read through, trying to find a full message.
+                position = 0
+                found = 0
+                quotes = False
+                braces = 0
+                for c in read:
+                    if c == '"':
+                        quotes = not quotes
+
+                    elif c == '[':
+                        if not quotes:
+                            braces = braces + 1
+
+                    elif c == ']':
+                        if not quotes:
+                            braces = braces - 1
+                            if braces == 0:
+                                found = position
+                                break
+
+                    position = position + 1
+
+                if found:
+                    try:
+                        m = Message(jsontext=read[:found + 1])
+                    except Exception, e:
+                        raise
+                    else:
+                        # Remove the message from read
+                        read = read[found + 1:]
+
+                    try:
+                        self.newMessage(m)
+                    except Exception, e:
+                        raise
+
+                    #FIXME: We need to restart looking for messages if we had found it!
+
+                # read more information
+                if self.socket:
+                    data = self.socket.recv(2048)
+                else:
+                    data = ''
+
         
 
 class HTTPClientTransport(Transport): 
