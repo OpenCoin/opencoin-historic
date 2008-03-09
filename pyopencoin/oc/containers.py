@@ -146,6 +146,18 @@ def decodeTime(s):
     struct = time.strptime(s, '%Y-%m-%dT%H:%M:%SZ')
     return calendar.timegm(struct)
 
+def validateIntString(s):
+    if str(int(s)) == s:
+        return s
+    else:
+        raise Exception('Encoding of int "%s" is incorrect' % s)
+
+def validateIntStringList(l):
+    for s in l:
+        validateIntString(s)
+
+    return l
+
 class Signature(Container):
     """The signature container (a combination of the keyprint and signature fields.
     
@@ -329,7 +341,8 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
               'issuer_public_master_key']
 
     codecs = {'issuer_cipher_suite':{'encode':encodeCryptoContainer,'decode':decodeCryptoContainer},
-              'issuer_public_master_key':{'encode':str, 'decode':decodeRSAKeyPair}}
+              'issuer_public_master_key':{'encode':str, 'decode':decodeRSAKeyPair},
+              'denominations':{'encode':list, 'decode':validateIntStringList}}
 
 
     def __init__(self,**kwargs):
@@ -472,7 +485,8 @@ class MintKey(ContainerWithSignature):
               'public_key':{'encode':str,'decode':decodeRSAKeyPair},
               'not_before':{'encode':encodeTime,'decode':decodeTime},
               'key_not_after':{'encode':encodeTime,'decode':decodeTime},
-              'token_not_after':{'encode':encodeTime,'decode':decodeTime}}
+              'token_not_after':{'encode':encodeTime,'decode':decodeTime},
+              'denomination':{'encode':str,'decode':validateIntString}}
 
     def __init__(self, **kwargs):
         ContainerWithSignature.__init__(self, **kwargs)
@@ -565,7 +579,8 @@ class CurrencyBase(Container):
 
     # signature codec is in place for CurrencyCoin
     codecs = {'key_identifier':{'encode':base64.b64encode,'decode':base64.b64decode},
-              'serial':{'encode':base64.b64encode,'decode':base64.b64decode},}
+              'serial':{'encode':base64.b64encode,'decode':base64.b64decode},
+              'denomination':{'encode':str,'decode':validateIntString}}
 
 
     def __init__(self, **kwargs):

@@ -136,9 +136,9 @@ class SocketServerTransport(Transport):
 class SocketClientTransport(Transport):
     """
     >>> import entities
-    >>> w = entities.Wallet()
-    >>> sct = SocketClientTransport('copycan.org',12008)
-    >>> w.sendMoney(sct)
+    >>> #w = entities.Wallet()
+    >>> #sct = SocketClientTransport('copycan.org',12008)
+    >>> #w.sendMoney(sct)
 
     """
     def __init__(self,addr,port):
