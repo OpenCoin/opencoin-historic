@@ -126,10 +126,10 @@ class Container(object):
 
 
     def serialize(self):
-        import pickle,base64
+        import pickle
+        import base64
+
         return base64.b64encode(pickle.dumps(self))
-
-
 
 
 def encodeTime(seconds):
@@ -147,12 +147,14 @@ def decodeTime(s):
     return calendar.timegm(struct)
 
 def validateIntString(s):
+    """Returns a string if s is a an encoding of the integer value of s with no spaces or leading/trailing zeros or decimal points."""
     if str(int(s)) == s:
         return s
     else:
-        raise Exception('Encoding of int "%s" is incorrect' % s)
+        raise TypeError('Encoding of int "%s" is incorrect' % s)
 
 def validateIntStringList(l):
+    """Returns a list of strings if each element in the list passes validateIntString."""
     for s in l:
         validateIntString(s)
 

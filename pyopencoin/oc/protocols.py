@@ -213,6 +213,8 @@ class TokenSpendRecipient(Protocol):
 
             if not isinstance(amount, types.StringType):
                 return ProtocolErrorMessage('SA')
+            if str(int(amount)) != amount:
+                return ProtocolErrorMessage('SA')
 
             if not isinstance(self.target, types.StringType):
                 return ProtocolErrorMessage('SA')
@@ -276,7 +278,9 @@ class TokenSpendRecipient(Protocol):
             # Convert the tokens
             try:
                 tokens = [containers.CurrencyCoin().fromPython(c) for c in tokens]
-            except AttributeError: #FIXME: this is the wrong error, I'm pretty sure
+            except TypeError:
+                return ProtocolErrorMessage('TS')
+            except IndexError:
                 return ProtocolErrorMessage('TS')
 
             
@@ -618,8 +622,10 @@ class TransferTokenRecipient(Protocol):
             #convert coins
             try:
                 coins = [containers.CurrencyCoin().fromPython(c) for c in coins]
-            except AttributeError: #FIXME: Right error?
+            except TypeError:
                 return ProtocolErrorMessage('TTRq16')
+            except IndexError:
+                return ProtocolErrorMessage('TTRq21')
 
             if not isinstance(options_list, types.ListType):
                 return ProtocolErrorMessage('TTRq10')
@@ -666,7 +672,7 @@ class TransferTokenRecipient(Protocol):
 
                 #and not double spent
                 try:
-                    #XXX have adjustable time for lock
+                    #XXX have adjustable time for lock - not really needed. We unlock anyways, or spend
                     self.issuer.dsdb.lock(transaction_id,coins,86400)
                 except LockingError, e:
                     return Message('TRANSFER_TOKEN_REJECT', [encoded_transaction_id, 'Token', 'Invalid token', []])
@@ -1009,10 +1015,12 @@ class fetchMintingKeyProtocol(Protocol):
             if len(message.data) == 0: # Nothing in the message
                 return ProtocolErrorMessage('MKP2')
 
+            for key in message.data:
+                if not isinstance(message.data, types.ListType):
+                    return ProtocolErrorMessage('MKP3')
+
             try:
                 keys = [containers.MintKey().fromPython(key) for key in message.data]
-            except AttributeError: #FIXME: Correct error?
-                return ProtocolErrorMessage('MKP3')
             except TypeError:
                 return ProtocolErrorMessage('MKP4')
             except IndexError:
