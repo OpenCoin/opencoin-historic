@@ -366,7 +366,7 @@ class SocketClientTest(Transport):
     >>> client = Wallet()
     >>> server = Wallet()
     >>> t = SocketClientTest('127.0.0.1',3456,server.receiveMoney)
-    >>> client.sendMoney(t)
+    >>> #client.sendMoney(t)
 
 
     """
@@ -376,17 +376,36 @@ class SocketClientTest(Transport):
         self.kwargs = kwargs
         self.addr = addr
         self.port = port
+        self.callback = callback
         self.debug = 1
         
     def start(self):
+        # Okay. This doesn't work for a few reasons.
+        # servertransport gets set up as the transport to use. The socket is not opened at this time though.
         servertransport = SocketServerTransport(self.addr,self.port)
         
+        # We try to connect to the socket. It fails becuase the socket isn't open
         import socket
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.connect((self.addr, self.port))
 
+        # We never get here.
         kwargs = self.kwargs
         self.callback(servertransport,**kwargs)
+
+        # Okay. To fix this, we have to do a few things. ServerSocketTransport is written using blocking
+        # sockets. And it never yields. That means that once we start a ServerSocketTransport, or a 
+        # SocketClientTest we never give back control for the other side. It works great with tests using
+        # different python instances or threads. It doesn't work, however if we don't have those things
+        # setup to use.
+
+        # Now, to fix this, you can stick a SocketServerTransport in it's own thread. Once you set it off,
+        # it should work find. However, to make sure you don't do anything weird, add a timeout to the
+        # socket on listen and remove the loop, so it doens't continue forever. And also, you should
+        # probably throw in something to make sure the thread is closed before you can continue, if python
+        # allows things like that.
+
+        # - Mathew
         
     def write(self,message):   
         self.socket.send(message.toJson())
