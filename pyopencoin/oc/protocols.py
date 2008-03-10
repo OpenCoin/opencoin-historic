@@ -46,8 +46,12 @@ class Protocol:
         return Message('GOODBYE')
 
     def finish(self,message):
-        'always the last state. There can be other final states'        
-        return Message('finished')
+        'always the last state. There can be other final states'
+        if hasattr(self,'transport') and hasattr(self.transport,'autoreset'):
+            self.transport.autoreset(self.transport)
+            return self.transport.protocol.state(message)
+        else:
+            return Message('finished')
                     
     def newMessage(self,message):
         'this is used by a transport to pass on new messages to the protocol'
@@ -91,6 +95,7 @@ class answerHandshakeProtocol(Protocol):
         nextprotocol = self.mapping[message.type]
         self.transport.setProtocol(nextprotocol)
         m = nextprotocol.newMessage(message)
+        #return m
         #print 'here ', m
         #return m
 
@@ -510,6 +515,10 @@ class TransferTokenRecipient(Protocol):
     >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['1234', 'my account', [], ['foobar'], [['type', 'redeem']]]))    
     <Message('PROTOCOL_ERROR','send again')>
 
+    This should also not be accepted - no coins but redeem
+    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['1234', 'my account', [], [], [['type', 'redeem']]]))
+    <Message('PROTOCOL_ERROR','send again')>
+    
     The malformed coin should be rejected
     >>> malformed = copy.deepcopy(tests.coins[0][0])
     >>> malformed.signature = 'Not a valid signature'
@@ -653,6 +662,9 @@ class TransferTokenRecipient(Protocol):
             if options['type'] == 'redeem':
 
                 failures = []
+
+                if not coins:
+                    return ProtocolErrorMessage('TTRq13a')
 
                 #check if coins are valid
                 for coin in coins:

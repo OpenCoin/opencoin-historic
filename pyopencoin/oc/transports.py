@@ -25,7 +25,8 @@ class Transport:
     def newMessage(self,message):
         """Once data has been read (by whatever means) this method is called to 
         put in the new message to deliver it to the protocol"""
-        self.protocol.newMessage(message)
+        if message:
+            self.protocol.newMessage(message)
 
     def start(self):
         """start the transport"""
@@ -253,7 +254,10 @@ class SimpleTestTransport(Transport):
     """
     def __init__(self):
         self.messages = []
-        self.write = self.messages.append
+
+    def write(self,message):
+        if message:
+            self.messages.append(message)
 
     def read(self):
         'return one buffered message. Returns None if there are not any'
@@ -355,8 +359,45 @@ class ClientTest(ServerTest):
         self.callback(servertransport,**kwargs)
 
    
+class SocketClientTest(Transport):
+
+    """
+    >>> from entities import Wallet
+    >>> client = Wallet()
+    >>> server = Wallet()
+    >>> t = SocketClientTest('127.0.0.1',3456,server.receiveMoney)
+    >>> client.sendMoney(t)
 
 
+    """
+
+
+    def __init__(self,addr,port,callback,**kwargs):
+        self.kwargs = kwargs
+        self.addr = addr
+        self.port = port
+        self.debug = 1
+        
+    def start(self):
+        servertransport = SocketServerTransport(self.addr,self.port)
+        
+        import socket
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.connect((self.addr, self.port))
+
+        kwargs = self.kwargs
+        self.callback(servertransport,**kwargs)
+        
+    def write(self,message):   
+        self.socket.send(message.toJson())
+        if message.type == 'finished':
+            self.socket.close()
+            return
+        else:            
+            data = self.socket.recv(2048)
+            if self.debug:
+                print message
+            self.newMessage(Message(jsontext=data))
 
 
 

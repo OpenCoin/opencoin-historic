@@ -547,19 +547,26 @@ class Issuer(Entity):
 
     def listen(self,transport):
         """
-        >>> import transports
-        >>> w = Wallet()
+        >>> import transports, tests,base64
+        >>> tid = base64.b64encode('foobar')
+        >>> i = tests.makeIssuer()
         >>> stt = transports.SimpleTestTransport()
-        >>> w.listen(stt)
+        >>> i.listen(stt)
         >>> stt.send('HANDSHAKE',{'protocol': 'opencoin 1.0'})
         <Message('HANDSHAKE_ACCEPT',None)>
-        >>> stt.send('sendMoney',[1,2])
-        <Message('Receipt',None)>
+        >>> stt.send('TRANSFER_TOKEN_REQUEST',[tid, 'my account', [], [tests.coinA.toPython()], [['type', 'redeem']]])
+        <Message('TRANSFER_TOKEN_ACCEPT',['Zm9vYmFy', []])>
+        >>> stt.send('foobar')
+        <Message('GOODBYE',None)>
+        >>> stt.send('foobar')
+        <Message('PROTOCOL_ERROR','please do a handshake')>
         """
-        protocol = protocols.answerHandshakeProtocol(TRANSFER_TOKEN_REQUEST=protocols.TransferTokenRecipient(self),)
+        protocol = protocols.answerHandshakeProtocol(TRANSFER_TOKEN_REQUEST=protocols.TransferTokenRecipient(self),
+                                                     MINTING_KEY_FETCH_DENOMINATION=protocols.giveMintingKeyProtocol(self),
+                                                     MINTING_KEY_FETCH_KEYID=protocols.giveMintingKeyProtocol(self))
+        transport.autoreset = self.listen
         transport.setProtocol(protocol)
         transport.start()
-
 
     def transferToTarget(self,target,coins):
         return True
