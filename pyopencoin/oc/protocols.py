@@ -517,7 +517,7 @@ class TransferTokenRecipient(Protocol):
 
     This should also not be accepted - no coins but redeem
     >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['1234', 'my account', [], [], [['type', 'redeem']]]))
-    <Message('PROTOCOL_ERROR','send again')>
+    <Message('TRANSFER_TOKEN_REJECT',['Token', 'Rejected', []])>
     
     The malformed coin should be rejected
     >>> malformed = copy.deepcopy(tests.coins[0][0])
@@ -664,7 +664,7 @@ class TransferTokenRecipient(Protocol):
                 failures = []
 
                 if not coins:
-                    return ProtocolErrorMessage('TTRq13a')
+                    return Message('TRANSFER_TOKEN_REJECT', ['Token', 'Rejected', []])
 
                 #check if coins are valid
                 for coin in coins:
