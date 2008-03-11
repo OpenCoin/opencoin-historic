@@ -1,0 +1,147 @@
+This describes the gui for the opencoin wallet, which is a standalone computer
+program that should run on windows, macosx and linux.
+
+Ideally its metaphors and user interaction ideas would be transferrable to other
+clients as well, e.g. a mobile phone.
+
+Functions
+=========
+
+A wallet holds tokens from different currencies - pretty much like a real world
+wallet. These tokens can be received from and sent to other wallets, or the 
+issuer of the currency.
+
+All the following functions need to be done within the scope of a specific 
+currency - we don't support mixed transactions at this time!
+
+
+Sending and receiving
+---------------------
+
+When sending tokens, the user needs to decide
+
+ - what amount to send
+
+   The wallet software tries to automatically pick the right tokens - if not
+   possible, an exchange (see below) needs to initiated
+
+ - what the purpose is 
+
+   some freetext
+
+ - whom to send it to
+
+   The user needs to decide whether to use an internet connection or a 
+   bluetooth connection. Other kinds of connection might be possible
+
+   If 'internet' is choosen, and address needs to be provided by the user.
+
+   If 'bluetooth' is choosen, a selection of nearby devices should be 
+   present to the user, and the user can pick the partner for this 
+   transaction.
+
+The other side needs to activate receiving of the tokens
+
+ - it will need to select the method (internet or bluetooth)
+
+ - once the first contact is made the user should be asked if she wants to 
+   receive
+   a) from the specific sender
+   b) the specified amount
+   c) the specified purpose
+
+After this the tokens get transferred, and everything should be fine ;-)
+
+There are quite a lot of things that can go wrong. There might be the 
+need for additional user input.
+
+Token exchange
+--------------
+
+When sending tokens, when tokens are about to expire or out of other reasons
+it might become necessary to exchange tokens - basically like changing a banknote 
+into smaller ones (or coins).
+
+This transaction is always done with the issuer.
+
+The user should select either
+ 
+ - the amount of tokens to exchange
+ - the exact tokens to exchange
+ 
+The user also needs to decide whether to exchange
+
+ - to allow a specific amount to be transferred (later on), e.g. '7'
+ - for tokens of exact same denomination
+ - for automatic selection of token denominations
+
+The connection is then being made. The user needs to be informed either upon
+successful completion of the transaction, or of a delay - requireing the user
+to return at a later time to collect the tokens. Maybe the wallet could do this
+automatically later on?
+
+
+Token redeem
+------------
+
+The user might want to redeem the tokens, which means effectively tranferring them
+to the issuer. The interaction is pretty much the same as with token sending.
+
+Token mint
+----------
+
+The user might want to have new tokens from the issuer, but this time not 'paying' with 
+old ones, but with other means, e.g. the serial number of a prepaid payment.
+
+The user needs to select the amount of tokens to receive and needs to provide some
+text input as the purpose.
+
+The transaction is made, and the user gets informed if it suceeded, failed or got delayed
+- automatic pickup would be great.
+
+
+Token inspection
+----------------
+
+The user should have the possibility to see exactly what tokens she holds in each of the
+currencies, down to the level of inspecting each and every token. 
+
+When getting an overview of the tokens (held in the active currency) most relevant
+information is
+
+ a) denomination of token
+ b) expiration date of token
+
+
+Expected use
+============
+
+Of the described functions,  sending, receiving and exchange will be most likely
+the most prominent methods. The token inspection could be something like the main
+view of a currency, and most of the functions could be triggered from there.
+
+To speak in 'skype' terms:
+
+The list of buddies could be something like the list of tokens, instead of red and
+green 'call' and 'hangup' buttons we would need 'send', 'receive', 'exchange' buttons.
+
+
+Other functions
+===============
+
+There are other intereractions between the user and the wallet
+
+ - allowing new currencies
+ - disallowing currencies
+ - getting new certificates from the issuer
+
+These would be more 'advanced' interactions, and don't need to be done on a day per day
+basis.
+
+
+
+
+
+
+
+
