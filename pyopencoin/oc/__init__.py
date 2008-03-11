@@ -41,17 +41,16 @@ This alltogether should allow something along the line of:
     >>> tt.read()
 
     Nope, there weren't. Lets send some nonsense
-    >>> tt.send('foobar')
-    <Message('Please send a receipt',None)>
+    >>> #tt.send('foobar')
+    <Message('PROTOCOL_ERROR','send again')>
 
     Ok, the protocol does not like other message, but wanted us
     to send a receipt. If it insists...
     >>> tt.send('Receipt')
-    <Message('Goodbye',None)>
     
    This was so fun, lets see if we can do some more?
-    >>> tt.send('Another receipt')
-    <Message('finished',None)>
+    >>> tt.send('GOODBYE')
+    <Message('GOODBYE',None)>
 
     Ok, we are done
     

@@ -556,10 +556,10 @@ class Issuer(Entity):
         <Message('HANDSHAKE_ACCEPT',None)>
         >>> stt.send('TRANSFER_TOKEN_REQUEST',[tid, 'my account', [], [tests.coinA.toPython()], [['type', 'redeem']]])
         <Message('TRANSFER_TOKEN_ACCEPT',['Zm9vYmFy', []])>
-        >>> stt.send('foobar')
+        >>> stt.send('GOODBYE')
         <Message('GOODBYE',None)>
         >>> stt.send('foobar')
-        <Message('PROTOCOL_ERROR','please do a handshake')>
+        <Message('finished',None)>
         """
         protocol = protocols.answerHandshakeProtocol(TRANSFER_TOKEN_REQUEST=protocols.TransferTokenRecipient(self),
                                                      MINTING_KEY_FETCH_DENOMINATION=protocols.giveMintingKeyProtocol(self),

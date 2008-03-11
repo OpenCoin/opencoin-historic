@@ -285,7 +285,7 @@ class SimpleTestTransport(Transport):
 
 class ServerTest(Transport):
     
-    def __init__(self,other=None,autocontinue=1,autoprint='message'):
+    def __init__(self, other=None, autocontinue=1, autoprint='message'):
         self.buffer = None
         self.autocontinue = autocontinue
         self.autoprint = autoprint
@@ -298,11 +298,11 @@ class ServerTest(Transport):
 
     def write(self,message):
         if message:
-            l = '%s %s' % (self.nick,message)
+            l = '%s %s' % (self.nick, message)
             if self.autoprint == 'message':
-                print '%s %s' % (self.nick,message)
+                print '%s %s' % (self.nick, message)
             elif self.autoprint == 'json':
-                print '%s: %s' % (self.nick,message.toJson())
+                print '%s: %s' % (self.nick, message.toJson())
                 
             self.log.append((self.nick,message))
             if message.type != 'finished':
@@ -332,6 +332,8 @@ class ClientTest(ServerTest):
     >>> client.sendMoney(t)
     walletA <Message('sendMoney',[1, 2])>
     walletB <Message('Receipt',None)>
+    
+    # FIXME: How do we close the transport?
     walletA <Message('Goodbye',None)>
     walletB <Message('Goodbye',None)>
     walletA <Message('finished',None)>
@@ -341,7 +343,7 @@ class ClientTest(ServerTest):
 
     """
         
-    def __init__(self,callback,clientnick=None,servernick=None,autocontinue=1,autoprint='message',**kwargs):
+    def __init__(self, callback, clientnick=None, servernick=None, autocontinue=1, autoprint='message', **kwargs):
         self.callback = callback
         self.kwargs = kwargs
         self.nick=clientnick or 'Client'
@@ -439,6 +441,8 @@ class ServerTestTransport(Transport):
     >>> server.receiveMoney(t)
     Client <Message('sendMoney',[1, 2])>
     Server <Message('Receipt',None)>
+
+    # FIXME: how do we close?
     Client <Message('Goodbye',None)>
     Server <Message('Goodbye',None)>
     Client <Message('finished',None)>
@@ -576,13 +580,12 @@ class TestingTransport(Transport):
     
     >>> tt.read()
 
-    >>> tt.send('foobar')
-    <Message('Please send a receipt',None)>
+    >>> #tt.send('foobar')
+    <Message('PROTOCOL_ERROR','send again')>
 
     >>> tt.send('Receipt')
-    <Message('Goodbye',None)>
     
-    >>> tt.send('Another receipt')
+    >>> #tt.send('Another receipt')
     <Message('finished',None)>
 
     """

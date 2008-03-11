@@ -42,16 +42,30 @@ class Protocol:
         pass
 
     def goodbye(self,message):
+        """Denotes the end of a chain of messages in the protocol."""
         self.state = self.finish
+        if message.toJson() == Message('GOODBYE').toJson():
+            self.state = self.hangup
+            return Message('GOODBYE')
+        else:
+            if hasattr(self, 'transport') and hasattr(self.transport, 'autoreset'):
+                self.transport.autoreset(self.transport)
+                return self.transport.protocol.state(message)
+            else:
+                raise Exception(message)
+
+    def finish(self, message=None):
+        'always the last state. There can be other final states'
+        #if hasattr(self,'transport') and hasattr(self.transport,'autoreset'):
+        #    self.transport.autoreset(self.transport)
+        #    return self.transport.protocol.state(message)
+        #else:
+        self.state = self.hangup
         return Message('GOODBYE')
 
-    def finish(self,message):
-        'always the last state. There can be other final states'
-        if hasattr(self,'transport') and hasattr(self.transport,'autoreset'):
-            self.transport.autoreset(self.transport)
-            return self.transport.protocol.state(message)
-        else:
-            return Message('finished')
+    def hangup(self, message):
+        #self.transport.hangup()
+        return Message('finished')
                     
     def newMessage(self,message):
         'this is used by a transport to pass on new messages to the protocol'
@@ -119,8 +133,11 @@ class TokenSpendSender(Protocol):
     >>> css.state(Message('SUM_ACCEPT'))
     <Message('TOKEN_SPEND',['...', [[(...)], [(...)]], 'foobar'])>
     >>> css.state(Message('TOKEN_ACCEPT'))
+
+    Okay. Now hangup
+    >>> css.finish()
     <Message('GOODBYE',None)>
-    >>> css.state(Message('Really?'))
+    >>> css.state(Message('GOODBYE'))
     <Message('finished',None)>
     """
     def __init__(self,coins,target):
@@ -150,21 +167,26 @@ class TokenSpendSender(Protocol):
 
     def spendCoin(self,message):
         if message.type == 'SUM_ACCEPT':
-            self.state = self.goodbye            
+
+            self.state = self.conclusion            
             jsonCoins = [c.toPython() for c in self.coins]
             return Message('TOKEN_SPEND',[self.encoded_transaction_id,
                                           jsonCoins,
                                           self.target])
+
         elif message.type == 'PROTOCOL_ERROR':
+            self.newState(self.goodbye)
             pass
 
         else:
+            self.newState(self.goodbye)
             return ProtocolErrorMessage('TokenSpendSender')
 
-    def goodbye(self,message):
+    def conclusion(self,message):
+        self.newState(self.goodbye)
+
         if message.type == 'TOKEN_ACCEPT':
-            self.state = self.finish
-            return Message('GOODBYE')
+            pass
 
         elif message.type == 'PROTOCOL_ERROR':
             pass
@@ -185,9 +207,9 @@ class TokenSpendRecipient(Protocol):
     <Message('SUM_ACCEPT',None)>
     >>> csr.state(Message('TOKEN_SPEND',['1234', [coin1, coin2], 'a book']))
     <Message('TOKEN_ACCEPT',None)>
-    >>> csr.state(Message('Goodbye',None))
+    >>> csr.state(Message('GOODBYE',None))
     <Message('GOODBYE',None)>
-    >>> csr.state(Message('foobar'))
+    >>> csr.state(Message(None))
     <Message('finished',None)>
 
     TODO: Add PROTOCOL_ERROR checking
@@ -200,6 +222,8 @@ class TokenSpendRecipient(Protocol):
 
     def start(self,message):
         import base64
+
+        self.newState(self.goodbye) # default is to end protocol. Reset if we continue
 
         if message.type == 'SUM_ANNOUNCE':
             try:
@@ -238,12 +262,11 @@ class TokenSpendRecipient(Protocol):
             action = self.wallet.confirmReceiveCoins('the other wallet id',self.sum,self.target)
 
             if action == 'reject':
-                self.state = self.goodbye 
                 return Message('SUM_REJECT')
 
             else:
                 self.action = action
-                self.state = self.handleCoins
+                self.newState(self.handleCoins)
                 return Message('SUM_ACCEPT')
 
         elif message.type == 'PROTOCOL_ERROR':
@@ -254,6 +277,8 @@ class TokenSpendRecipient(Protocol):
 
     def handleCoins(self,message):
         import base64
+
+        self.newState(self.goodbye)
 
         if message.type == 'TOKEN_SPEND':
             try:
@@ -295,7 +320,6 @@ class TokenSpendRecipient(Protocol):
             result = Message('TOKEN_REJECT','default')
             
             if transaction_id != self.transaction_id:
-                #FIXME: is the a PROTOCOL_ERROR?
                 result = Message('TOKEN_REJECT','Rejected')
             
             elif sum(tokens) != self.sum:
@@ -309,7 +333,6 @@ class TokenSpendRecipient(Protocol):
                 if out:
                     result = Message('TOKEN_ACCEPT')
 
-            self.state = self.goodbye
             return result
 
         elif message.type == 'PROTOCOL_ERROR':
@@ -338,7 +361,14 @@ class TransferTokenSender(Protocol):
     >>> tts.state(Message('HANDSHAKE_ACCEPT'))
     <Message('TRANSFER_TOKEN_REQUEST',['...', 'my account', [], [[(...)], [(...)]], [['type', 'redeem']]])>
     >>> tts.state(Message('TRANSFER_TOKEN_ACCEPT',[tts.encoded_transaction_id, []]))
+
+    >>> tts.state == tts.goodbye
+    True
+
+    >>> tts.finish()
     <Message('GOODBYE',None)>
+    >>> tts.state(Message('GOODBYE'))
+    <Message('finished',None)>
 
     """
 
@@ -363,11 +393,13 @@ class TransferTokenSender(Protocol):
                 self.coins]
         if self.kwargs:
             data.append([list(i) for i in self.kwargs.items()])                
-        self.state = self.goodbye
+        self.state = self.conclusion
         return Message('TRANSFER_TOKEN_REQUEST',data)
 
-    def goodbye(self,message):
+    def conclusion(self,message):
         import base64
+
+        self.newState(self.goodbye)
 
         if message.type == 'TRANSFER_TOKEN_ACCEPT':
 
@@ -406,7 +438,6 @@ class TransferTokenSender(Protocol):
 
             else:
                 if len(blinds) != 0:
-                    raise Exception('c')
                     return ProtocolErrorMessage('TTA')
                 
             self.result = 1
@@ -487,15 +518,11 @@ class TransferTokenSender(Protocol):
             self.result = 0
 
         elif message.type == 'PROTOCOL_ERROR':
-            #FIXME: self.state=self.finish is hackish. Does it do what we want?
-            self.state = self.finish
             return Message('GOODBYE')
 
         else:
             return ProtocolErrorMessage('TransferTokenSender')
 
-        self.state = self.finish
-        return Message('GOODBYE')
 
 
 class TransferTokenRecipient(Protocol):
@@ -516,21 +543,25 @@ class TransferTokenRecipient(Protocol):
     <Message('PROTOCOL_ERROR','send again')>
 
     This should also not be accepted - no coins but redeem
+    >>> ttr.state = ttr.start
     >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['1234', 'my account', [], [], [['type', 'redeem']]]))
     <Message('TRANSFER_TOKEN_REJECT',['Token', 'Rejected', []])>
     
     The malformed coin should be rejected
     >>> malformed = copy.deepcopy(tests.coins[0][0])
     >>> malformed.signature = 'Not a valid signature'
+    >>> ttr.state = ttr.start
     >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['1234', 'my account', [], [malformed.toPython()], [['type', 'redeem']]]))
     <Message('TRANSFER_TOKEN_REJECT',['1234', 'Token', 'See detail', ['Rejected']])>
 
     The unknown key_identifier should be rejected
     >>> malformed = copy.deepcopy(tests.coins[0][0])
     >>> malformed.key_identifier = 'Not a valid key identifier'
+    >>> ttr.state = ttr.start
     >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['1234', 'my account', [], [malformed.toPython()], [['type', 'redeem']]]))
     <Message('TRANSFER_TOKEN_REJECT',['1234', 'Token', 'See detail', ['Rejected']])>
 
+    >>> ttr.state = ttr.start
     >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['1234', 'my account', [], [coin1, coin2], [['type', 'redeem']]]))
     <Message('TRANSFER_TOKEN_ACCEPT',['1234', []])>
 
@@ -549,6 +580,14 @@ class TransferTokenRecipient(Protocol):
     >>> ttr.state = ttr.start
     >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['1234', 'my account', blindslist, [], [['type', 'mint']]]))
     <Message('TRANSFER_TOKEN_ACCEPT',['1234', ['Do0el3uxdyFMF8NdXtowBLBOxXM0r7xR9hXkaZWEhPUBQCe8yaYGO09wnxrWEVFlt0r9M6bCZxKtzNGDGw3/XQ==', 'dTnL8yTkdelG9fW//ZoKzUl7LTjBXiElaHkfyMLgVetEM7pmEzfcdfRWhm2PP3IhnkZ8CmAR1uOJ99rJ+XBASA==']])>
+
+    >>> ttr.state == ttr.goodbye
+    True
+
+    >>> ttr.finish()
+    <Message('GOODBYE',None)>
+    >>> ttr.state(Message('GOODBYE'))
+    <Message('finished',None)>
 
     Now, check to make sure the implementation is good
     >>> ttr.state = ttr.start
@@ -575,6 +614,8 @@ class TransferTokenRecipient(Protocol):
     def start(self,message):
         from entities import LockingError
         import base64
+
+        self.newState(self.goodbye) # No matter what, we have one shot
         
         if message.type == 'TRANSFER_TOKEN_REQUEST':
             try:
@@ -702,7 +743,6 @@ class TransferTokenRecipient(Protocol):
                     #Note: if we fail here, that means we have large problems, since the coins are locked
                     return ProtocolErrorMessage('TTRq20')
 
-                self.state = self.goodbye
                 return Message('TRANSFER_TOKEN_ACCEPT',[encoded_transaction_id, []])
 
 
@@ -839,7 +879,6 @@ class TransferTokenRecipient(Protocol):
                     #Note: if we fail here, that means we have large problems, since the coins are locked
                     return Message('PROTOCOL_ERROR', 'send again')
 
-                self.state = self.goodbye
 
                 return Message('TRANSFER_TOKEN_ACCEPT', [encoded_transaction_id, minted])
 
@@ -894,7 +933,14 @@ class fetchMintingKeyProtocol(Protocol):
     >>> from tests import mintKeys
     >>> mintKey = mintKeys[0]
     >>> fmp.state(Message('MINTING_KEY_PASS',[mintKey.toPython()]))
+
+    >>> fmp.state == fmp.goodbye
+    True
+
+    >>> fmp.finish()
     <Message('GOODBYE',None)>
+    >>> fmp.state(Message('GOODBYE'))
+    <Message('finished',None)>
 
 
     And now by keyid
@@ -907,6 +953,11 @@ class fetchMintingKeyProtocol(Protocol):
     <Message('MINTING_KEY_FETCH_KEYID',['sj17RxE1hfO06+oTgBs9Z7xLut/3NN+nHJbXSJYTks0='])>
 
     >>> fmp.state(Message('MINTING_KEY_PASS',[mintKey.toPython()]))
+
+    >>> fmp.state == fmp.goodbye
+    True
+
+    >>> fmp.finish()
     <Message('GOODBYE',None)>
 
 
@@ -916,8 +967,15 @@ class fetchMintingKeyProtocol(Protocol):
 
     >>> fmp.newState(fmp.getKey)
     >>> fmp.state(Message('MINTING_KEY_FAILURE',[['RxE1', 'Unknown key_identifier']]))
+
+    >>> fmp.state == fmp.goodbye
+    True
+
+    >>> fmp.finish()
     <Message('GOODBYE',None)>
-   
+    >>> fmp.state(Message('GOODBYE'))
+    <Message('finished',None)>
+
     Now lets break something
     
     >>> fmp.newState(fmp.getKey)
@@ -970,7 +1028,9 @@ class fetchMintingKeyProtocol(Protocol):
     Make sure we are in the denomination branch
     >>> fmp.newState(fmp.getKey)
     >>> fmp.state(Message('MINTING_KEY_FAILURE', [['1', '']]))
-    <Message('GOODBYE',None)>
+
+    >>> fmp.state == fmp.goodbye
+    True
     
     Do a check
 
@@ -1010,14 +1070,16 @@ class fetchMintingKeyProtocol(Protocol):
                 return Message('MINTING_KEY_FETCH_KEYID',self.keyids) 
 
         elif message.type == 'HANDSHAKE_REJECT':
-            self.newState(self.finish)
-            return Message('GOODBYE')
+            self.newState(self.goodbye)
 
         else:
+            self.newState(self.goodbye)
             return Message('PROTOCOL ERROR','send again')
 
     def getKey(self,message):
         """Gets the actual key"""
+
+        self.newState(self.goodbye)
 
         if message.type == 'MINTING_KEY_PASS':
 
@@ -1044,8 +1106,6 @@ class fetchMintingKeyProtocol(Protocol):
             # wallet explicitly
             self.keycerts.extend(keys)
             
-            self.newState(self.finish)
-            return Message('GOODBYE')
                 
 
         elif message.type == 'MINTING_KEY_FAILURE':
@@ -1095,8 +1155,6 @@ class fetchMintingKeyProtocol(Protocol):
                     except TypeError:
                         return ProtocolErrorMessage('MKF9')
 
-            self.newState(self.finish)
-            return Message('GOODBYE')
         
         elif message.type == 'PROTOCOL_ERROR':
             pass
@@ -1250,16 +1308,16 @@ class WalletSenderProtocol(Protocol):
     <Message('sendMoney',[1, 2])>
     
     >>> sp.state(Message('Foo'))
-    <Message('Please send a receipt',None)>
+    <Message('PROTOCOL_ERROR','send again')>
 
     Lets give it a receipt
+    >>> sp.newState(sp.waitForReceipt)
     >>> sp.state(Message('Receipt'))
-    <Message('Goodbye',None)>
 
-    >>> sp.state(Message('Bla'))
-    <Message('finished',None)>
+    >>> sp.finish()
+    <Message('GOODBYE',None)>
 
-    >>> sp.state(Message('Bla'))
+    >>> sp.state(Message('GOODBYE'))
     <Message('finished',None)>
 
     """
@@ -1273,17 +1331,18 @@ class WalletSenderProtocol(Protocol):
     def start(self,message):
         'always set the new state before returning'
         
-        self.state = self.waitForReceipt
+        self.newState(self.waitForReceipt)
+
         return Message('sendMoney',[1,2])
 
     def waitForReceipt(self,message):
         'after sending we need a receipt'
+        self.newState(self.goodbye)
 
         if message.type == 'Receipt':
-            self.state=self.finish
-            return Message('Goodbye')
+            pass
         else:
-            return Message('Please send a receipt')
+            return ProtocolErrorMessage('WalletProtocol')
 
 class WalletRecipientProtocol(Protocol):
 
@@ -1292,17 +1351,15 @@ class WalletRecipientProtocol(Protocol):
         Protocol.__init__(self)
 
     def start(self,message):
+        self.newState(self.goodbye)
+        
         if message.type == 'sendMoney':
             if self.wallet:
                 self.wallet.coins.extend(message.data)
-            self.state=self.Goodbye
             return Message('Receipt')
         else:
-            return Message('Please send me money, mama')
+            return ProtocolErrorMessage('WalletProtocol')
 
-    def Goodbye(self,message):
-        self.state = self.finish
-        return Message('Goodbye')
 
 if __name__ == "__main__":
     import doctest,sys
