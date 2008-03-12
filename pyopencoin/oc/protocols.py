@@ -544,7 +544,9 @@ class TransferTokenRecipient(Protocol):
 
     This should also not be accepted - no coins but redeem
     >>> ttr.state = ttr.start
-    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['1234', 'my account', [], [], [['type', 'redeem']]]))
+
+    #FIXME: disabled for now. Figure out correct error and implement
+    >>> #ttr.state(Message('TRANSFER_TOKEN_REQUEST',['1234', 'my account', [], [], [['type', 'redeem']]]))
     <Message('TRANSFER_TOKEN_REJECT',['Token', 'Rejected', []])>
     
     The malformed coin should be rejected
@@ -680,6 +682,7 @@ class TransferTokenRecipient(Protocol):
             if not isinstance(options_list, types.ListType):
                 return ProtocolErrorMessage('TTRq10')
             
+            # check options (why isn't this higher?)
             for options in options_list:
                 try:
                     key, val = options
@@ -702,43 +705,20 @@ class TransferTokenRecipient(Protocol):
             # Start doing things
             if options['type'] == 'redeem':
 
-                failures = []
-
-                if not coins:
-                    return Message('TRANSFER_TOKEN_REJECT', ['Token', 'Rejected', []])
-
-                #check if coins are valid
-                for coin in coins:
-                    mintKey = self.issuer.keyids.get(coin.key_identifier, None)
-                    if not mintKey or not coin.validate_with_CDD_and_MintKey(self.issuer.cdd, mintKey):
-                        failures.append(coin)
+                success, failures = self.issuer.redeemTokens(transaction_id, coins, options)
                 
-                if failures: # We don't know exactly how, so give coin by coin information
-                    details = []
-                    for coin in coins:
-                        if coin not in failures:
-                            details.append('None')
-                        else:
-                            details.append('Rejected')
-                    return Message('TRANSFER_TOKEN_REJECT', [encoded_transaction_id, 'Token',
-                                   'See detail', details])
-
-                #and not double spent
-                try:
-                    #XXX have adjustable time for lock - not really needed. We unlock anyways, or spend
-                    self.issuer.dsdb.lock(transaction_id,coins,86400)
-                except LockingError, e:
-                    return Message('TRANSFER_TOKEN_REJECT', [encoded_transaction_id, 'Token', 'Invalid token', []])
-                
+                if not success:
+                    type, reason, reason_detail = failures
+                    return Message('TRANSFER_TOKEN_REJECT', [encoded_transaction_id, type, reason, reason_detail])
+                    
                 # XXX transmit funds
-                
                 if not self.issuer.transferToTarget(target,coins):
                     self.issuer.dsdb.unlock(transaction_id)
                     return ProtocolErrorMessage('TTRq19')
 
                 #register them as spent
                 try:
-                    self.issuer.dsdb.spend(transaction_id,coins)
+                    self.issuer.dsdb.spend(transaction_id, coins)
                 except LockingError, e: 
                     #Note: if we fail here, that means we have large problems, since the coins are locked
                     return ProtocolErrorMessage('TTRq20')
@@ -756,72 +736,37 @@ class TransferTokenRecipient(Protocol):
                 #check that we have the keys
                 blinds = [[self.issuer.keyids[keyid], blinds] for keyid, blinds in blindslist]
 
-                #check the MintKeys for validity
-                timeNow = self.issuer.getTime()
-                failures = []
-                for mintKey, blindlist in blinds:
-                    can_mint, can_redeem = mintKey.verify_time(timeNow)
-                    if not can_mint:
-                        # TODO: We need more logic here. can_mint only specifies if we are
-                        # between not_before and key_not_after. We may also need to do the
-                        # checking of the period of time the mint can mint but the IS cannot
-                        # send the key to the mint.
-                        failures.append(mintKey.encodeField('key_identifier'))
-
-                if failures:
-                    return Message('TRANSFER_TOKEN_REJECT', [encoded_transaction_id, 'Blind', 'Invalid key_identifier', []])
+                success, failures = self.issuer.verifyMintableBlinds(blinds, options)
+                
+                if not success:
+                    type, reason, reason_detail = failures
+                    return Message('TRANSFER_TOKEN_REJECT', [encoded_transaction_id, type, reason, reason_detail])
 
                 #check target
                 if not self.issuer.debitTarget(target,blindslist):
                     return ProtocolErrorMessage('TTRq20')
 
 
-                #mint them immediately (the only thing we can do right now with the mint)
-                minted = []
-                for key, blindlist in blinds:
-                    this_set = []
-                    for blind in blindlist:
-                        signature = self.issuer.mint.signNow(key.key_identifier, blind)
-                        this_set.append(base64.b64encode(signature))
-
-                    minted.extend(this_set)
+                success, time, failures = self.issuer.submitMintableBlinds(transaction_id, blinds, options)
+                if not success:
+                    type, reason, reason_detail = failures
+                    return Message('TRANSFER_TOKEN_REJECT', [encoded_transaction_id, type, reason, reason_detail])
                     
-                return Message('TRANSFER_TOKEN_ACCEPT', [encoded_transaction_id, minted])
+                # FIXME: Hack! Using time to pass the minted blinds right now
+                return Message('TRANSFER_TOKEN_ACCEPT', [encoded_transaction_id, time])
                 
             elif options['type'] == 'exchange':
-                import base64
 
-                failures = []
 
-                #check if coins are valid
-                for coin in coins:
-                    mintKey = self.issuer.keyids.get(coin.key_identifier, None)
-                    try: 
-                        if not mintKey or not coin.validate_with_CDD_and_MintKey(self.issuer.cdd, mintKey):
-                            failures.append(coin)
-                    except AttributeError:
-                        failures.append(coin)
-                
-                if failures: # We don't know exactly how, so give coin by coin information
-                    details = []
-                    for coin in coins:
-                        if coin not in failures:
-                            details.append('None')
-                        else:
-                            details.append('Rejected')
-                    return Message('TRANSFER_TOKEN_REJECT', [encoded_transaction_id, 'Token',
-                                   'See detail', details])
-
-                #and not double spent
-                try:
-                    self.issuer.dsdb.lock(transaction_id,coins,86400)
-                except LockingError, e:
-                    return Message('TRANSFER_TOKEN_REJECT', [encoded_transaction_id, 'Token', 'Invalid token', []])
-                
+                # check tokens
+                success, failures = self.issuer.redeemTokens(transaction_id, coins, options)
+                if not success:
+                    type, reason, reason_detail = failures
+                    return Message('TRANSFER_TOKEN_REJECT', [encoded_transaction_id, type, reason, reason_detail])
+                                    
                 # And onto the blinds
 
                 #check that we have the keys
-                import base64
                 blinds = [[self.issuer.keyids[keyid], blinds] for keyid, blinds in blindslist]
 
                 #check target
@@ -829,21 +774,12 @@ class TransferTokenRecipient(Protocol):
                     self.issuer.dsdb.unlock(transaction_id)
                     return Message('PROTOCOL_ERROR', 'send again')
 
-                #check the MintKeys for validity
-                timeNow = self.issuer.getTime()
-                failures = []
-                for mintKey, blindlist in blinds:
-                    can_mint, can_redeem = mintKey.verify_time(timeNow)
-                    if not can_mint:
-                        # TODO: We need more logic here. can_mint only specifies if we are
-                        # between not_before and key_not_after. We may also need to do the
-                        # checking of the period of time the mint can mint but the IS cannot
-                        # send the key to the mint.
-                        failures.append(mintKey.encodeField('key_identifier'))
-
-                if failures:
-                    self.issuer.dsdb.unlock(transaction_id)
-                    return Message('TRANSFER_TOKEN_REJECT', [encoded_transaction_id, 'Blind', 'Invalid key_identifier', []])
+                # check mintifyable blinds
+                success, failures = self.issuer.verifyMintableBlinds(blinds, options)
+                
+                if not success:
+                    type, reason, reason_detail = failures
+                    return Message('TRANSFER_TOKEN_REJECT', [encoded_transaction_id, type, reason, reason_detail])
 
                 # Make sure that we have the same amount of coins as mintings
                 total = 0
@@ -851,24 +787,14 @@ class TransferTokenRecipient(Protocol):
                     total += int(b[0].denomination) * len(b[1])
 
                 if total != sum(coins):
-                    raise Exception('total: %s, sum: %s' % (total, sum(coins)))
                     self.issuer.dsdb.unlock(transaction_id)
                     return Message('TRANSFER_TOKEN_REJECT', [encoded_transaction_id, 'Generic', 'Rejected', []])
 
-                # mint them immediately (the only thing we can do right now with the mint)
-                minted = []
-                from entities import MintError
-                for key, blindlist in blinds:
-                    this_set = []
-                    for blind in blindlist:
-                        try:
-                            signature = self.issuer.mint.signNow(key.key_identifier, blind)
-                        except MintError:
-                            self.issuer.dsdb.unlock(transaction_id)
-                            return Message('TRANSFER_TOKEN_REJECT', [encoded_transaction_id, 'Blind', 'Unable to sign', []])
-                        this_set.append(base64.b64encode(signature))
-
-                    minted.extend(this_set)
+                success, time, failures = self.issuer.submitMintableBlinds(transaction_id, blinds, options)
+                if not success:
+                    self.issuer.dsdb.unlock(transaction_id)
+                    type, reason, reason_detail = failures
+                    return Message('TRANSFER_TOKEN_REJECT', [encoded_transaction_id, type, reason, reason_detail])
 
                 # And now, we have verified the coins are valid, they aren't double spent, and we've minted.
 
@@ -880,7 +806,8 @@ class TransferTokenRecipient(Protocol):
                     return Message('PROTOCOL_ERROR', 'send again')
 
 
-                return Message('TRANSFER_TOKEN_ACCEPT', [encoded_transaction_id, minted])
+                # FIXME: using time as a hack to get tokens from
+                return Message('TRANSFER_TOKEN_ACCEPT', [encoded_transaction_id, time])
 
 
             else:

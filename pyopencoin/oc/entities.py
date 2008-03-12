@@ -573,7 +573,101 @@ class Issuer(Entity):
 
     def debitTarget(self,target,blinds):
         return True
+        
+    def redeemTokens(self, transaction_id, tokens, options):
+        """verifies the tokens and locks them.
+        
+        Returns a tuple of (locked, failures).
+        Locked is a boolean specifying if the tokens are locked or not
+        Failures is a tuple of (type, reason, reason_detail) to return in case of a reject.
+        
+        failures may be None if there were no failures
+        """
+        
+        # FIXME: This will fail if we try to lock with an already-known request_id. Maybe a different error?
+        
+        failures = []
 
+        if not tokens:
+            return ('TRANSFER_TOKEN_REJECT', ('Token', 'Rejected', []))
+
+        #check if coins are valid
+        for token in tokens:
+            mintKey = self.keyids.get(token.key_identifier, None)
+            if not mintKey or not token.validate_with_CDD_and_MintKey(self.cdd, mintKey):
+                failures.append(token)
+        
+        if failures: # We don't know exactly how, so give coin by coin information
+            details = []
+            for token in tokens:
+                if token not in failures:
+                    details.append('None')
+                else:
+                    details.append('Rejected')
+            return (False, ('Token', 'See detail', details))
+
+        #and not double spent
+        try:
+            #XXX have adjustable time for lock - not really needed. We unlock anyways, or spend
+            self.dsdb.lock(transaction_id, tokens, 86400)
+        except LockingError, e:
+            # FIXME: Add per-token errors depending on values
+            return (False, ('Token', 'Invalid token', []))
+            
+        return (True, None)
+
+    def verifyMintableBlinds(self, blindslist, options):
+        """returns a tuple of (success, failures) if the blinds in blindslist are mintable.
+        
+        success is a boolean set to true if they are mintable, otherwise false
+        failures is a tuple of (type, reason, reason-detail) to return in case of a reject
+        
+        blindslist is a list of [ [MintKey, [blind1, blind2...]], [MintKey....]]
+        """
+        
+        #check the MintKeys for validity
+        timeNow = self.getTime()
+        failures = []
+        for mintKey, blindlist in blindslist:
+            can_mint, can_redeem = mintKey.verify_time(timeNow)
+            if not can_mint:
+                # TODO: We need more logic here. can_mint only specifies if we are
+                # between not_before and key_not_after. We may also need to do the
+                # checking of the period of time the mint can mint but the IS cannot
+                # send the key to the mint.
+                failures.append(mintKey.encodeField('key_identifier'))
+
+        if failures:
+            return (False, ('Blind', 'Invalid key_identifier', []))
+
+        else:
+            return (True, None)
+            
+    def submitMintableBlinds(self, transaction_id, blindslist, options):
+        """returns a tuple of (success, time, failures) after submitting blinds to the mint.
+        
+        success is a boolean set to true if we successfully submitted. False otherwise.
+                Note: it can be false if we have JITM and it has already failed.
+        time is an int of time in seconds to pass with a 'DELAY'
+        failures is a tuple of (type, reason, reason_detail) to be passed if a 'REJECT'.
+        """
+        #FIXME: we only do JITM minting right now
+
+        import base64
+        
+        #mint them immediately (the only thing we can do right now with the mint)
+        minted = []
+        for key, blindlist in blindslist:
+            this_set = []
+            for blind in blindlist:
+                signature = self.mint.signNow(key.key_identifier, blind)
+                this_set.append(base64.b64encode(signature))
+
+            minted.extend(this_set)
+            
+        # FIXME: HACK! Submitting blinds instead of time.
+        return (True, minted, None)
+        
 class KeyFetchError(Exception):
     pass
 
