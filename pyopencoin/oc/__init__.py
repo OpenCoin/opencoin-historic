@@ -47,10 +47,10 @@ This alltogether should allow something along the line of:
     Ok, the protocol does not like other message, but wanted us
     to send a receipt. If it insists...
     >>> tt.send('Receipt')
-    
-   This was so fun, lets see if we can do some more?
-    >>> tt.send('GOODBYE')
     <Message('GOODBYE',None)>
+
+    This was so fun, lets see if we can do some more?
+    >>> tt.send('GOODBYE')
 
     Ok, we are done
     

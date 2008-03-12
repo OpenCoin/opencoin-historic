@@ -30,6 +30,7 @@ class Protocol:
         
         self.state = self.start
         self.result = None
+        self.done = None
 
     def setTransport(self,transport):
         'get the transport we are working with'
@@ -41,31 +42,22 @@ class Protocol:
        
         pass
 
-    def goodbye(self,message):
+    def goodbye(self,message=None):
         """Denotes the end of a chain of messages in the protocol."""
-        self.state = self.finish
-        if message.toJson() == Message('GOODBYE').toJson():
-            self.state = self.hangup
-            return Message('GOODBYE')
-        else:
-            if hasattr(self, 'transport') and hasattr(self.transport, 'autoreset'):
+        if message == None:
+            message = Message('GOODBYE')
+        #we are not done
+        if not self.done:                       
+            #maybe we need to reset?                
+            if message.type != 'GOODBYE' and hasattr(self, 'transport') and hasattr(self.transport, 'autoreset'):
                 self.transport.autoreset(self.transport)
                 return self.transport.protocol.state(message)
+            #well, then lets be done, say goodbye to signal the fact
             else:
-                raise Exception(message)
-
-    def finish(self, message=None):
-        'always the last state. There can be other final states'
-        #if hasattr(self,'transport') and hasattr(self.transport,'autoreset'):
-        #    self.transport.autoreset(self.transport)
-        #    return self.transport.protocol.state(message)
-        #else:
-        self.state = self.hangup
-        return Message('GOODBYE')
-
-    def hangup(self, message):
-        #self.transport.hangup()
-        return Message('finished')
+                self.done = 1
+                return Message('GOODBYE')
+        else:
+            pass
                     
     def newMessage(self,message):
         'this is used by a transport to pass on new messages to the protocol'
@@ -133,12 +125,9 @@ class TokenSpendSender(Protocol):
     >>> css.state(Message('SUM_ACCEPT'))
     <Message('TOKEN_SPEND',['...', [[(...)], [(...)]], 'foobar'])>
     >>> css.state(Message('TOKEN_ACCEPT'))
-
-    Okay. Now hangup
-    >>> css.finish()
     <Message('GOODBYE',None)>
     >>> css.state(Message('GOODBYE'))
-    <Message('finished',None)>
+    
     """
     def __init__(self,coins,target):
 
@@ -186,7 +175,7 @@ class TokenSpendSender(Protocol):
         self.newState(self.goodbye)
 
         if message.type == 'TOKEN_ACCEPT':
-            pass
+            return self.goodbye()
 
         elif message.type == 'PROTOCOL_ERROR':
             pass
@@ -209,8 +198,9 @@ class TokenSpendRecipient(Protocol):
     <Message('TOKEN_ACCEPT',None)>
     >>> csr.state(Message('GOODBYE',None))
     <Message('GOODBYE',None)>
+
+    After we have received a goodbye, we don't get anything else
     >>> csr.state(Message(None))
-    <Message('finished',None)>
 
     TODO: Add PROTOCOL_ERROR checking
     """
@@ -361,15 +351,12 @@ class TransferTokenSender(Protocol):
     >>> tts.state(Message('HANDSHAKE_ACCEPT'))
     <Message('TRANSFER_TOKEN_REQUEST',['...', 'my account', [], [[(...)], [(...)]], [['type', 'redeem']]])>
     >>> tts.state(Message('TRANSFER_TOKEN_ACCEPT',[tts.encoded_transaction_id, []]))
-
+    <Message('GOODBYE',None)>
     >>> tts.state == tts.goodbye
     True
+    >>> tts.state(Message('foobar'))
 
-    >>> tts.finish()
-    <Message('GOODBYE',None)>
-    >>> tts.state(Message('GOODBYE'))
-    <Message('finished',None)>
-
+    
     """
 
     def __init__(self, target, blinds, coins, **kwargs):
@@ -398,9 +385,11 @@ class TransferTokenSender(Protocol):
 
     def conclusion(self,message):
         import base64
-
+        
+        #no matter what, this is going to be the last state, after this
+        #its goodbye
         self.newState(self.goodbye)
-
+        
         if message.type == 'TRANSFER_TOKEN_ACCEPT':
 
             try:
@@ -440,8 +429,6 @@ class TransferTokenSender(Protocol):
                 if len(blinds) != 0:
                     return ProtocolErrorMessage('TTA')
                 
-            self.result = 1
-                
         elif message.type == 'TRANSFER_TOKEN_DELAY':
             try:
                 encoded_transaction_id, reason = message.data
@@ -463,8 +450,7 @@ class TransferTokenSender(Protocol):
                 return ProtocolErrorMessage('TTD')
 
             # FIXME Do some things here, after we work out how delays work
-                
-            self.result = 1
+            
 
         elif message.type == 'TRANSFER_TOKEN_REJECT':
             try:
@@ -515,13 +501,10 @@ class TransferTokenSender(Protocol):
 
             # FIXME: Do something here?
 
-            self.result = 0
-
-        elif message.type == 'PROTOCOL_ERROR':
-            return Message('GOODBYE')
-
-        else:
+        elif message.type != 'PROTOCOL_ERROR':
             return ProtocolErrorMessage('TransferTokenSender')
+
+        return self.goodbye() 
 
 
 
@@ -586,13 +569,13 @@ class TransferTokenRecipient(Protocol):
     >>> ttr.state == ttr.goodbye
     True
 
-    >>> ttr.finish()
-    <Message('GOODBYE',None)>
     >>> ttr.state(Message('GOODBYE'))
-    <Message('finished',None)>
+    <Message('GOODBYE',None)>
+
 
     Now, check to make sure the implementation is good
     >>> ttr.state = ttr.start
+    >>> ttr.done = 0
     >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST'))
     <Message('PROTOCOL_ERROR','send again')>
 
@@ -859,16 +842,13 @@ class fetchMintingKeyProtocol(Protocol):
 
     >>> from tests import mintKeys
     >>> mintKey = mintKeys[0]
+    
     >>> fmp.state(Message('MINTING_KEY_PASS',[mintKey.toPython()]))
+    <Message('GOODBYE',None)>
 
     >>> fmp.state == fmp.goodbye
     True
-
-    >>> fmp.finish()
-    <Message('GOODBYE',None)>
     >>> fmp.state(Message('GOODBYE'))
-    <Message('finished',None)>
-
 
     And now by keyid
 
@@ -880,12 +860,10 @@ class fetchMintingKeyProtocol(Protocol):
     <Message('MINTING_KEY_FETCH_KEYID',['sj17RxE1hfO06+oTgBs9Z7xLut/3NN+nHJbXSJYTks0='])>
 
     >>> fmp.state(Message('MINTING_KEY_PASS',[mintKey.toPython()]))
+    <Message('GOODBYE',None)>
 
     >>> fmp.state == fmp.goodbye
     True
-
-    >>> fmp.finish()
-    <Message('GOODBYE',None)>
 
 
     Lets have some problems a failures (we set the state
@@ -893,15 +871,12 @@ class fetchMintingKeyProtocol(Protocol):
     of lines)
 
     >>> fmp.newState(fmp.getKey)
+    >>> fmp.done = 0
     >>> fmp.state(Message('MINTING_KEY_FAILURE',[['RxE1', 'Unknown key_identifier']]))
-
+    <Message('GOODBYE',None)>
     >>> fmp.state == fmp.goodbye
     True
-
-    >>> fmp.finish()
-    <Message('GOODBYE',None)>
     >>> fmp.state(Message('GOODBYE'))
-    <Message('finished',None)>
 
     Now lets break something
     
@@ -1083,11 +1058,10 @@ class fetchMintingKeyProtocol(Protocol):
                         return ProtocolErrorMessage('MKF9')
 
         
-        elif message.type == 'PROTOCOL_ERROR':
-            pass
-
-        else:
+        elif message.type != 'PROTOCOL_ERROR':
             return ProtocolErrorMessage('fetchMintingKeyProtocol')
+
+        return self.goodbye(message)            
 
 
 
@@ -1240,12 +1214,9 @@ class WalletSenderProtocol(Protocol):
     Lets give it a receipt
     >>> sp.newState(sp.waitForReceipt)
     >>> sp.state(Message('Receipt'))
-
-    >>> sp.finish()
     <Message('GOODBYE',None)>
 
     >>> sp.state(Message('GOODBYE'))
-    <Message('finished',None)>
 
     """
 
@@ -1267,7 +1238,7 @@ class WalletSenderProtocol(Protocol):
         self.newState(self.goodbye)
 
         if message.type == 'Receipt':
-            pass
+            return self.goodbye()
         else:
             return ProtocolErrorMessage('WalletProtocol')
 

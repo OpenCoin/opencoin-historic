@@ -122,7 +122,8 @@ class SocketServerTransport(Transport):
         if self.debug:
             print message
         self.conn.send(message.toJson())
-        if message.type == 'finished':
+        #if message.type == 'finished':
+        if self.protocol.done:
             self.conn.close()
             self.conn = None
            
@@ -332,12 +333,8 @@ class ClientTest(ServerTest):
     >>> client.sendMoney(t)
     walletA <Message('sendMoney',[1, 2])>
     walletB <Message('Receipt',None)>
-    
-    # FIXME: How do we close the transport?
-    walletA <Message('Goodbye',None)>
-    walletB <Message('Goodbye',None)>
-    walletA <Message('finished',None)>
-
+    walletA <Message('GOODBYE',None)>
+    walletB <Message('GOODBYE',None)>
 
 
 
@@ -441,11 +438,8 @@ class ServerTestTransport(Transport):
     >>> server.receiveMoney(t)
     Client <Message('sendMoney',[1, 2])>
     Server <Message('Receipt',None)>
-
-    # FIXME: how do we close?
-    Client <Message('Goodbye',None)>
-    Server <Message('Goodbye',None)>
-    Client <Message('finished',None)>
+    Client <Message('GOODBYE',None)>
+    Server <Message('GOODBYE',None)>
     """
 
     def __init__(self,callback,**kwargs):
@@ -584,9 +578,9 @@ class TestingTransport(Transport):
     <Message('PROTOCOL_ERROR','send again')>
 
     >>> tt.send('Receipt')
-    
-    >>> #tt.send('Another receipt')
-    <Message('finished',None)>
+    <Message('GOODBYE',None)>
+
+    >>> tt.send('Another receipt')
 
     """
 

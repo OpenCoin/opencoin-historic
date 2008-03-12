@@ -272,7 +272,7 @@ class Wallet(Entity):
             self.coins.extend(to_use)
             raise
 
-        if protocol.state != protocol.finish:
+        if not protocol.done:
             # If we didn't succeed, re-add the coins to the wallet.
             # Of course, we may need to remint, so FIXME: look at this
             self.coins.extend(to_use)
@@ -357,6 +357,10 @@ class Wallet(Entity):
         redeem them with the IS.
         """
         # FIXME: What are action and reason for?
+        # FIXED: see protocols:332 - when reiceiving tokens the user has a choice of whtat to
+        # to with them. Thats the action: action in  ['redeem','exchange','trust'].
+        # reason is describing what the tokens are going to be for, e.g 'a book'
+
         transport = self.getIssuerTransport()
         if 1: #redeem
             self.otherCoins.extend(coins) # Deposit them
@@ -559,7 +563,6 @@ class Issuer(Entity):
         >>> stt.send('GOODBYE')
         <Message('GOODBYE',None)>
         >>> stt.send('foobar')
-        <Message('finished',None)>
         """
         protocol = protocols.answerHandshakeProtocol(TRANSFER_TOKEN_REQUEST=protocols.TransferTokenRecipient(self),
                                                      MINTING_KEY_FETCH_DENOMINATION=protocols.giveMintingKeyProtocol(self),
@@ -567,6 +570,7 @@ class Issuer(Entity):
         transport.autoreset = self.listen
         transport.setProtocol(protocol)
         transport.start()
+
 
     def transferToTarget(self,target,coins):
         return True

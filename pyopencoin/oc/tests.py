@@ -22,11 +22,8 @@ Client <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
 Server <Message('HANDSHAKE_ACCEPT',None)>
 Client <Message('MINTING_KEY_FETCH_DENOMINATION',[['1'], '0'])>
 Server <Message('MINTING_KEY_FAILURE',[['1', 'Unknown denomination']])>
-
-# FIXME: How do we close the connection?
 Client <Message('GOODBYE',None)>
 Server <Message('GOODBYE',None)>
-Client <Message('finished',None)>
 
 Now, lets have a key
 
@@ -38,11 +35,8 @@ Client <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
 Server <Message('HANDSHAKE_ACCEPT',None)>
 Client <Message('MINTING_KEY_FETCH_DENOMINATION',[['1'], '0'])>
 Server <Message('MINTING_KEY_PASS',[[...]])>
-
-# FIXME: How do we close the connection?
 Client <Message('GOODBYE',None)>
 Server <Message('GOODBYE',None)>
-Client <Message('finished',None)>
 
 Test the transfer token protocol
 >>> issuer = makeIssuer()
@@ -55,11 +49,8 @@ Client <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
 Server <Message('HANDSHAKE_ACCEPT',None)>
 Client <Message('TRANSFER_TOKEN_REQUEST',['...', 'myaccount', [], [[(...)], [(...)]], [['type', 'redeem']]])>
 Server <Message('TRANSFER_TOKEN_ACCEPT',['...', []])>
-
-# FIXME: How do we close the connection?
 Client <Message('GOODBYE',None)>
 Server <Message('GOODBYE',None)>
-Client <Message('finished',None)>
 
 Test the transfer token protocol with an exchange
 >>> issuer = makeIssuer()
@@ -81,11 +72,8 @@ Client <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
 Server <Message('HANDSHAKE_ACCEPT',None)>
 Client <Message('TRANSFER_TOKEN_REQUEST',['...', 'myaccount', [['...', ['...', '...', '...']]], [[(...)], [(...)]], [['type', 'exchange']]])>
 Server <Message('TRANSFER_TOKEN_ACCEPT',['...', ['...', '...', '...']])>
-
-#FIXME: How do we close the connection?
 Client <Message('GOODBYE',None)>
 Server <Message('GOODBYE',None)>
-Client <Message('finished',None)>
 
 
 Test the coin spend protocol.
@@ -106,8 +94,11 @@ walletB <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
 issuer <Message('HANDSHAKE_ACCEPT',None)>
 walletB <Message('TRANSFER_TOKEN_REQUEST',['...', 'my account', [], [[(...)]], [['type', 'redeem']]])>
 issuer <Message('TRANSFER_TOKEN_ACCEPT',['...', []])>
+walletB <Message('GOODBYE',None)>
+issuer <Message('GOODBYE',None)>
 walletB <Message('TOKEN_ACCEPT',None)>
-
+walletA <Message('GOODBYE',None)>
+walletB <Message('GOODBYE',None)>
 
 >>> coinB.validate_with_CDD_and_MintKey(CDD,mint_key1)
 True
