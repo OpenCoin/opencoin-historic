@@ -70,8 +70,22 @@ class Protocol:
         self.state = method
         
     def initiateHandshake(self,message):   
-        self.newState(self.firstStep)
+        self.newState(self.verifyHandshake)
         return Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})
+
+    def verifyHandshake(self, message):
+        if message.type == 'HANDSHAKE_ACCEPT':
+            self.newState(self.firstStep)
+            return self.firstStep(message)
+
+        elif message.type == 'HANDSHAKE_REJECT':
+            self.newState(self.goodbye)
+            # FIXME: force a hangup here? maybe just a loop around and do another handshake?
+            # FIXME: We need to do something here.
+            
+        else:
+            self.newState(self.goodbye)
+            return ProtocolErrorMessage('vH')
 
 #ProtocolErrorMessage = lambda x: Message('PROTOCOL_ERROR', 'send again %s' % x)
 ProtocolErrorMessage = lambda x: Message('PROTOCOL_ERROR', 'send again')
@@ -133,9 +147,15 @@ class TokenSpendSender(Protocol):
     >>> css.state(Message('TOKEN_ACCEPT'))
     <Message('GOODBYE',None)>
     >>> css.state(Message('GOODBYE'))
+
+
+    And test to make sure we can skip handshake if we need to
+    >>> css = TokenSpendSender([coin1, coin2], 'foobar', skip_handshake=True)
+    >>> css.state(Message(None))
+    <Message('SUM_ANNOUNCE',['...', '3', 'foobar'])>
     
     """
-    def __init__(self,coins,target):
+    def __init__(self, coins, target, skip_handshake = False):
 
         self.coins = coins
         self.amount = sum(coins)
@@ -147,7 +167,11 @@ class TokenSpendSender(Protocol):
         self.encoded_transaction_id = base64.b64encode(self.transaction_id)
 
         Protocol.__init__(self)
-        self.state = self.initiateHandshake
+
+        if skip_handshake:
+            self.state = self.firstStep
+        else:
+            self.state = self.initiateHandshake
 
     def firstStep(self,message):       
         self.state = self.spendCoin
@@ -362,10 +386,14 @@ class TransferTokenSender(Protocol):
     True
     >>> tts.state(Message('foobar'))
 
-    
+    And now test that we can skip the handshake if we want.
+    >>> tts = TransferTokenSender('my account', [], [coin1, coin2], skip_handshake=True, type='redeem')
+    >>> tts.state(Message(None))
+    <Message('TRANSFER_TOKEN_REQUEST',['...', 'my account', [], [[(...)], [(...)]], [['type', 'redeem']]])>
+
     """
 
-    def __init__(self, target, blinds, coins, **kwargs):
+    def __init__(self, target, blinds, coins, skip_handshake=False, **kwargs):
         import base64
         from crypto import _r as Random
         self.transaction_id = Random.getRandomString(128)
@@ -377,7 +405,11 @@ class TransferTokenSender(Protocol):
         self.kwargs = kwargs
 
         Protocol.__init__(self)
-        self.state = self.initiateHandshake
+
+        if skip_handshake:
+            self.state = self.firstStep
+        else:
+            self.state = self.initiateHandshake
    
     def firstStep(self,message):
         data = [self.encoded_transaction_id,
@@ -529,7 +561,7 @@ class TransferTokenRecipient(Protocol):
 
     This should not be accepted
     >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['1234', 'my account', [], ['foobar'], [['type', 'redeem']]]))    
-    <Message('PROTOCOL_ERROR','send again')>
+    <Message('PROTOCOL_ERROR','send again...')>
 
     This should also not be accepted - no coins but redeem
     >>> ttr.state = ttr.start
@@ -583,7 +615,7 @@ class TransferTokenRecipient(Protocol):
     >>> ttr.state = ttr.start
     >>> ttr.done = 0
     >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST'))
-    <Message('PROTOCOL_ERROR','send again')>
+    <Message('PROTOCOL_ERROR','send again...')>
 
     Okay. Have to reset DSDB to do this next trick
     >>> issuer = tests.makeIssuer()
@@ -612,77 +644,77 @@ class TransferTokenRecipient(Protocol):
             try:
                 encoded_transaction_id, target, blindslist, coins, options_list = message.data
             except TypeError:
-                return ProtocolErrorMessage('TTRq17')
+                return ProtocolErrorMessage('TTRq')
 
             if not isinstance(target, types.StringType):
-                return ProtocolErrorMessage('TTRq1')
+                return ProtocolErrorMessage('TTRq')
 
             if not isinstance(blindslist, types.ListType):
-                return ProtocolErrorMessage('TTRq2')
+                return ProtocolErrorMessage('TTRq')
 
             for blind in blindslist:
             
                 if not isinstance(blind, types.ListType):
-                    return ProtocolErrorMessage('TTRq3')
+                    return ProtocolErrorMessage('TTRq')
                 try:
                     key, b = blind
                 except ValueError:
-                    return ProtocolErrorMessage('TTRq4')
+                    return ProtocolErrorMessage('TTRq')
                 
                 if not isinstance(key, types.StringType):
-                    return ProtocolErrorMessage('TTRq5')
+                    return ProtocolErrorMessage('TTRq')
                 
                 if not isinstance(b, types.ListType):
-                    return ProtocolErrorMessage('TTRq6')
+                    return ProtocolErrorMessage('TTRq')
                 
                 for blindstring in b:
                     if not isinstance(blindstring, types.StringType):
-                        return ProtocolErrorMessage('TTRq7')
+                        return ProtocolErrorMessage('TTRq')
                 if len(b) == 0:
-                    return ProtocolErrorMessage('TTRq14')
+                    return ProtocolErrorMessage('TTRq')
 
             # Decode transaction_id
             try:
                 transaction_id = base64.b64decode(encoded_transaction_id)
             except TypeError:
-                return ProtocolErrorMessage('TTRq18')
+                return ProtocolErrorMessage('TTRq')
 
             # Convert blindslist
             try:
                 blindslist = [[base64.b64decode(key), [base64.b64decode(bl) for bl in blinds]] for key, blinds in blindslist]
             except TypeError:
-                return ProtocolErrorMessage('TTRq15')
+                return ProtocolErrorMessage('TTRq')
 
             if not isinstance(coins, types.ListType):
-                return ProtocolErrorMessage('TTRq8')
+                return ProtocolErrorMessage('TTRq')
             
             for coin in coins:
                 if not isinstance(coin, types.ListType):
-                    return ProtocolErrorMessage('TTRq9')
+                    return ProtocolErrorMessage('TTRq')
 
             #convert coins
             try:
                 coins = [containers.CurrencyCoin().fromPython(c) for c in coins]
             except TypeError:
-                return ProtocolErrorMessage('TTRq16')
+                return ProtocolErrorMessage('TTRq')
             except IndexError:
-                return ProtocolErrorMessage('TTRq21')
+                return ProtocolErrorMessage('TTRq')
 
             if not isinstance(options_list, types.ListType):
-                return ProtocolErrorMessage('TTRq10')
+                return ProtocolErrorMessage('TTRq')
             
             # check options (why isn't this higher?)
             for options in options_list:
                 try:
                     key, val = options
                 except ValueError:
-                    return ProtocolErrorMessage('TTRq11')
+                    return ProtocolErrorMessage('TTRq')
             
                 if not isinstance(key, types.StringType):
-                    return ProtocolErrorMessage('TTRq12')
+                    return ProtocolErrorMessage('TTRq')
                 
                 if not isinstance(val, types.StringType):
-                    return ProtocolErrorMessage('TTRq13')
+                    return ProtocolErrorMessage('TTRq')
 
             # Decipher options
             options = {}
@@ -703,14 +735,14 @@ class TransferTokenRecipient(Protocol):
                 # XXX transmit funds
                 if not self.issuer.transferToTarget(target,coins):
                     self.issuer.dsdb.unlock(transaction_id)
-                    return ProtocolErrorMessage('TTRq19')
+                    return ProtocolErrorMessage('TTRq')
 
                 #register them as spent
                 try:
                     self.issuer.dsdb.spend(transaction_id, coins)
                 except LockingError, e: 
                     #Note: if we fail here, that means we have large problems, since the coins are locked
-                    return ProtocolErrorMessage('TTRq20')
+                    return ProtocolErrorMessage('TTRq')
 
                 return Message('TRANSFER_TOKEN_ACCEPT',[encoded_transaction_id, []])
 
@@ -733,7 +765,7 @@ class TransferTokenRecipient(Protocol):
 
                 #check target
                 if not self.issuer.debitTarget(target,blindslist):
-                    return ProtocolErrorMessage('TTRq20')
+                    return ProtocolErrorMessage('TTRq')
 
 
                 success, time, failures = self.issuer.submitMintableBlinds(transaction_id, blinds, options)
@@ -761,7 +793,7 @@ class TransferTokenRecipient(Protocol):
                 #check target
                 if not self.issuer.debitTarget(target,blindslist):
                     self.issuer.dsdb.unlock(transaction_id)
-                    return Message('PROTOCOL_ERROR', 'send again')
+                    return ProtocolErrorMessage('TTRq')
 
                 # check mintifyable blinds
                 success, failures = self.issuer.verifyMintableBlinds(blinds, options)
@@ -792,7 +824,7 @@ class TransferTokenRecipient(Protocol):
                     self.issuer.dsdb.spend(transaction_id,coins)
                 except LockingError, e: 
                     #Note: if we fail here, that means we have large problems, since the coins are locked
-                    return Message('PROTOCOL_ERROR', 'send again')
+                    return ProtocolErrorMessage('TTRq')
 
 
                 # FIXME: using time as a hack to get tokens from
@@ -886,7 +918,7 @@ class fetchMintKeyProtocol(Protocol):
     
     >>> fmp.newState(fmp.getKey)
     >>> fmp.state(Message('FOOBAR'))
-    <Message('PROTOCOL_ERROR','send again')>
+    <Message('PROTOCOL_ERROR','send again...')>
 
     Okay. Now we'll test every possible MINT_KEY_PASS.
     The correct argument is a list of coins. Try things to
@@ -894,19 +926,19 @@ class fetchMintKeyProtocol(Protocol):
     
     >>> fmp.newState(fmp.getKey)
     >>> fmp.state(Message('MINT_KEY_PASS', [['foo']]))
-    <Message('PROTOCOL_ERROR','send again')>
+    <Message('PROTOCOL_ERROR','send again...')>
 
     >>> fmp.newState(fmp.getKey)
     >>> fmp.state(Message('MINT_KEY_PASS', ['foo']))
-    <Message('PROTOCOL_ERROR','send again')>
+    <Message('PROTOCOL_ERROR','send again...')>
 
     >>> fmp.newState(fmp.getKey)
     >>> fmp.state(Message('MINT_KEY_PASS', 'foo'))
-    <Message('PROTOCOL_ERROR','send again')>
+    <Message('PROTOCOL_ERROR','send again...')>
 
     >>> fmp.newState(fmp.getKey)
     >>> fmp.state(Message('MINT_KEY_PASS', []))
-    <Message('PROTOCOL_ERROR','send again')>
+    <Message('PROTOCOL_ERROR','send again...')>
 
     Now try every possible bad MINT_KEY_FAILURE.
     Note: it may make sense to verify we have tood reasons
@@ -919,12 +951,12 @@ class fetchMintKeyProtocol(Protocol):
     Check base64 decoding causes failure
     >>> fmp.newState(fmp.getKey)
     >>> fmp.state(Message('MINT_KEY_FAILURE', [[1, '']]))
-    <Message('PROTOCOL_ERROR','send again')>
+    <Message('PROTOCOL_ERROR','send again...')>
 
     And the normal tests
     >>> fmp.newState(fmp.getKey)
     >>> fmp.state(Message('MINT_KEY_FAILURE', [[]]))
-    <Message('PROTOCOL_ERROR','send again')>
+    <Message('PROTOCOL_ERROR','send again...')>
     
     Okay. Check the denomination branch now
     
@@ -942,11 +974,16 @@ class fetchMintKeyProtocol(Protocol):
 
     >>> fmp.newState(fmp.getKey)
     >>> fmp.state(Message('MINT_KEY_FAILURE', [[]]))
-    <Message('PROTOCOL_ERROR','send again')>
+    <Message('PROTOCOL_ERROR','send again...')>
     
+    And now test that we can skip handshake if we want
+    >>> fmp = fetchMintKeyProtocol(denominations=['1'], skip_handshake=True)
+    >>> fmp.state(Message(None))
+    <Message('MINT_KEY_FETCH_DENOMINATION',[['1'], '0'])>
+
     """
 
-    def __init__(self,denominations=None,keyids=None,time=None):
+    def __init__(self, denominations=None, keyids=None, time=None, skip_handshake=False):
         
         self.denominations = denominations
         self.keyids = keyids
@@ -959,26 +996,20 @@ class fetchMintKeyProtocol(Protocol):
 
         Protocol.__init__(self)
 
-        self.newState(self.initiateHandshake)
+        if skip_handshake:
+            self.newState(self.firstStep)
+        else:
+            self.newState(self.initiateHandshake)
 
     def firstStep(self,message):
         """Completes handshake, asks for the minting keys """
         
-        if message.type == 'HANDSHAKE_ACCEPT':
-           
-            if self.denominations:
-                self.newState(self.getKey)
-                return Message('MINT_KEY_FETCH_DENOMINATION',[self.denominations, self.encoded_time])
-            elif self.keyids:
-                self.newState(self.getKey)
-                return Message('MINT_KEY_FETCH_KEYID',self.keyids)
-
-        elif message.type == 'HANDSHAKE_REJECT':
-            self.newState(self.goodbye)
-
-        else:
-            self.newState(self.goodbye)
-            return Message('PROTOCOL ERROR','send again')
+        if self.denominations:
+            self.newState(self.getKey)
+            return Message('MINT_KEY_FETCH_DENOMINATION',[self.denominations, self.encoded_time])
+        elif self.keyids:
+            self.newState(self.getKey)
+            return Message('MINT_KEY_FETCH_KEYID',self.keyids)
 
 
     def getKey(self,message):
@@ -989,21 +1020,21 @@ class fetchMintKeyProtocol(Protocol):
         if message.type == 'MINT_KEY_PASS':
 
             if not isinstance(message.data, types.ListType):
-                return ProtocolErrorMessage('MKP1')
+                return ProtocolErrorMessage('MKP')
             
             if len(message.data) == 0: # Nothing in the message
-                return ProtocolErrorMessage('MKP2')
+                return ProtocolErrorMessage('MKP')
 
             for key in message.data:
                 if not isinstance(message.data, types.ListType):
-                    return ProtocolErrorMessage('MKP3')
+                    return ProtocolErrorMessage('MKP')
 
             try:
                 keys = [containers.MintKey().fromPython(key) for key in message.data]
             except TypeError:
-                return ProtocolErrorMessage('MKP4')
+                return ProtocolErrorMessage('MKP')
             except IndexError:
-                return ProtocolErrorMessage('MKP5')
+                return ProtocolErrorMessage('MKP')
 
             #TODO: Check to make sure we got the keys we asked for, probably?
 
@@ -1017,23 +1048,23 @@ class fetchMintKeyProtocol(Protocol):
             reasons = message.data
 
             if not isinstance(reasons, types.ListType):
-                return ProtocolErrorMessage('MKF1')
+                return ProtocolErrorMessage('MKF')
             if not reasons:
-                return ProtocolErrorMessage('MKF2')
+                return ProtocolErrorMessage('MKF')
 
             for reasonlist in reasons:
                 if not isinstance(reasonlist, types.ListType):
-                    return ProtocolErrormessage('MKF3')
+                    return ProtocolErrormessage('MKF')
 
                 try:
                     key, rea = reasonlist
                 except ValueError:
-                    return ProtocolErrorMessage('MKF4')
+                    return ProtocolErrorMessage('MKF')
 
                 if not isinstance(key, types.StringType):
-                    return ProtocolErrorMessage('MKF5')
+                    return ProtocolErrorMessage('MKF')
                 if not isinstance(rea, types.StringType):
-                    return ProtocolErrorMessage('MKF6')
+                    return ProtocolErrorMessage('MKF')
 
                 # Do not do any conversions of keyid/denomination at this time. Have
                 # to wait to do it after we know which set we have
@@ -1058,7 +1089,7 @@ class fetchMintKeyProtocol(Protocol):
                     try:
                         self.reasons.append((base64.b64decode(key), reason))
                     except TypeError:
-                        return ProtocolErrorMessage('MKF9')
+                        return ProtocolErrorMessage('MKF')
 
         
         elif message.type != 'PROTOCOL_ERROR':
@@ -1098,7 +1129,7 @@ class giveMintKeyProtocol(Protocol):
 
     >>> gmp.newState(gmp.start)
     >>> gmp.state(Message('bla','blub'))
-    <Message('PROTOCOL_ERROR','send again')>
+    <Message('PROTOCOL_ERROR','send again...')>
 
     """
 
@@ -1119,7 +1150,7 @@ class giveMintKeyProtocol(Protocol):
             try:
                 denominations, time = message.data
             except ValueError: # catch tuple unpack errors
-                return Message('PROTOCOL_ERROR', 'send again')
+                return ProtocolErrorMessage('MKFD')
 
             if not isinstance(denominations, types.ListType):
                 return ProtocolErrorMessage('MKFD')
@@ -1176,7 +1207,7 @@ class giveMintKeyProtocol(Protocol):
                     errors.append([base64.b64encode(keyid), 'Unknown key_identifier'])
         
         else:
-            return Message('PROTOCOL_ERROR', 'send again')
+            return ProtocolErrorMessage('MKFK5')
 
         if not errors:            
             return Message('MINT_KEY_PASS',[key.toPython() for key in keys])
@@ -1196,7 +1227,7 @@ class WalletSenderProtocol(Protocol):
     <Message('sendMoney',[1, 2])>
     
     >>> sp.state(Message('Foo'))
-    <Message('PROTOCOL_ERROR','send again')>
+    <Message('PROTOCOL_ERROR','send again...')>
 
     Lets give it a receipt
     >>> sp.newState(sp.waitForReceipt)
