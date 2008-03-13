@@ -15,7 +15,7 @@ class Transport:
         "Constructor. Override this"
 
     def setProtocol(self,protocol):
-        "This sets the protocl instance that is used with this transport"
+        "This sets the protocol instance that is used with this transport"
         self.protocol = protocol
         protocol.setTransport(self)
 

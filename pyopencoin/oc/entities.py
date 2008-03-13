@@ -47,8 +47,8 @@ class Wallet(Entity):
         
         self.cdds[CDD.currency_identifier] = CDD
 
-    def fetchMintingKey(self, transport, denominations=None, keyids=None, time=None):
-        protocol = protocols.fetchMintingKeyProtocol(denominations=denominations, keyids=keyids, time=time)
+    def fetchMintKey(self, transport, denominations=None, keyids=None, time=None):
+        protocol = protocols.fetchMintKeyProtocol(denominations=denominations, keyids=keyids, time=time)
         transport.setProtocol(protocol)
         transport.start()
         protocol.newMessage(Message(None))
@@ -288,8 +288,9 @@ class Wallet(Entity):
         >>> stt.send('sendMoney',[1,2])
         <Message('Receipt',None)>
         """
-        protocol = protocols.answerHandshakeProtocol(sendMoney=protocols.WalletRecipientProtocol(self),
-                                                     SUM_ANNOUNCE=protocols.TokenSpendRecipient(self))
+        protocol = protocols.answerHandshakeProtocol(arguments=self,
+                                                     sendMoney=protocols.WalletRecipientProtocol,
+                                                     SUM_ANNOUNCE=protocols.TokenSpendRecipient)
         transport.setProtocol(protocol)
         transport.start()
 
@@ -544,8 +545,8 @@ class Issuer(Entity):
 
         return mintKey
 
-    def giveMintingKey(self,transport):
-        protocol = protocols.giveMintingKeyProtocol(self)
+    def giveMintKey(self,transport):
+        protocol = protocols.giveMintKeyProtocol(self)
         transport.setProtocol(protocol)
         transport.start()
 
@@ -560,16 +561,26 @@ class Issuer(Entity):
         <Message('HANDSHAKE_ACCEPT',None)>
         >>> stt.send('TRANSFER_TOKEN_REQUEST',[tid, 'my account', [], [tests.coinA.toPython()], [['type', 'redeem']]])
         <Message('TRANSFER_TOKEN_ACCEPT',['Zm9vYmFy', []])>
+
+        >>> stt.send('MINT_KEY_FETCH_DENOMINATION',[['1'], '0'])
+        <Message('MINT_KEY_PASS',[...])>
+        
         >>> stt.send('GOODBYE')
         <Message('GOODBYE',None)>
         >>> stt.send('foobar')
         """
-        protocol = protocols.answerHandshakeProtocol(TRANSFER_TOKEN_REQUEST=protocols.TransferTokenRecipient(self),
-                                                     MINTING_KEY_FETCH_DENOMINATION=protocols.giveMintingKeyProtocol(self),
-                                                     MINTING_KEY_FETCH_KEYID=protocols.giveMintingKeyProtocol(self))
-        transport.autoreset = self.listen
-        transport.setProtocol(protocol)
-        transport.start()
+        if hasattr(transport, 'protocol') and transport.protocol:
+            transport.setProtocol(self.protocol)
+
+        else:
+            protocol = protocols.answerHandshakeProtocol(arguments=self,
+                                                         TRANSFER_TOKEN_REQUEST=protocols.TransferTokenRecipient,
+                                                         MINT_KEY_FETCH_DENOMINATION=protocols.giveMintKeyProtocol,
+                                                         MINT_KEY_FETCH_KEYID=protocols.giveMintKeyProtocol)
+            self.protocol = protocol
+            transport.autoreset = self.listen
+            transport.setProtocol(protocol)
+            transport.start()
 
 
     def transferToTarget(self,target,coins):

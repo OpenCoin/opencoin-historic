@@ -68,8 +68,8 @@ class Protocol:
 
     def newState(self,method):
         self.state = method
-
-    def initiateHandshake(self,message):    
+        
+    def initiateHandshake(self,message):   
         self.newState(self.firstStep)
         return Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})
 
@@ -79,14 +79,18 @@ ProtocolErrorMessage = lambda x: Message('PROTOCOL_ERROR', 'send again')
 class answerHandshakeProtocol(Protocol):
 
 
-    def __init__(self,**mapping):
+    def __init__(self, arguments, **mapping):
         Protocol.__init__(self)
+        self.arguments = arguments
         self.mapping = mapping
 
     def start(self,message):
-
         if message.type == 'HANDSHAKE':
             if message.data['protocol'] == 'opencoin 1.0':
+                # Set up a state where the handshake no longer is needed.
+                self.old_start = self.start
+                self.start = self.dispatch # Now, if we restart we end up in dispatch
+                
                 self.newState(self.dispatch)
                 return Message('HANDSHAKE_ACCEPT')
             else:
@@ -97,19 +101,21 @@ class answerHandshakeProtocol(Protocol):
 
 
     def dispatch(self,message):        
-        self.result = message
-        nextprotocol = self.mapping[message.type]
+
+        try:
+            nextprotocol = self.mapping[message.type](self.arguments)
+        except AttributeError:
+            self.newState(self.goodbye)
+            return ProtocolErrorMessage('aHP')
+
         self.transport.setProtocol(nextprotocol)
         m = nextprotocol.newMessage(message)
-        #return m
-        #print 'here ', m
-        #return m
 
 
 
 
 ############################### Spending coins (w2w) ##########################
-# Spoken bewteen two wallets to transfer coins / tokens                       #
+# Spoken between two wallets to transfer coins / tokens                       #
 ###############################################################################
 
 class TokenSpendSender(Protocol):
@@ -120,7 +126,7 @@ class TokenSpendSender(Protocol):
     >>> css = TokenSpendSender([coin1,coin2],'foobar')
     >>> css.state(Message(None))
     <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
-    >>> css.state(Message('HANDSHAKE_ACCEPT'))
+    >>> css.state(Message('HANDSHAKE_ACCEPT',None))
     <Message('SUM_ANNOUNCE',['...', '3', 'foobar'])>
     >>> css.state(Message('SUM_ACCEPT'))
     <Message('TOKEN_SPEND',['...', [[(...)], [(...)]], 'foobar'])>
@@ -348,7 +354,7 @@ class TransferTokenSender(Protocol):
     >>> tts = TransferTokenSender('my account',[],[coin1, coin2],type='redeem')
     >>> tts.state(Message(None))
     <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
-    >>> tts.state(Message('HANDSHAKE_ACCEPT'))
+    >>> tts.state(Message('HANDSHAKE_ACCEPT',None))
     <Message('TRANSFER_TOKEN_REQUEST',['...', 'my account', [], [[(...)], [(...)]], [['type', 'redeem']]])>
     >>> tts.state(Message('TRANSFER_TOKEN_ACCEPT',[tts.encoded_transaction_id, []]))
     <Message('GOODBYE',None)>
@@ -826,24 +832,23 @@ class TransferTokenRecipient(Protocol):
 #Between a wallet and the IS, to get the mint key                             #
 ###############################################################################
 
-class fetchMintingKeyProtocol(Protocol):
+class fetchMintKeyProtocol(Protocol):
     """
     Used by a wallet to fetch the mints keys, needed when 
     creating blanks
        
     Lets fetch by denomination
 
-    >>> fmp = fetchMintingKeyProtocol(denominations=['1'])
+    >>> fmp = fetchMintKeyProtocol(denominations=['1'])
     >>> fmp.state(Message(None))
     <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
-
-    >>> fmp.state(Message('HANDSHAKE_ACCEPT'))
-    <Message('MINTING_KEY_FETCH_DENOMINATION',[['1'], '0'])>
+    >>> fmp.state(Message('HANDSHAKE_ACCEPT',None))
+    <Message('MINT_KEY_FETCH_DENOMINATION',[['1'], '0'])>
 
     >>> from tests import mintKeys
     >>> mintKey = mintKeys[0]
     
-    >>> fmp.state(Message('MINTING_KEY_PASS',[mintKey.toPython()]))
+    >>> fmp.state(Message('MINT_KEY_PASS',[mintKey.toPython()]))
     <Message('GOODBYE',None)>
 
     >>> fmp.state == fmp.goodbye
@@ -852,14 +857,13 @@ class fetchMintingKeyProtocol(Protocol):
 
     And now by keyid
 
-    >>> fmp = fetchMintingKeyProtocol(keyids=['sj17RxE1hfO06+oTgBs9Z7xLut/3NN+nHJbXSJYTks0='])
+    >>> fmp = fetchMintKeyProtocol(keyids=['sj17RxE1hfO06+oTgBs9Z7xLut/3NN+nHJbXSJYTks0='])
     >>> fmp.state(Message(None))
     <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
-
     >>> fmp.state(Message('HANDSHAKE_ACCEPT'))
-    <Message('MINTING_KEY_FETCH_KEYID',['sj17RxE1hfO06+oTgBs9Z7xLut/3NN+nHJbXSJYTks0='])>
+    <Message('MINT_KEY_FETCH_KEYID',['sj17RxE1hfO06+oTgBs9Z7xLut/3NN+nHJbXSJYTks0='])>
 
-    >>> fmp.state(Message('MINTING_KEY_PASS',[mintKey.toPython()]))
+    >>> fmp.state(Message('MINT_KEY_PASS',[mintKey.toPython()]))
     <Message('GOODBYE',None)>
 
     >>> fmp.state == fmp.goodbye
@@ -872,7 +876,7 @@ class fetchMintingKeyProtocol(Protocol):
 
     >>> fmp.newState(fmp.getKey)
     >>> fmp.done = 0
-    >>> fmp.state(Message('MINTING_KEY_FAILURE',[['RxE1', 'Unknown key_identifier']]))
+    >>> fmp.state(Message('MINT_KEY_FAILURE',[['RxE1', 'Unknown key_identifier']]))
     <Message('GOODBYE',None)>
     >>> fmp.state == fmp.goodbye
     True
@@ -884,27 +888,27 @@ class fetchMintingKeyProtocol(Protocol):
     >>> fmp.state(Message('FOOBAR'))
     <Message('PROTOCOL_ERROR','send again')>
 
-    Okay. Now we'll test every possible MINTING_KEY_PASS.
+    Okay. Now we'll test every possible MINT_KEY_PASS.
     The correct argument is a list of coins. Try things to
     break it.
     
     >>> fmp.newState(fmp.getKey)
-    >>> fmp.state(Message('MINTING_KEY_PASS', [['foo']]))
+    >>> fmp.state(Message('MINT_KEY_PASS', [['foo']]))
     <Message('PROTOCOL_ERROR','send again')>
 
     >>> fmp.newState(fmp.getKey)
-    >>> fmp.state(Message('MINTING_KEY_PASS', ['foo']))
+    >>> fmp.state(Message('MINT_KEY_PASS', ['foo']))
     <Message('PROTOCOL_ERROR','send again')>
 
     >>> fmp.newState(fmp.getKey)
-    >>> fmp.state(Message('MINTING_KEY_PASS', 'foo'))
+    >>> fmp.state(Message('MINT_KEY_PASS', 'foo'))
     <Message('PROTOCOL_ERROR','send again')>
 
     >>> fmp.newState(fmp.getKey)
-    >>> fmp.state(Message('MINTING_KEY_PASS', []))
+    >>> fmp.state(Message('MINT_KEY_PASS', []))
     <Message('PROTOCOL_ERROR','send again')>
 
-    Now try every possible bad MINTING_KEY_FAILURE.
+    Now try every possible bad MINT_KEY_FAILURE.
     Note: it may make sense to verify we have tood reasons
     as well.
 
@@ -914,12 +918,12 @@ class fetchMintingKeyProtocol(Protocol):
 
     Check base64 decoding causes failure
     >>> fmp.newState(fmp.getKey)
-    >>> fmp.state(Message('MINTING_KEY_FAILURE', [[1, '']]))
+    >>> fmp.state(Message('MINT_KEY_FAILURE', [[1, '']]))
     <Message('PROTOCOL_ERROR','send again')>
 
     And the normal tests
     >>> fmp.newState(fmp.getKey)
-    >>> fmp.state(Message('MINTING_KEY_FAILURE', [[]]))
+    >>> fmp.state(Message('MINT_KEY_FAILURE', [[]]))
     <Message('PROTOCOL_ERROR','send again')>
     
     Okay. Check the denomination branch now
@@ -929,7 +933,7 @@ class fetchMintingKeyProtocol(Protocol):
 
     Make sure we are in the denomination branch
     >>> fmp.newState(fmp.getKey)
-    >>> fmp.state(Message('MINTING_KEY_FAILURE', [['1', '']]))
+    >>> fmp.state(Message('MINT_KEY_FAILURE', [['1', '']]))
 
     >>> fmp.state == fmp.goodbye
     True
@@ -937,7 +941,7 @@ class fetchMintingKeyProtocol(Protocol):
     Do a check
 
     >>> fmp.newState(fmp.getKey)
-    >>> fmp.state(Message('MINTING_KEY_FAILURE', [[]]))
+    >>> fmp.state(Message('MINT_KEY_FAILURE', [[]]))
     <Message('PROTOCOL_ERROR','send again')>
     
     """
@@ -955,21 +959,19 @@ class fetchMintingKeyProtocol(Protocol):
 
         Protocol.__init__(self)
 
-    def start(self,message):
-        self.newState(self.requestKey)
-        return Message('HANDSHAKE',{'protocol':'opencoin 1.0'})
+        self.newState(self.initiateHandshake)
 
-    def requestKey(self,message):
+    def firstStep(self,message):
         """Completes handshake, asks for the minting keys """
-
+        
         if message.type == 'HANDSHAKE_ACCEPT':
-            
+           
             if self.denominations:
                 self.newState(self.getKey)
-                return Message('MINTING_KEY_FETCH_DENOMINATION',[self.denominations, self.encoded_time])
+                return Message('MINT_KEY_FETCH_DENOMINATION',[self.denominations, self.encoded_time])
             elif self.keyids:
                 self.newState(self.getKey)
-                return Message('MINTING_KEY_FETCH_KEYID',self.keyids) 
+                return Message('MINT_KEY_FETCH_KEYID',self.keyids)
 
         elif message.type == 'HANDSHAKE_REJECT':
             self.newState(self.goodbye)
@@ -978,12 +980,13 @@ class fetchMintingKeyProtocol(Protocol):
             self.newState(self.goodbye)
             return Message('PROTOCOL ERROR','send again')
 
+
     def getKey(self,message):
         """Gets the actual key"""
 
         self.newState(self.goodbye)
 
-        if message.type == 'MINTING_KEY_PASS':
+        if message.type == 'MINT_KEY_PASS':
 
             if not isinstance(message.data, types.ListType):
                 return ProtocolErrorMessage('MKP1')
@@ -1010,7 +1013,7 @@ class fetchMintingKeyProtocol(Protocol):
             
                 
 
-        elif message.type == 'MINTING_KEY_FAILURE':
+        elif message.type == 'MINT_KEY_FAILURE':
             reasons = message.data
 
             if not isinstance(reasons, types.ListType):
@@ -1059,14 +1062,14 @@ class fetchMintingKeyProtocol(Protocol):
 
         
         elif message.type != 'PROTOCOL_ERROR':
-            return ProtocolErrorMessage('fetchMintingKeyProtocol')
+            return ProtocolErrorMessage('fetchMintKeyProtocol')
 
         return self.goodbye(message)            
 
 
 
-class giveMintingKeyProtocol(Protocol):
-    """An issuer hands out a key. The other side of fetchMintingKeyProtocol.
+class giveMintKeyProtocol(Protocol):
+    """An issuer hands out a key. The other side of fetchMintKeyProtocol.
     >>> from entities import Issuer
     >>> issuer = Issuer()
     >>> issuer.createMasterKey(keylength=512)
@@ -1074,29 +1077,26 @@ class giveMintingKeyProtocol(Protocol):
     ...                short_currency_identifier='OC', options=[], issuer_service_location='here')
     >>> now = 0; later = 1; much_later = 2
     >>> pub1 = issuer.createSignedMintKey('1', now, later, much_later)
-    >>> gmp = giveMintingKeyProtocol(issuer)
+    >>> gmp = giveMintKeyProtocol(issuer)
     
-    >>> gmp.state(Message('HANDSHAKE',{'protocol': 'opencoin 1.0'}))
-    <Message('HANDSHAKE_ACCEPT',None)>
+    >>> gmp.state(Message('MINT_KEY_FETCH_DENOMINATION',[['1'], '0']))
+    <Message('MINT_KEY_PASS',[[('key_identifier', '...'), ('currency_identifier', 'http://opencent.net/OpenCent2'), ('denomination', '1'), ('not_before', '...T...Z'), ('key_not_after', '...T...Z'), ('token_not_after', '...T...Z'), ('public_key', '...,...'), ['signature', [('keyprint', '...'), ('signature', '...')]]]])>
 
-    >>> gmp.state(Message('MINTING_KEY_FETCH_DENOMINATION',[['1'], '0']))
-    <Message('MINTING_KEY_PASS',[[('key_identifier', '...'), ('currency_identifier', 'http://opencent.net/OpenCent2'), ('denomination', '1'), ('not_before', '...T...Z'), ('key_not_after', '...T...Z'), ('token_not_after', '...T...Z'), ('public_key', '...,...'), ['signature', [('keyprint', '...'), ('signature', '...')]]]])>
-
-    >>> gmp.newState(gmp.giveKey)
-    >>> m = gmp.state(Message('MINTING_KEY_FETCH_KEYID',[pub1.encodeField('key_identifier')]))
+    >>> gmp.newState(gmp.start)
+    >>> m = gmp.state(Message('MINT_KEY_FETCH_KEYID',[pub1.encodeField('key_identifier')]))
     >>> m
-    <Message('MINTING_KEY_PASS',[...])>
+    <Message('MINT_KEY_PASS',[...])>
 
-    >>> gmp.newState(gmp.giveKey)
-    >>> gmp.state(Message('MINTING_KEY_FETCH_DENOMINATION',[['2'], '0']))
-    <Message('MINTING_KEY_FAILURE',[['2', 'Unknown denomination']])>
+    >>> gmp.newState(gmp.start)
+    >>> gmp.state(Message('MINT_KEY_FETCH_DENOMINATION',[['2'], '0']))
+    <Message('MINT_KEY_FAILURE',[['2', 'Unknown denomination']])>
    
 
-    >>> gmp.newState(gmp.giveKey)
-    >>> gmp.state(Message('MINTING_KEY_FETCH_KEYID',['NonExistantIDxxx']))
-    <Message('MINTING_KEY_FAILURE',[['NonExistantIDxxx', 'Unknown key_identifier']])>
+    >>> gmp.newState(gmp.start)
+    >>> gmp.state(Message('MINT_KEY_FETCH_KEYID',['NonExistantIDxxx']))
+    <Message('MINT_KEY_FAILURE',[['NonExistantIDxxx', 'Unknown key_identifier']])>
 
-    >>> gmp.newState(gmp.giveKey)
+    >>> gmp.newState(gmp.start)
     >>> gmp.state(Message('bla','blub'))
     <Message('PROTOCOL_ERROR','send again')>
 
@@ -1110,25 +1110,12 @@ class giveMintingKeyProtocol(Protocol):
 
     def start(self,message):
 
-        if message.type == 'HANDSHAKE':
-            if message.data['protocol'] == 'opencoin 1.0':
-                self.newState(self.giveKey)
-                return Message('HANDSHAKE_ACCEPT')
-            else:
-                self.newState(self.goodbye)
-                return Message('HANDSHAKE_REJECT','did not like the protocol version')
-        else:
-            return Message('PROTOCOL_ERROR','please do a handshake')
-
-
-    def giveKey(self,message):
-    
         self.newState(self.goodbye)
 
         errors = []
         keys = []
 
-        if message.type == 'MINTING_KEY_FETCH_DENOMINATION':
+        if message.type == 'MINT_KEY_FETCH_DENOMINATION':
             try:
                 denominations, time = message.data
             except ValueError: # catch tuple unpack errors
@@ -1161,7 +1148,7 @@ class giveMintingKeyProtocol(Protocol):
                 except 'KeyFetchError': 
                     errors.append([denomination, 'Unknown denomination'])
         
-        elif message.type == 'MINTING_KEY_FETCH_KEYID':                
+        elif message.type == 'MINT_KEY_FETCH_KEYID':                
 
             import base64
 
@@ -1192,9 +1179,9 @@ class giveMintingKeyProtocol(Protocol):
             return Message('PROTOCOL_ERROR', 'send again')
 
         if not errors:            
-            return Message('MINTING_KEY_PASS',[key.toPython() for key in keys])
+            return Message('MINT_KEY_PASS',[key.toPython() for key in keys])
         else:
-            return Message('MINTING_KEY_FAILURE',errors)
+            return Message('MINT_KEY_FAILURE',errors)
 
 ############################### For testing ########################################
 
