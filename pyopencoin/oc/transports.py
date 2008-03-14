@@ -143,7 +143,11 @@ class SocketServerTransport(Transport):
             print message
 
         if message:
-            self.conn.send(message.toJson())
+            try:
+                self.conn.send(message.toJson())
+            except socket.error:
+                self.close()
+                return
 
         if self.protocol.done:
             self.close()
@@ -176,16 +180,27 @@ class SocketClientTransport(Transport):
         
     def write(self,message):   
         if message:
-            self.socket.send(message.toJson())
+            try:
+                self.socket.send(message.toJson())
+            except socket.error:
+                self.close()
+                return
 
         if self.protocol.done:
             self.close()
             return
         
         else:            
-            print 'Message.type: %s' % message.type
+            if self.debug:
+                print 'Message.type: %s' % message.type
             read = ''
-            data = self.socket.recv(2048)
+
+            try:
+                data = self.socket.recv(2048)
+            except socket.error:
+                self.close()
+                return
+
             while data:
                 data = data.replace('\r','')
                 read = read + data
@@ -232,7 +247,11 @@ class SocketClientTransport(Transport):
 
                 # read more information
                 if self.socket:
-                    data = self.socket.recv(2048)
+                    try:
+                        data = self.socket.recv(2048)
+                    except socket.error:
+                        self.close()
+                        return
                 else:
                     data = ''
 
