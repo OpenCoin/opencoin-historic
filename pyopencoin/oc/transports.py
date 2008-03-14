@@ -31,6 +31,32 @@ class Transport:
     def start(self):
         """start the transport"""
 
+class SocketServerHandler:
+    """SocketServerHandler accepts connections on a socket, makes a SocketServerTransport, and feeds the transport to function."""
+    def __init__(self, addr, port, function):
+        self.addr = addr
+        self.port = port
+        self.debug = False
+        self.function = function
+
+    def start(self):
+
+        import socket
+        self.runserver = True
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.bind((self.addr, self.port))
+        s.listen(5)
+        self.socket = s
+
+        while self.runserver:
+            incoming_sock, incoming_addr = self.socket.accept()
+            sst = SocketServerTransport(incoming_sock, self.debug)
+
+            # TODO: Add in ability to use select, or spawn off a thread, or something
+
+            self.function(sst)
+            
+
 
 class SocketServerTransport(Transport):
     """ No idea how to test this with a doctest
@@ -39,101 +65,80 @@ class SocketServerTransport(Transport):
         shells
 
     """
-    def __init__(self,addr,port):
-        self.addr = addr
-        self.port = port
-        self.debug = 0
+    def __init__(self, sock, debug=False):
+        self.conn = sock
+        self.debug = debug
 
     def start(self):
-        """This is a prove that I have no understanding of sockets. Whats
-        a socket, whats a conn, when is it open, when closed?"""
 
-        import socket
-        self.runserver = 1
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.bind((self.addr, self.port))
-        s.listen(1)
-        self.socket = s
-        self.init_conn()
-        while self.runserver:
-            read = ''
-            data = self.conn.recv(2048)
-            while data:
-                data  = data.replace('\r','')
-                read = read + data
+        read = ''
+        data = self.conn.recv(2048)
+        while data:
+            data  = data.replace('\r','')
+            read = read + data
                 
-                # Read through, trying to find a full message.
-                position = 0
-                found = 0
-                quotes = False
-                braces = 0
-                for c in read:
-                    if c == '"':
-                        quotes = not quotes
+            # Read through, trying to find a full message.
+            position = 0
+            found = 0
+            quotes = False
+            braces = 0
+            for c in read:
+                if c == '"':
+                    quotes = not quotes
 
-                    elif c == '[':
-                        if not quotes:
-                            braces = braces + 1
+                elif c == '[':
+                    if not quotes:
+                        braces = braces + 1
 
-                    elif c == ']':
-                        if not quotes:
-                            braces = braces - 1
-                            if braces == 0:
-                                found = position
-                                break
+                elif c == ']':
+                    if not quotes:
+                        braces = braces - 1
+                        if braces == 0:
+                            found = position
+                            break
 
-                    position = position + 1
+                position = position + 1
 
-                if found:
-                    try:
-                        m = Message(jsontext=read[:found + 1])
-                    except Exception, e:
-                        raise
-                    else:
-                        read = read[found + 1:]
+            if found:
+                try:
+                    m = Message(jsontext=read[:found + 1])
+                except Exception, e:
+                    raise
+                else:
+                    read = read[found + 1:]
 
-                    try:
-                        self.newMessage(m)
-                    except Exception, e:
-                        raise
-    
+                try:
+                    if self.debug:
+                        print m
+                    self.newMessage(m)
+                except Exception, e:
+                    raise
 
-                # The socket may already be closed. Check.
-                if not self.conn:
-                    break
 
-                # read more information
-                data = self.conn.recv(2048)
+            # The socket may already be closed. Check.
+            if not self.conn:
+                break
 
-            # No more data, the connection is closed. Close the socket
-            if self.conn:
-                self.conn.close()
+            # read more information
+            data = self.conn.recv(2048)
 
-            # connection closed. wait for the next connection
-            self.init_conn()
-            
+        # No more data, the connection is closed. Close the socket
+        if self.conn:
+            self.conn.close()
 
-    def init_conn(self):
-        conn, addr = self.socket.accept()
-        self.conn = conn
-        return conn
+        # TODO: Somehow signal death. Remove ourselves from a select or kill the thread?
 
     def write(self,message):
         if self.debug:
             print message
-        self.conn.send(message.toJson())
-        #if message.type == 'finished':
+
+        if message:
+            self.conn.send(message.toJson())
+
         if self.protocol.done:
             self.conn.close()
             self.conn = None
            
-            # FIXME: randomly commented out
-            #self.runserver = 0
-            #self.socket.close()
-            
-            #self.init_conn()
-            #self.protocol.state = self.protocol.start
-
 
 class SocketClientTransport(Transport):
     """
@@ -154,9 +159,10 @@ class SocketClientTransport(Transport):
         self.socket.connect((self.addr, self.port))
         
     def write(self,message):   
-        self.socket.send(message.toJson())
+        if message:
+            self.socket.send(message.toJson())
 
-        if message.type == 'finished':
+        if message.type == 'GOODBYE': # FIXME: We need to use the protocol stuff, or somehow know what we mean to do.
             self.socket.close()
             self.socket = None
             return
@@ -201,6 +207,8 @@ class SocketClientTransport(Transport):
                         read = read[found + 1:]
 
                     try:
+                        if self.debug:
+                            print m
                         self.newMessage(m)
                     except Exception, e:
                         raise
