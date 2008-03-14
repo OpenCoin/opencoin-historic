@@ -72,7 +72,13 @@ class SocketServerTransport(Transport):
     def start(self):
 
         read = ''
-        data = self.conn.recv(2048)
+
+        try:
+            data = self.conn.recv(2048)
+        except socket.error:
+            self.close()
+            return
+
         while data:
             data  = data.replace('\r','')
             read = read + data
@@ -120,7 +126,11 @@ class SocketServerTransport(Transport):
                 break
 
             # read more information
-            data = self.conn.recv(2048)
+            try:
+                data = self.conn.recv(2048)
+            except socket.error:
+                self.close()
+                return
 
         # No more data, the connection is closed. Close the socket
         if self.conn:
@@ -136,8 +146,14 @@ class SocketServerTransport(Transport):
             self.conn.send(message.toJson())
 
         if self.protocol.done:
-            self.conn.close()
-            self.conn = None
+            self.close()
+
+    def close(self):
+        if self.debug:
+            print 'Closing socket'
+        self.conn.close()
+        self.conn = None
+        return
            
 
 class SocketClientTransport(Transport):
@@ -162,9 +178,8 @@ class SocketClientTransport(Transport):
         if message:
             self.socket.send(message.toJson())
 
-        if message.type == 'GOODBYE': # FIXME: We need to use the protocol stuff, or somehow know what we mean to do.
-            self.socket.close()
-            self.socket = None
+        if self.protocol.done:
+            self.close()
             return
         
         else:            
@@ -220,6 +235,14 @@ class SocketClientTransport(Transport):
                     data = self.socket.recv(2048)
                 else:
                     data = ''
+
+    def close(self):
+        if self.debug:
+            print 'Closing socket'
+        self.socket.close()
+        self.socket = None
+        return
+
 
         
 
