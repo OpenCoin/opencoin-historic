@@ -24,16 +24,19 @@ Abstract
 
 ToDo
 
-   - do the stuff in ./TODO
-   - licence of this document?
+   - licence of this document (GNU FDL, CC, Public Domain)?
    - "Introduction", including scope of protocol
    - JSON, 7-bit ASCII
+   - define coin/certificate format, encryption padding
+   - add note on randomness
+   - add PROTOCOL_ERROR
    - add HANDSHAKE, CONTINUE, GOODBYE; warning that GOODBYE will disappear
    - replace "COIN_SPEND" with "SPEND_TOKEN"
    - throw out reduntant "TRANSFER_TOKEN" explanatoins
    - add authentication and authorization, at least for "target"
      when minting
    - add mandatory trusted channel (Bluetooth, TLS)
+   - reformat this into RFC-XML
 
 
 Table of Contents

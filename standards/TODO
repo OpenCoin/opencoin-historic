@@ -15,13 +15,7 @@ Allowed and recommended algorithms for hashing, signing blinding and encrypting
 
 protocol.txt
 ============
-Define encryption padding
-Add default transaction_id handling (Both parties agreeing to a transaction_id)
-Add hello/versioning/protocol handshaking
-Add generic error message
-Renamings (Coin-->Token, ...)
-RFC style
-Licence - GNU FDL?  (oierw thinks public domain or a CC license)
+See protocol.txt, section "ToDo"
 
 
 protocol-over-https.txt
