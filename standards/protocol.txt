@@ -201,7 +201,7 @@ fail, the whole transaction fails.
 
 3.4 Wallet send minting request to issuer  
 
-* Send [was: MINT_REQUEST]
+* Send
 
         TRANSFER_TOKEN_REQUEST( transaction_id, target, 
             list_of_blinds+keyids, (empty list) , list_of_options, )
@@ -231,7 +231,7 @@ fail, the whole transaction fails.
 
 3.5 Wallet gets token back
 
-* Wallet asks issuer service [was: FETCH_MINTED_REQUEST]
+* Wallet asks issuer service
 
         TRANSFER_TOKEN_RESUME( transaction_id )
 
