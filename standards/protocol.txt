@@ -24,14 +24,14 @@ Abstract
 
 ToDo
 
-   - licence of this document (GNU FDL, CC, Public Domain)?
+   - licence of this document (GNU FDL, CC-BY-SA, Public Domain)?
    - "Introduction", including scope of protocol
    - JSON, 7-bit ASCII
    - define token/certificate format, encryption padding
+   - define validity of certificates and tokens
    - add note on randomness
    - add PROTOCOL_ERROR
    - add HANDSHAKE, CONTINUE, GOODBYE; warning that GOODBYE will disappear
-   - replace "SPEND_TOKEN_REQUEST" with "SPEND_TOKEN"
    - throw out reduntant "TRANSFER_TOKEN" explanatoins
    - add authentication and authorization, at least for "target"
      when minting
@@ -42,6 +42,10 @@ ToDo
 Table of Contents
 
    1. Introduction
+      1.1  Object of the OpenCoin protocol
+      1.2  Limited scope of the OpenCoin protocol
+      1.3  General Layout of the OpenCoin protocol
+      1.4  Encoding of messages, tokens and certificates
    2. General guidelines
    3. The OpenCoin protocol
       3.1.  Issuer setup
@@ -57,7 +61,69 @@ Table of Contents
 
 1. Introduction
 
+1.1 Object of the OpenCoin protocol
+
+The OpenCoin protocol aims to implement David Chaum's concept of "untraceable 
+payments" [3]. The general procedure is this:
+
+* Minting
+  * A payer creates a yet unsigned, 'blank' token according to the rules 
+    published by the issuer. It includes a serial number.
+  * He obfuscates this blank, yielding the 'blind'. He send the blind to the
+    issuer and request signing with a special minting key.
+  * If the issuer's requirements for minting (which may include a payment) 
+    are met, he signs the payer's  blind with the nominated minting key.
+  * The payer fetches the signed blind from the issuer and 'unblinds'. The 
+    result is a token including a valid signature from the issuer.
+
+* Spending
+    A payer sends the token to a payee. The payee verifies that the token is
+    valid according to the issuer's rules (format, data, signature, ...) and
+    checks it against the issuer's double spending database (DSDB). He tells
+    the payer if he accepts the token.
+
+* Redemption
+    The payee sends the token to the issuer. The issuer verifies that the 
+    token is valid and checks it against his DSDB. If he accepts the token, 
+    he adds its serial number to the DSDB. He may offer the payee something 
+    in exchange for the token (like a payment).
+
+Spending and redemption are actually entwined to one simultanious operation.
+
+Tokens include a reference to this protocol, a reference to the issuer, a 
+denomination and a random serial. The minting key used to sign the token is
+deticated to mint exclusivly tokens of this denomination.
+
+This protocol is designed such that tokens are unforgable and untracable:
+
+* Unforgeability/balance
+  Without knowledge of the issuer's private minting keys, no combination of 
+  payers and payees can successfully redeem tokens of a total denomination 
+  higher than the total denomination of tokens minted by the issuer for them.
+
+  Particularly, no one (except the issuer) can produce N+1 valid tokens from
+  N valid tokens ('one-more-forgery').
+
+* Untraceability
+  No combination of the issuer and a set of payees are able to correlate 
+  blinds and tokens of a payer just by looking at them (but maybe by traffic
+  analysis).
+
+
+1.2 Limited scope of the OpenCoin protocol
+
 [ToDo]
+
+
+1.3 General Layout of the OpenCoin protocol
+
+[ToDo]
+
+
+1.4 Encoding of messages, tokens and certificates
+
+[ToDo]
+
 
 
 2. General guidelines
