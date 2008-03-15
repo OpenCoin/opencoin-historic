@@ -2,10 +2,10 @@
 * Wallet to Wallet *
 ********************
 
-=============
-= SUM       =
-= TOKEN     =
-=============
+=================
+= SUM           =
+= SPEND_TOKEN   =
+=================
 
 SUM
 -----
@@ -31,18 +31,18 @@ B:
                         
 
 
-TOKEN
------
+SPEND_TOKEN
+-----------
 
 A:
-  TOKEN_REDEEM  list(token)
+  SPEND_TOKEN_REQUEST   list(token)
         Prior:  SUM_ACCEPT
         Follow: TOKEN_REJECT
                 TOKEN_ACCEPT
 
 B:
-  TOKEN_REJECT  type
-                list(detail-reason)|list()
+  SPEND_TOKEN_REJECT    type
+                        list(detail-reason) | list()
                     Reasons:
                         'Rejected'
                         'Invalid token'
@@ -53,6 +53,6 @@ B:
         Follow: TOKEN_REDEEM
                 Goodbye
 
-  TOKEN_ACCEPT
+  SPEND_TOKEN_ACCEPT
         Prior:  TOKEN_REDEEM
         Follow: Goodbye
