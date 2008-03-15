@@ -143,8 +143,8 @@ class TokenSpendSender(Protocol):
     >>> css.state(Message('HANDSHAKE_ACCEPT',None))
     <Message('SUM_ANNOUNCE',['...', '3', 'foobar'])>
     >>> css.state(Message('SUM_ACCEPT'))
-    <Message('TOKEN_SPEND',['...', [[(...)], [(...)]], 'foobar'])>
-    >>> css.state(Message('TOKEN_ACCEPT'))
+    <Message('SPEND_TOKEN_REQUEST',['...', [[(...)], [(...)]], 'foobar'])>
+    >>> css.state(Message('SPEND_TOKEN_ACCEPT'))
     <Message('GOODBYE',None)>
     >>> css.state(Message('GOODBYE'))
 
@@ -189,7 +189,7 @@ class TokenSpendSender(Protocol):
 
             self.state = self.conclusion            
             jsonCoins = [c.toPython() for c in self.coins]
-            return Message('TOKEN_SPEND',[self.encoded_transaction_id,
+            return Message('SPEND_TOKEN_REQUEST',[self.encoded_transaction_id,
                                           jsonCoins,
                                           self.target])
 
@@ -204,7 +204,7 @@ class TokenSpendSender(Protocol):
     def conclusion(self,message):
         self.newState(self.goodbye)
 
-        if message.type == 'TOKEN_ACCEPT':
+        if message.type == 'SPEND_TOKEN_ACCEPT':
             return self.goodbye()
 
         elif message.type == 'PROTOCOL_ERROR':
@@ -224,8 +224,8 @@ class TokenSpendRecipient(Protocol):
     >>> csr = TokenSpendRecipient(w)
     >>> csr.state(Message('SUM_ANNOUNCE',['1234','standard', 'currency', '3','a book']))
     <Message('SUM_ACCEPT',None)>
-    >>> csr.state(Message('TOKEN_SPEND',['1234', [coin1, coin2], 'a book']))
-    <Message('TOKEN_ACCEPT',None)>
+    >>> csr.state(Message('SPEND_TOKEN_REQUEST',['1234', [coin1, coin2], 'a book']))
+    <Message('SPEND_TOKEN_ACCEPT',None)>
     >>> csr.state(Message('GOODBYE',None))
     <Message('GOODBYE',None)>
 
@@ -300,7 +300,7 @@ class TokenSpendRecipient(Protocol):
 
         self.newState(self.goodbye)
 
-        if message.type == 'TOKEN_SPEND':
+        if message.type == 'SPEND_TOKEN_REQUEST':
             try:
                 encoded_transaction_id, tokens, target = message.data
             except ValueError:
@@ -337,21 +337,21 @@ class TokenSpendRecipient(Protocol):
             # And now do things
 
             #be conservative
-            result = Message('TOKEN_REJECT','default')
+            result = Message('SPEND_TOKEN_REJECT','default')
             
             if transaction_id != self.transaction_id:
-                result = Message('TOKEN_REJECT','Rejected')
+                result = Message('SPEND_TOKEN_REJECT','Rejected')
             
             elif sum(tokens) != self.sum:
-                result = Message('TOKEN_REJECT','Rejected')
+                result = Message('SPEND_TOKEN_REJECT','Rejected')
             
             elif target != self.target:
-                result = Message('TOKEN_REJECT','Rejected')
+                result = Message('SPEND_TOKEN_REJECT','Rejected')
             
             elif self.action in ['redeem','exchange','trust']:
                 out = self.wallet.handleIncomingCoins(tokens,self.action,target)
                 if out:
-                    result = Message('TOKEN_ACCEPT')
+                    result = Message('SPEND_TOKEN_ACCEPT')
 
             return result
 
