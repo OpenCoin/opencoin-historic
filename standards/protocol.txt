@@ -27,11 +27,11 @@ ToDo
    - licence of this document (GNU FDL, CC, Public Domain)?
    - "Introduction", including scope of protocol
    - JSON, 7-bit ASCII
-   - define coin/certificate format, encryption padding
+   - define token/certificate format, encryption padding
    - add note on randomness
    - add PROTOCOL_ERROR
    - add HANDSHAKE, CONTINUE, GOODBYE; warning that GOODBYE will disappear
-   - replace "COIN_SPEND" with "SPEND_TOKEN"
+   - replace "SPEND_TOKEN_REQUEST" with "SPEND_TOKEN"
    - throw out reduntant "TRANSFER_TOKEN" explanatoins
    - add authentication and authorization, at least for "target"
      when minting
@@ -269,9 +269,9 @@ fail, the whole transaction fails.
 Alice - sends a token
 Bob   - receives the token
 
-Note: 
-  The request type "COIN_SPEND" may get exchanged by "TRANSFER_TOKEN_REQUEST"
-  of type "redeem" in future versions of this protocol.
+  [ Warning: 
+    The messages "SPEND_TOKEN_*" may get exchanged by "TRANSFER_TOKEN_*" of 
+    type "redeem" or "spend" in future versions of this protocol. ]
 
 * Prerequisites
   * Wallet Alice locates Wallet Bob and sets up (secure) connection
@@ -296,9 +296,9 @@ Note:
 * Wallet Alice sends tokens to Wallet Bob (this time including their clear 
   serial and signature)
   
-    A:      COIN_SPEND( transaction_id, list(token1, ...) )
+    A:      SPEND_TOKEN_REQUEST( transaction_id, list(token1, ...) )
 
-* The atom for a COIN_SPEND is the entire list of tokens
+* The atom for a SPEND_TOKEN_REQUEST is the entire list of tokens
 
 * Wallet Bob checks if the sum of their values matches the announced sum, if 
   they are valid and (if the former tests do not fail) tries itself to spent
@@ -307,9 +307,9 @@ Note:
   wallet Bob rejects the request it with a reason/reasons, otherwise accepts
   them:
 
-    B:      COIN_REJECT( transaction_id, list( (tokenN, "ReasonN") ) )
-        or  COIN_REJECT( transaction_id, emptylist, "Reason")
-        or  COIN_ACCEPT( transaction_id )
+    B:      SPEND_TOKEN_REJECT( transaction_id, list( (tokenN, "ReasonN") ) )
+        or  SPEND_TOKEN_REJECT( transaction_id, emptylist, "Reason")
+        or  SPEND_TOKEN_ACCEPT( transaction_id )
 
   Possible reasons are "unknown", "invalid" ... [ToDo].
 
