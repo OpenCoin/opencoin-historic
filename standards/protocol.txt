@@ -26,9 +26,12 @@ ToDo
 
    - do the stuff in ./TODO
    - licence of this document?
-   - "Introduction"
-   - replace "COIN_SPEND" with "TRANSFER_TOKEN"
+   - "Introduction", including scope of protocol
+   - JSON, 7-bit ASCII
+   - add HANDSHAKE, CONTINUE, GOODBYE; warning that GOODBYE will disappear
+   - replace "COIN_SPEND" with "SPEND_TOKEN"
    - throw out reduntant "TRANSFER_TOKEN" explanatoins
+   - Warning that TRANSFER_TOKEN option "type=" will move forward
    - add authentication and authorization, at least for "target"
      when minting
    - add mandatory trusted channel (Bluetooth, TLS)
@@ -144,7 +147,7 @@ IS:
   Keep (r, blank, blind) in mind. 
   
 
-t 3.3.5 "TRANSFER_TOKEN": A generic wallet-issuer request
+3.3.5 "TRANSFER_TOKEN": A generic wallet-issuer request
 
 The atom for this transaction is a list of tokens - if one of the tokens /blanks
 fail, the whole transaction fails.
