@@ -31,7 +31,6 @@ ToDo
    - add HANDSHAKE, CONTINUE, GOODBYE; warning that GOODBYE will disappear
    - replace "COIN_SPEND" with "SPEND_TOKEN"
    - throw out reduntant "TRANSFER_TOKEN" explanatoins
-   - Warning that TRANSFER_TOKEN option "type=" will move forward
    - add authentication and authorization, at least for "target"
      when minting
    - add mandatory trusted channel (Bluetooth, TLS)
@@ -155,69 +154,73 @@ fail, the whole transaction fails.
 * Client sends
    
         TRANSFER_TOKEN_REQUEST( 
-            transaction_id, list_of_options, target, list_of_blinds+keyids, list_of_tokens
-        )
-    
+            transaction_id, target, list_of_blinds+keyids, 
+            list_of_tokens, list_of_options )
+
+  [ WARNING: In future versions of this protocol, it wll change to
+        TRANSFER_TOKEN_REQUEST (
+            transaction_id, list_of_options,
+            target, list_of_blinds+keyids, list_of_tokens )
+  ]
+
   to IS (issuer service), where 
 
   * transaction_id is a base64(random(128bit)) referencing this transaction
-    e.g. for later resume after an abort. 
-  * option may contain variable=value pairs like "JITM=mandatory".
-  * target 
-    * value(list_of_blinds) = value(list_of_tokens): empty
-    * value(list_of_blinds) > value(list_of_tokens): payment reference
-    * value(list_of_blinds) < value(list_of_tokens): account reference
-
-  For now, only 'pure' transactions are allowed, so one of these must 
-  be empty:
-  * target        : token exchange (value(list_of_blinds) = value(list_of_tokens))
-  * list_of_tokens : mint request
-  * list_of_blinds+keyids: redemption
+    e.g. for later resume after an abort.
+  * list_of_option may contain variable=value pairs like "JITM=mandatory".
+    It must contain the option "type", which can have three values:
+    * mint    : A minting request. target is a payment reference, 
+                list_of_tokens must be empty.
+    * redeem  : A token redemption. target is an account reference,
+                list_of_blinds+keyids must be empty.
+    * exchange: A request to mint new tokens for old ones. target must be 
+                empty, value of blinds must equal value of tokens.
 
   If at least one of the blinds or tokens is rejected, the issuer answers
 
-    TRANSFER_TOKEN_REJECT( transaction_id, reason,
-                           list( (blind1.key_id, reason1), ... ), \
-                           list( (token1.key_id,  reason1), ... )  )
+        TRANSFER_TOKEN_REJECT( 
+            transaction_id, reason,
+            list( (blind1.key_id, reason1), ... ),
+            list( (token1.key_id,  reason1), ... )  )
 
   where "reason" may be some general failure like "500 minting not available".
   If the request is accepted with no delay, IS answers
 
-    TRANSFER_TOKEN_ACCEPT( transaction_id, message, list_of_signed_blinds)
+        TRANSFER_TOKEN_ACCEPT( 
+            transaction_id, message, list_of_signed_blinds)
 
   (with list_of_singed_blinds empty if no minting was required)
   If minting was requested and acccepted but postponed, IS answers
 
-    TRANSFER_TOKEN_DELAY( transaction_id, message )
+        TRANSFER_TOKEN_DELAY( transaction_id, message )
 
   In this case, the wallet can fetch the signed blinds later by 
 
-    TRANSFER_TOKEN_RESUME( transaction_id )
+        TRANSFER_TOKEN_RESUME( transaction_id )
 
 
 3.4 Wallet send minting request to issuer  
 
 * Send [was: MINT_REQUEST]
 
-    TRANSFER_TOKEN_REQUEST( transaction_id, list_of_options, target, \
-                            list_of_blinds+keyids, (empty list) )
+        TRANSFER_TOKEN_REQUEST( transaction_id, target, 
+            list_of_blinds+keyids, (empty list) , list_of_options, )
 
   to issuer service
 
 * Issuer: if request will not be minted (e.g., "Bad Key ID" if the key_id
   is not current):
 
-    TRANSFER_TOKEN_REJECT( transaction_id, reason,
-                           list( (blind1.key_id, reason1), ... ), \
-                           (empty list1)  )
+        TRANSFER_TOKEN_REJECT( transaction_id, reason,
+            list( (blind1.key_id, reason1), ... ), (empty list1)  )
 
   ElseIf minting is done just-in-time, IS answers
 
-    TRANSFER_TOKEN_ACCEPT( transaction_id, message, list_of_signed_blinds)
+        TRANSFER_TOKEN_ACCEPT( transaction_id, message, list_of_signed_blinds)
 
   Else IS queues blind to the mint and tells wallet to wait
 
-    TRANSFER_TOKEN_DELAY( transaction_id, reason )
+        TRANSFER_TOKEN_DELAY( transaction_id, reason )
 
   Session is terminated.
 
@@ -230,24 +233,24 @@ fail, the whole transaction fails.
 
 * Wallet asks issuer service [was: FETCH_MINTED_REQUEST]
 
-    TRANSFER_TOKEN_RESUME( transaction_id )
+        TRANSFER_TOKEN_RESUME( transaction_id )
 
 * IS either rejects finally
 
-    TRANSFER_TOKEN_REJECT( transaction_id, reason,
-                           list( (blind1.key_id, reason1), ... ), (empty list) )
+        TRANSFER_TOKEN_REJECT( transaction_id, reason,
+            list( (blind1.key_id, reason1), ... ), (empty list) )
  
   with reasons like "TID Unknown", "TID expired", "TID rejected", ...,
   or tells to wait longer
 
-    TRANSFER_TOKEN_DELAY( transaction_id, reason )
+        TRANSFER_TOKEN_DELAY( transaction_id, reason )
     
   (question: what about key expiration while request is in mining queue)
   (oierw thinks: as long as the key is valid for minting when the request is made, we are good)
 
   or passes signed blinds to wallet Bob, must preserve order
 
-    TRANSFER_TOKEN_ACCEPT( transaction_id, message, list_of_singed_blinds )
+        TRANSFER_TOKEN_ACCEPT( transaction_id, message, list_of_singed_blinds )
     
   Session terminates
 
