@@ -472,10 +472,17 @@ Bob   - receives the token
 
 4. References
 
-[1]  The OpenCoin project <http://opencoin.org/>
+[1]         The OpenCoin project <http://opencoin.org/>
 
-[2]  The OpenCoin project, "OpenCoin protocol v1.0"
-     <https://trac.opencoin.org/trac/opencoin/browser/trunk/standards/protocol.txt>
+[2]         The OpenCoin project, "OpenCoin protocol v1.0"
+            <https://trac.opencoin.org/trac/opencoin/browser/trunk/standards/protocol.txt>
 
-[3]  David Chaum, "Blind signatures for untraceable payments", Advances in 
-     Cryptology - Crypto '82, Springer-Verlag (1983), 199-203.
+[3]         David Chaum, "Blind signatures for untraceable payments", Advances
+            in Cryptology - Crypto '82, Springer-Verlag (1983), 199-203.
+
+[RFC4086]   D. Eastlake, J. Schiller and S. Crocker, "Randomness Requirements 
+            for Security", RFC 4086, June 2005
+
+[RFC4627]   D. Crockford, "The application/json Media Type for JavaScript 
+            Object Notation (JSON)", RFC 4627, July 2006
+
