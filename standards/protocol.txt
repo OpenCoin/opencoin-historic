@@ -37,6 +37,7 @@ ToDo
      when minting
    - add mandatory trusted channel (Bluetooth, TLS)
    - reformat this into RFC-XML
+   - add warning on differences to scientific notation
 
 
 Table of Contents
@@ -78,9 +79,9 @@ payments" [3]. The general procedure is this:
 
 * Spending
     A payer sends the token to a payee. The payee verifies that the token is
-    valid according to the issuer's rules (format, data, signature, ...) and
-    checks it against the issuer's double spending database (DSDB). He tells
-    the payer if he accepts the token.
+    valid according to the issuer's rules (format, data, signature, ...). In
+    the standard online case, he also checks it against the issuer's double 
+    spending database (DSDB). He tells the payer if he accepts the token.
 
 * Redemption
     The payee sends the token to the issuer. The issuer verifies that the 
@@ -88,21 +89,22 @@ payments" [3]. The general procedure is this:
     he adds its serial number to the DSDB. He may offer the payee something 
     in exchange for the token (like a payment).
 
-Spending and redemption are actually entwined to one simultanious operation.
+In the standard case of online payment, spending and redemption are actually 
+entwined to one simultanious operation.
 
 Tokens include a reference to this protocol, a reference to the issuer, a 
-denomination and a random serial. The minting key used to sign the token is
-deticated to mint exclusivly tokens of this denomination.
+denomination, a random serial and the mint's signature over this data. The
+minting key used to sign the token is deticated to mint exclusivly tokens 
+of this denomination.
 
 This protocol is designed such that tokens are unforgable and untracable:
 
 * Unforgeability/balance
   Without knowledge of the issuer's private minting keys, no combination of 
   payers and payees can successfully redeem tokens of a total denomination 
-  higher than the total denomination of tokens minted by the issuer for them.
-
-  Particularly, no one (except the issuer) can produce N+1 valid tokens from
-  N valid tokens ('one-more-forgery').
+  higher than the total denomination of tokens minted by the issuer for them. 
+  In Particular, no one (except the issuer) can produce N+1 valid tokens 
+  from N valid tokens ('one-more-forgery').
 
 * Untraceability
   No combination of the issuer and a set of payees are able to correlate 
@@ -117,7 +119,54 @@ This protocol is designed such that tokens are unforgable and untracable:
 
 1.3 General Layout of the OpenCoin protocol
 
-[ToDo]
+The OpenCoin protocol typically involves three parties: the issuer, a sender/
+payer (Alice) and a receiver/payee (Bob). We call the OpenCoin user agents of 
+payer and payee 'wallets'. The issuer consists of four parts:
+* The 'master key holder' (MHK) generates and keeps the master key pair 
+  and signes and publishes the 'currency description document' (CDD) and 
+  all the certificates.
+* The mint generates and keeps the minting keys and signes blinds.
+* The 'double spending database' (DSDB) keeps track of the serials of 
+  tokens which got redeemed.
+* The 'issuer service' (IS) is the public interface of the issuer on the
+  internet.
+
+The participants send each other messages in request/response pairs. The 
+universal scheme is this:
+
+     * session initiation *
+
+   -- [ HANDSHAKE, DATA ] -->
+  <-- [ HANDSHAKE, null ] --
+
+   -- [ REQUEST_1, DATA ] -->
+  <-- [ RESPONSE_1,DATA ] --
+
+   -- [ REQUEST_2, DATA ] -->
+  <-- [ RESPONSE_2,DATA ] --
+
+   -- [ CONTINUE,  null ] -->
+  <-- [ CONTINUE,  null ] --
+
+          * pause *
+
+   -- [ REQUEST_3, DATA ] -->
+  <-- [ RESPONSE_3,DATA ] --
+
+   -- [ REQUEST_4, DATA ] -->
+  <-- [ RESPONSE_4,DATA ] --
+
+   -- [ GOODBYE,   null ] -->
+  <-- [ GOODBYE,   null ] --
+
+     * session termination *
+
+The standard case involves three sessions:
+
+   Payer Alice  --[minting]--------------------------------->  Issuer
+   Payer Alice  --[spending]-->  Payee Bob  --[redemption]-->  Issuer
+
+the latter two usually happening at the same time ('online case').
 
 
 1.4 Encoding of messages, tokens and certificates
