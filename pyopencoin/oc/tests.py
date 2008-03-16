@@ -18,7 +18,7 @@ Lets test without having any keys in the mint
 
 >>> t = ClientTest(issuer.listen)
 >>> walletA.fetchMintKey(t,denominations=['1'])
-Client <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
+Client <Message('HANDSHAKE',[['protocol', 'opencoin 1.0']])>
 Server <Message('HANDSHAKE_ACCEPT',None)>
 Client <Message('MINT_KEY_FETCH_DENOMINATION',[['1'], '0'])>
 Server <Message('MINT_KEY_FAILURE',[['1', 'Unknown denomination']])>
@@ -31,7 +31,7 @@ Now, lets have a key
 >>> pub1 = issuer.createSignedMintKey('1', now, later, much_later)
 >>> t = ClientTest(issuer.listen)
 >>> walletA.fetchMintKey(t,denominations=['1'])
-Client <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
+Client <Message('HANDSHAKE',[['protocol', 'opencoin 1.0']])>
 Server <Message('HANDSHAKE_ACCEPT',None)>
 Client <Message('MINT_KEY_FETCH_DENOMINATION',[['1'], '0'])>
 Server <Message('MINT_KEY_PASS',[[...]])>
@@ -45,7 +45,7 @@ Test the transfer token protocol
 >>> coin2 = coins[1][0] # denomination of 2
 >>> walletB.coins = [coin1, coin2]
 >>> walletB.transferTokens(t,'myaccount',[],[coin1, coin2],type='redeem')
-Client <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
+Client <Message('HANDSHAKE',[['protocol', 'opencoin 1.0']])>
 Server <Message('HANDSHAKE_ACCEPT',None)>
 Client <Message('TRANSFER_TOKEN_REQUEST',['...', 'myaccount', [], [[(...)], [(...)]], [['type', 'redeem']]])>
 Server <Message('TRANSFER_TOKEN_ACCEPT',['...', []])>
@@ -68,7 +68,7 @@ Test the transfer token protocol with an exchange
 >>> import base64
 
 >>> walletB.transferTokens(t, 'myaccount', blanks, walletB.coins, type='exchange')
-Client <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
+Client <Message('HANDSHAKE',[['protocol', 'opencoin 1.0']])>
 Server <Message('HANDSHAKE_ACCEPT',None)>
 Client <Message('TRANSFER_TOKEN_REQUEST',['...', 'myaccount', [['...', ['...', '...', '...']]], [[(...)], [(...)]], [['type', 'exchange']]])>
 Server <Message('TRANSFER_TOKEN_ACCEPT',['...', ['...', '...', '...']])>
@@ -85,12 +85,12 @@ Test the coin spend protocol.
 >>> walletB.issuer_transport = t2
 >>> walletA.coins=[coin1]
 >>> walletA.sendCoins(t, target='a book', amount=1)
-walletA <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
+walletA <Message('HANDSHAKE',[['protocol', 'opencoin 1.0']])>
 walletB <Message('HANDSHAKE_ACCEPT',None)>
 walletA <Message('SUM_ANNOUNCE',['...', '...', '...', '1', 'a book'])>
 walletB <Message('SUM_ACCEPT',None)>
 walletA <Message('SPEND_TOKEN_REQUEST',['...', [[(...)]], 'a book'])>
-walletB <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
+walletB <Message('HANDSHAKE',[['protocol', 'opencoin 1.0']])>
 issuer <Message('HANDSHAKE_ACCEPT',None)>
 walletB <Message('TRANSFER_TOKEN_REQUEST',['...', 'my account', [], [[(...)]], [['type', 'redeem']]])>
 issuer <Message('TRANSFER_TOKEN_ACCEPT',['...', []])>

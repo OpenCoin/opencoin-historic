@@ -71,11 +71,12 @@ class Protocol:
         
     def initiateHandshake(self,message):   
         self.newState(self.verifyHandshake)
-        return Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})
+        return Message('HANDSHAKE',[['protocol', 'opencoin 1.0']])
 
     def verifyHandshake(self, message):
         if message.type == 'HANDSHAKE_ACCEPT':
             self.newState(self.firstStep)
+            # FIXME: If we have handshakes that return things, we need to check for them here
             return self.firstStep(message)
 
         elif message.type == 'HANDSHAKE_REJECT':
@@ -100,7 +101,32 @@ class answerHandshakeProtocol(Protocol):
 
     def start(self,message):
         if message.type == 'HANDSHAKE':
-            if message.data['protocol'] == 'opencoin 1.0':
+            
+            # NOTE: We do not do set up the newState. If this fails, it comes right back to handshakes
+            if not isinstance(message.data, types.ListType):
+                return ProtocolErrorMessage('aHP')
+            
+            for var in message.data:
+                try:
+                    key, value = var
+                except ValueError:
+                    return ProtocolErrorMessage('aHP')
+            
+            if not message.data:
+                return ProtocolErrorMessage('aHP')
+
+            # Make a dictionary of options in the handshake
+
+            options = {}
+            for var in message.data:
+                key, value = var
+                if key in options:
+                    raise ProtocolErrorMessage('aHP')
+                
+                options[key] = value
+
+            # FIXME: If we allow opencoin 1.0+, we need to check for that as well
+            if options['protocol'] == 'opencoin 1.0':
                 # Set up a state where the handshake no longer is needed.
                 self.old_start = self.start
                 self.start = self.dispatch # Now, if we restart we end up in dispatch
@@ -139,7 +165,7 @@ class TokenSpendSender(Protocol):
     >>> coin2 = coins[1][0]
     >>> css = TokenSpendSender([coin1,coin2],'foobar')
     >>> css.state(Message(None))
-    <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
+    <Message('HANDSHAKE',[['protocol', 'opencoin 1.0']])>
     >>> css.state(Message('HANDSHAKE_ACCEPT',None))
     <Message('SUM_ANNOUNCE',['...', '3', 'foobar'])>
     >>> css.state(Message('SUM_ACCEPT'))
@@ -377,7 +403,7 @@ class TransferTokenSender(Protocol):
 
     >>> tts = TransferTokenSender('my account',[],[coin1, coin2],type='redeem')
     >>> tts.state(Message(None))
-    <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
+    <Message('HANDSHAKE',[['protocol', 'opencoin 1.0']])>
     >>> tts.state(Message('HANDSHAKE_ACCEPT',None))
     <Message('TRANSFER_TOKEN_REQUEST',['...', 'my account', [], [[(...)], [(...)]], [['type', 'redeem']]])>
     >>> tts.state(Message('TRANSFER_TOKEN_ACCEPT',[tts.encoded_transaction_id, []]))
@@ -873,7 +899,7 @@ class fetchMintKeyProtocol(Protocol):
 
     >>> fmp = fetchMintKeyProtocol(denominations=['1'])
     >>> fmp.state(Message(None))
-    <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
+    <Message('HANDSHAKE',[['protocol', 'opencoin 1.0']])>
     >>> fmp.state(Message('HANDSHAKE_ACCEPT',None))
     <Message('MINT_KEY_FETCH_DENOMINATION',[['1'], '0'])>
 
@@ -891,7 +917,7 @@ class fetchMintKeyProtocol(Protocol):
 
     >>> fmp = fetchMintKeyProtocol(keyids=['sj17RxE1hfO06+oTgBs9Z7xLut/3NN+nHJbXSJYTks0='])
     >>> fmp.state(Message(None))
-    <Message('HANDSHAKE',{'protocol': 'opencoin 1.0'})>
+    <Message('HANDSHAKE',[['protocol', 'opencoin 1.0']])>
     >>> fmp.state(Message('HANDSHAKE_ACCEPT'))
     <Message('MINT_KEY_FETCH_KEYID',['sj17RxE1hfO06+oTgBs9Z7xLut/3NN+nHJbXSJYTks0='])>
 
