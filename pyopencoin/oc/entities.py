@@ -70,7 +70,7 @@ class Wallet(Entity):
                     raise Exception('Got a bad key')
 
     def sendMoney(self,transport):
-        "Sends some money to the given transport."
+        """FOR TESTING PURPOSES ONLY. Sends some money to the given transport."""
 
         protocol = protocols.WalletSenderProtocol(self)
         transport.setProtocol(protocol)
@@ -79,7 +79,7 @@ class Wallet(Entity):
         protocol.newMessage(Message(None))
 
     def receiveMoney(self,transport):
-        """receiveMoney sets up the wallet to receive tokens from another wallet."""
+        """FOR TESTING PURPOSES ONLY. sets up the wallet to receive tokens from another wallet."""
         protocol = protocols.WalletRecipientProtocol(self)
         transport.setProtocol(protocol)
         transport.start()
@@ -300,8 +300,11 @@ class Wallet(Entity):
 
         confirmReceiveCoins returns 'trust' if they accept the transaction with a certain
         wallet for a sum regarding a target.
+
+        Except that this argument then gets used as the action in 'redeem', 'exhange', 'trust'
+        telling us what to do with the tokens after we get them.
         """
-        return 'trust'
+        return 'redeem'
 
 
     def transferTokens(self, transport, target, blanks, coins, type):
@@ -356,20 +359,39 @@ class Wallet(Entity):
 
         it seems to be anther part of receiveCoins. Basically, given some coins, it attempts to
         redeem them with the IS.
+
+        returns True if successful. Nothing if not
+        FIXME: It doesn't see to know if the transfer works?
         """
-        # FIXME: What are action and reason for?
-        # FIXED: see protocols:332 - when reiceiving tokens the user has a choice of whtat to
+        # Q: What are action and reason for?
+        # A: see protocols:332 - when reiceiving tokens the user has a choice of what to
         # to with them. Thats the action: action in  ['redeem','exchange','trust'].
         # reason is describing what the tokens are going to be for, e.g 'a book'
 
-        transport = self.getIssuerTransport()
-        if 1: #redeem
-            self.otherCoins.extend(coins) # Deposit them
+        cdd = self.cdds[coins[0].currency_identifier]
+
+        # Get a connection to the IS
+        issuer_service_location = cdd.issuer_service_location
+        transport = self.getIssuerTransport(issuer_service_location)
+
+        if action == 'redeem':
+            self.otherCoins.extend(coins) # Deposit them in otherCoins
             if transport:
                 self.transferTokens(transport,'my account',[],coins,'redeem')
-        return 1
 
-    def getIssuerTransport(self):
+        elif action == 'exchange':
+            raise NotImplementedError
+        
+        elif action == 'trust':
+            self.coins.append(coins) # Move the coins into our wallet, trusting that they are good
+            
+        else:
+            raise Exception('Unknown action')
+
+        return True
+
+
+    def getIssuerTransport(self, location):
         return getattr(self,'issuer_transport',0)
 
     def removeCoins(self, coins):

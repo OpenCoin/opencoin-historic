@@ -243,10 +243,11 @@ class TokenSpendSender(Protocol):
 class TokenSpendRecipient(Protocol):
     """
     >>> import entities
-    >>> from tests import coins
+    >>> from tests import coins, CDD
     >>> coin1 = coins[0][0].toPython() # Denomination of 1
     >>> coin2 = coins[1][0].toPython() # Denomination of 2
     >>> w = entities.Wallet()
+    >>> w.addCDD(CDD)
     >>> csr = TokenSpendRecipient(w)
     >>> csr.state(Message('SUM_ANNOUNCE',['1234','standard', 'currency', '3','a book']))
     <Message('SUM_ACCEPT',None)>
