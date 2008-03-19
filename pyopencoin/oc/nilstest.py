@@ -17,7 +17,10 @@ t2 = ClientTest(issuer.listen,
                 autoprint='json',
                 servernick='issuer')
 
-walletB.issuer_transport = t2
+# setup things for walletB to be able to perform connection with issuer
+walletB.addIssuerTransport(location=issuer.cdd.issuer_service_location, transport=t2)
+walletB.cdds[issuer.cdd.currency_identifier] = issuer.cdd
+
 walletA.sendCoins(t,amount=1,target='a book')
 
 

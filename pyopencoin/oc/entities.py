@@ -38,6 +38,7 @@ class Wallet(Entity):
         self.getTime = getTime # The getTime function
         self.keyids = {} # MintKeys by key_identifier
         self.cdds = {} # CDDs by CurrencyIdentifier
+        self.issuer_transports = {} # The issuer_transports open by location
 
 
     def addCDD(self, CDD):
@@ -84,7 +85,7 @@ class Wallet(Entity):
         transport.setProtocol(protocol)
         transport.start()
 
-    def sendCoins(self,transport,target,amount=None):
+    def sendCoins(self, transport, target, amount):
         """sendCoins sends coins over a transport to a target of a certain amount.
         
         We need to be careful to try every possible working combination of coins to
@@ -372,14 +373,16 @@ class Wallet(Entity):
 
         # Get a connection to the IS
         issuer_service_location = cdd.issuer_service_location
-        transport = self.getIssuerTransport(issuer_service_location)
 
         if action == 'redeem':
+            transport = self.getIssuerTransport(issuer_service_location)
             self.otherCoins.extend(coins) # Deposit them in otherCoins
             if transport:
                 self.transferTokens(transport,'my account',[],coins,'redeem')
 
         elif action == 'exchange':
+            transport = self.getIssuerTransport(issuer_service_location)
+            # FIXME: should make some amount of blanks and sends the blinds in a TTR
             raise NotImplementedError
         
         elif action == 'trust':
@@ -392,7 +395,17 @@ class Wallet(Entity):
 
 
     def getIssuerTransport(self, location):
-        return getattr(self,'issuer_transport',0)
+        if location in self.issuer_transports:
+            return self.issuer_transports[location]
+        else:
+            # FIXME: Try to open a transport if it makes sense
+            return None
+
+    def addIssuerTransport(self, location, transport):
+        self.issuer_transports[location] = transport
+
+    def delIssuerTransport(self, location):
+        del self.issuer_transports[location]
 
     def removeCoins(self, coins):
         """removeCoins removes a set of coins from self.coins or self.otherCoins
@@ -400,6 +413,8 @@ class Wallet(Entity):
         This is used so we can cleanly remove coins after a redemption. Coins being
         used for a redemption may come from the wallet itself or from another wallet.
         """
+        # NOTE: This assumes that self.coins and self.otherCoins do not contain
+        # copies of the same coin
         for c in coins:
             try:
                 self.coins.remove(c)
@@ -424,6 +439,8 @@ class Wallet(Entity):
         cdd = self.cdds[blanks[0].currency_identifier] # all blanks have the same CDD in a transaction
 
         #FIXME: We need to make sure we atleast have the same number of blanks and blinds at the protocol level!
+        # Well, maybe not the protocol level. We know we received the full message because we can decode the json.
+        # At this point, either our memory is screwed, or the IS screwed up. No real way to fix it either.
         for i in range(shortest):
             blank = blanks[i]
             blind = blinds[i]
@@ -528,14 +545,13 @@ class Issuer(Entity):
      
         self.cdd = cdd
 
-    def createSignedMintKey(self,denomination, not_before, key_not_after, token_not_after, signing_key=None, size=1024):
+    def createSignedMintKey(self, denomination, not_before, key_not_after, token_not_after, size=1024):
         """Have the Mint create a new key and sign the public key."""
 
         if denomination not in self.cdd.denominations:
             raise Exception('Trying to create a bad denomination')
        
-        if not signing_key:
-            signing_key = self.masterKey
+        signing_key = self.masterKey
 
         hash_alg = self.cdd.issuer_cipher_suite.hashing
         sign_alg = self.cdd.issuer_cipher_suite.signing

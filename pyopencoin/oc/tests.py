@@ -82,7 +82,7 @@ Test the coin spend protocol.
 >>> issuer.getTime = issuer.mint.getTime = lambda: calendar.timegm((2008,01,31,0,0,0))
 >>> t = ClientTest(walletB.listen,clientnick='walletA',servernick='walletB')
 >>> t2 = ClientTest(issuer.listen,clientnick='walletB',servernick='issuer')
->>> walletB.issuer_transport = t2
+>>> walletB.addIssuerTransport(location='here', transport=t2)
 >>> walletA.coins=[coin1]
 >>> walletA.sendCoins(t, target='a book', amount=1)
 walletA <Message('HANDSHAKE',[['protocol', 'opencoin 1.0']])>

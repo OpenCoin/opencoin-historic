@@ -45,6 +45,7 @@ class Protocol:
     def goodbye(self,message=None):
         """Denotes the end of a chain of messages in the protocol."""
         if message == None:
+            #FIXME: Setting a blank message to goodbye forces a GOODBYE message to be sent automatically
             message = Message('GOODBYE')
         #we are not done
         if not self.done:                       
@@ -54,7 +55,7 @@ class Protocol:
                 return self.transport.protocol.state(message)
             #well, then lets be done, say goodbye to signal the fact
             else:
-                self.done = 1
+                self.done = True
                 return Message('GOODBYE')
         else:
             pass
@@ -262,9 +263,8 @@ class TokenSpendRecipient(Protocol):
     TODO: Add PROTOCOL_ERROR checking
     """
     
-    def __init__(self,wallet,issuer_transport = None):
+    def __init__(self, wallet):
         self.wallet = wallet
-        self.issuer_transport = issuer_transport
         Protocol.__init__(self)
 
     def start(self,message):
@@ -305,8 +305,8 @@ class TokenSpendRecipient(Protocol):
             self.sum = int(amount)
 
             # And do stuff
-            #get some feedback from interface somehow
-            action = self.wallet.confirmReceiveCoins('the other wallet id',self.sum,self.target)
+            # FIXME: get some feedback from interface somehow
+            action = self.wallet.confirmReceiveCoins('the other wallet id', self.sum, self.target)
 
             if action == 'reject':
                 return Message('SUM_REJECT')
@@ -375,8 +375,8 @@ class TokenSpendRecipient(Protocol):
             elif target != self.target:
                 result = Message('SPEND_TOKEN_REJECT','Rejected')
             
-            elif self.action in ['redeem','exchange','trust']:
-                out = self.wallet.handleIncomingCoins(tokens,self.action,target)
+            elif self.action in ['redeem', 'exchange', 'trust']:
+                out = self.wallet.handleIncomingCoins(tokens, self.action, target)
                 if out:
                     result = Message('SPEND_TOKEN_ACCEPT')
 
