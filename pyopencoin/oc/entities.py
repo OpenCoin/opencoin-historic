@@ -273,13 +273,16 @@ class Wallet(Entity):
             self.coins.extend(to_use)
             raise
 
+        # FIXME: protocol.done is not the correct thing to be using here. protocol.done
+        # specifies that we are ready to hangup the connection, when instead, we want to
+        # know that the specific protocol we are using is complete (protocols.py:58)
         if not protocol.done:
             # If we didn't succeed, re-add the coins to the wallet.
             # Of course, we may need to remint, so FIXME: look at this
             self.coins.extend(to_use)
 
     def listen(self,transport):
-        """
+        """listens on a transport, answers a handshake, and performs wallet server type things
         >>> import transports
         >>> w = Wallet()
         >>> stt = transports.SimpleTestTransport()
@@ -364,14 +367,12 @@ class Wallet(Entity):
         returns True if successful. Nothing if not
         FIXME: It doesn't see to know if the transfer works?
         """
-        # Q: What are action and reason for?
-        # A: see protocols:332 - when reiceiving tokens the user has a choice of what to
-        # to with them. Thats the action: action in  ['redeem','exchange','trust'].
-        # reason is describing what the tokens are going to be for, e.g 'a book'
+        # Q: What is reason for?
+        # A: reason is describing what the tokens are going to be for, e.g 'a book'
 
         cdd = self.cdds[coins[0].currency_identifier]
 
-        # Get a connection to the IS
+        # Get the IS location
         issuer_service_location = cdd.issuer_service_location
 
         if action == 'redeem':
@@ -398,9 +399,32 @@ class Wallet(Entity):
         if location in self.issuer_transports:
             return self.issuer_transports[location]
         else:
-            # FIXME: Try to open a transport if it makes sense
-            return None
+            return self.makeIssuerTransport(location)
 
+    def makeIssuerTransport(self, location):
+        """creates a transport to the issuer at a location."""
+        # NOTE: if using in testing and want an issuerTransport that you can not connect to,
+        # overwrite with lambda location: return None if you want things to silently fail,
+        # and lambda location: raise FIXME exception to signify the connection failed
+        if not location.startswith('opencoin://'):
+            raise Exception #FIXME: Better error should go here, probably
+
+        # strip off opencoin://
+        fullstring = location[len('opencoin://'):]
+
+        try:
+            address, port = fullstring.split(':')
+        except ValueError:
+            raise Exception #FIXME: Better error should go here, probably
+
+        import transports
+
+        sct = transports.SocketClientTransport(address, int(port))
+
+        self.addIssuerTransport(location, sct)
+
+        return sct
+        
     def addIssuerTransport(self, location, transport):
         self.issuer_transports[location] = transport
 
