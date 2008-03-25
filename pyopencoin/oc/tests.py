@@ -86,7 +86,7 @@ Test the coin spend protocol.
 >>> walletA.coins=[coin1]
 >>> walletA.sendCoins(t, target='a book', amount=1)
 walletA <Message('HANDSHAKE',[['protocol', 'opencoin 1.0']])>
-walletB <Message('HANDSHAKE_ACCEPT',[['protocol', 'opencoin 1.0'], ['cdd_version', '0']])>
+walletB <Message('HANDSHAKE_ACCEPT',[['protocol', 'opencoin 1.0']])>
 walletA <Message('SUM_ANNOUNCE',['...', '...', '...', '1', 'a book'])>
 walletB <Message('SUM_ACCEPT',None)>
 walletA <Message('SPEND_TOKEN_REQUEST',['...', [[(...)]], 'a book'])>

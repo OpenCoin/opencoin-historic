@@ -288,12 +288,11 @@ class Wallet(Entity):
         >>> stt = transports.SimpleTestTransport()
         >>> w.listen(stt)
         >>> stt.send('HANDSHAKE',[['protocol', 'opencoin 1.0']])
-        <Message('HANDSHAKE_ACCEPT',[['protocol', 'opencoin 1.0'], ['cdd_version', '0']])>
+        <Message('HANDSHAKE_ACCEPT',[['protocol', 'opencoin 1.0']])>
         >>> stt.send('sendMoney',[1,2])
         <Message('Receipt',None)>
         """
-        protocol = protocols.answerHandshakeProtocol(cdd_version='0', #FIXME: get cdd version from cdd
-                                                     arguments=self,
+        protocol = protocols.answerHandshakeProtocol(arguments=self,
                                                      sendMoney=protocols.WalletRecipientProtocol,
                                                      SUM_ANNOUNCE=protocols.TokenSpendRecipient)
         transport.setProtocol(protocol)
@@ -636,7 +635,7 @@ class Issuer(Entity):
             transport.setProtocol(self.protocol)
 
         else:
-            protocol = protocols.answerHandshakeProtocol(cdd_version='0', #FIXME: use real cdd version
+            protocol = protocols.answerHandshakeProtocol(handshake_options=[['cdd_version','0']], #FIXME: use real cdd version
                                                          arguments=self,
                                                          TRANSFER_TOKEN_REQUEST=protocols.TransferTokenRecipient,
                                                          MINT_KEY_FETCH_DENOMINATION=protocols.giveMintKeyProtocol,

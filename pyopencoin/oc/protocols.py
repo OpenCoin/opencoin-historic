@@ -94,9 +94,9 @@ ProtocolErrorMessage = lambda x: Message('PROTOCOL_ERROR', 'send again')
 
 class answerHandshakeProtocol(Protocol):
 
-    def __init__(self, cdd_version, arguments, **mapping):
+    def __init__(self, arguments, handshake_options=None, **mapping):
         Protocol.__init__(self)
-        self.cdd_version = cdd_version
+        self.handshake_options = handshake_options
         self.arguments = arguments
         self.mapping = mapping
 
@@ -133,7 +133,11 @@ class answerHandshakeProtocol(Protocol):
                 self.start = self.dispatch # Now, if we restart we end up in dispatch
                 
                 self.newState(self.dispatch)
-                return Message('HANDSHAKE_ACCEPT', [['protocol', 'opencoin 1.0'], ['cdd_version', self.cdd_version]])
+                
+                send_options = [['protocol', 'opencoin 1.0']]
+                if self.handshake_options:
+                    send_options.extend(self.handshake_options)
+                return Message('HANDSHAKE_ACCEPT', send_options)
             else:
                 self.newState(self.goodbye)
                 return Message('HANDSHAKE_REJECT','did not like the protocol version')
