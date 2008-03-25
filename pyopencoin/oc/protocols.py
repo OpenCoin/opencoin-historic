@@ -94,9 +94,9 @@ ProtocolErrorMessage = lambda x: Message('PROTOCOL_ERROR', 'send again')
 
 class answerHandshakeProtocol(Protocol):
 
-
-    def __init__(self, arguments, **mapping):
+    def __init__(self, cdd_version, arguments, **mapping):
         Protocol.__init__(self)
+        self.cdd_version = cdd_version
         self.arguments = arguments
         self.mapping = mapping
 
@@ -121,7 +121,7 @@ class answerHandshakeProtocol(Protocol):
             options = {}
             for var in message.data:
                 key, value = var
-                if key in options:
+                if key in options: # only one key allowed
                     raise ProtocolErrorMessage('aHP')
                 
                 options[key] = value
@@ -133,7 +133,7 @@ class answerHandshakeProtocol(Protocol):
                 self.start = self.dispatch # Now, if we restart we end up in dispatch
                 
                 self.newState(self.dispatch)
-                return Message('HANDSHAKE_ACCEPT')
+                return Message('HANDSHAKE_ACCEPT', [['protocol', 'opencoin 1.0'], ['cdd_version', self.cdd_version]])
             else:
                 self.newState(self.goodbye)
                 return Message('HANDSHAKE_REJECT','did not like the protocol version')
@@ -570,6 +570,7 @@ class TransferTokenSender(Protocol):
         elif message.type != 'PROTOCOL_ERROR':
             return ProtocolErrorMessage('TransferTokenSender')
 
+        # Really?!?
         return self.goodbye() 
 
 
@@ -893,9 +894,7 @@ class TransferTokenRecipient(Protocol):
 ###############################################################################
 
 class fetchMintKeyProtocol(Protocol):
-    """
-    Used by a wallet to fetch the mints keys, needed when 
-    creating blanks
+    """Used by a wallet to fetch the mints keys, needed when creating blanks
        
     Lets fetch by denomination
 
@@ -1123,6 +1122,7 @@ class fetchMintKeyProtocol(Protocol):
         elif message.type != 'PROTOCOL_ERROR':
             return ProtocolErrorMessage('fetchMintKeyProtocol')
 
+        # FIXME: Really?!?
         return self.goodbye(message)            
 
 
@@ -1241,6 +1241,110 @@ class giveMintKeyProtocol(Protocol):
             return Message('MINT_KEY_PASS',[key.toPython() for key in keys])
         else:
             return Message('MINT_KEY_FAILURE',errors)
+
+############################## CDD Exchange with IS ################################
+
+class requestCDDProtocol(Protocol):
+    """Used by a wallet to fetch new CDDs from the IS 
+       
+    >>> rcp = requestCDDProtocol('0')
+    >>> rcp.state(Message(None))
+    <Message('HANDSHAKE',[['protocol', 'opencoin 1.0']])>
+    >>> rcp.state(Message('HANDSHAKE_ACCEPT',None))
+    <Message('FETCH_CDD_REQUEST','0')>
+
+    >>> from tests import CDD
+    >>> rcp.state(Message('CDD_PASS', CDD.toPython()))
+    <Message('GOODBYE',None)>
+
+    >>> rcp.state == rcp.goodbye
+    True
+    >>> rcp.state(Message('GOODBYE'))
+    
+    """
+
+    def __init__(self, cdd_version, skip_handshake=False):
+        
+        self.cdd_version = cdd_version
+
+        Protocol.__init__(self)
+
+        if skip_handshake:
+            self.newState(self.firstStep)
+        else:
+            self.newState(self.initiateHandshake)
+
+    def firstStep(self, message):
+
+        self.newState(self.getResponse)
+        return Message('FETCH_CDD_REQUEST', self.cdd_version)
+
+    def getResponse(self, message):
+
+        self.newState(self.goodbye)
+        
+        if message.type == 'CDD_PASS':
+        
+            raw_cdd = message.data
+
+            if not isinstance(raw_cdd, types.ListType):
+                return ProtocolErrorMessage('FCR')
+
+            try:
+                cdd = containers.CDD().fromPython(raw_cdd)
+            except TypeError:
+                return ProtocolErrorMessage('FCR')
+            except IndexErro:
+                return ProtocolErrorMessage('FCR')
+
+            if not cdd.verify_self():
+                # FIXME: What should we do here?
+                return ProtocolErrorMessage('FCR')
+
+            # FIXME: A required test
+            # if cdd.options['version'] != self.cdd_version:
+
+            # FIXME: We should ensure that we have proper follow through
+            # so a IS that gets compromised cannot change the issuer_master_public_key.
+            # The way that makes sense to do that is to work off of an option of the
+            # previous CDD
+            
+            # Example using previously published 
+            # if cdd.issuer_master_public_key != prev_ver.issuer_public_master_key:
+            #     if next_issuer_public_master_key not in prev_ver.options:
+            #         This key is invalid
+            #     else:
+            #         if prev_ver.options[next_issuer_public_master_key] == cdd.encode('issuer_public_master.key'):
+            #             This key is valid
+            #         else:
+            #             This key is invalid
+
+            # FIXME: Actually do something with the key
+
+        elif message.type == 'CDD_FAIL':
+
+            if not isinstance(message.data, types.NoneType):
+                return ProtocolErrorMessage('FCF')
+
+            # FIXME: Do something?
+
+        elif message.type != 'PROTOCOL_ERROR':
+            return ProtocolErrorMessage('TransferTokenSender')
+
+        else:
+            return ProtocolErrorMessage('fCP')
+
+        # Really?!?
+        return self.goodbye() 
+
+class giveCDDProtocol(Protocol):
+    """Foo!."""
+
+    def __init__(self, issuer):
+
+        self.issuer = issuer
+        Protocol.__init__(self)
+
 
 ############################### For testing ########################################
 

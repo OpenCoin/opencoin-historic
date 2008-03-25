@@ -6,20 +6,20 @@
 >>> issuer = Issuer()
 >>> issuer.createMasterKey(keylength=512)
 >>> issuer.makeCDD(currency_identifier='http://opencent.net/OpenCent', denominations=['1', '2'],
-...                short_currency_identifier='OC', options=[], issuer_service_location='here')
+...                short_currency_identifier='OC', options=[('version', '0')], issuer_service_location='here')
 
 >>> walletA.addCDD(issuer.cdd)
 >>> walletB.addCDD(issuer.cdd)
 
 >>> CDD.toJson()
-'[["standard_identifier","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["short_currency_identifier","OC"],["issuer_service_location","opencoin://issuer.opencent.net:8002"],["denominations",["1","2","5","10","20","50","100","200","500","1000"]],["issuer_cipher_suite",["RSASigningAlgorithm","RSABlindingAlgorithm","SHA256HashingAlgorithm"]],["options",[]],["issuer_public_master_key","sloGu4+P4rslyC4RiAJrZbG0Z90FwEV88eW1JnNv7BDU33+uIhi2G0f/XL+AoUwmF1VsdhQhzEtGNVjnlx0TViWgqvrYX6AqB1/R3zYP9+JnuIIyHiyS+Z+Y3uoB0sLMD+dvHcDRo7cbb+ZNAvlcPoQ4Hb3+tuxwBMmVkZMaOu8=,AQAB"],["signature",[["keyprint","hxz5pRwS+RFp88qQliXYm3R5uNighktwxqEh4RMOuuk="],["signature","fifLuwjQXpviAD6ruHXaW09HipPNmrX41n125Ku+AAplbNDMHs/+jCRQGwJ4yMyk0hNsX/Idqhm3ckebZAujync03mWMRA4pZEMLmYdkjLsOSdw7YoPFO2+Ah5GILnGB4WRm3L1q9yeaCCrjuoZO135vUV1ykUl7k2LBOKMxw4A="]]]]'
+'[["standard_identifier","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["short_currency_identifier","OC"],["issuer_service_location","opencoin://issuer.opencent.net:8002"],["denominations",["1","2","5","10","20","50","100","200","500","1000"]],["issuer_cipher_suite",["RSASigningAlgorithm","RSABlindingAlgorithm","SHA256HashingAlgorithm"]],["options",[["version","0"]]],["issuer_public_master_key","sloGu4+P4rslyC4RiAJrZbG0Z90FwEV88eW1JnNv7BDU33+uIhi2G0f/XL+AoUwmF1VsdhQhzEtGNVjnlx0TViWgqvrYX6AqB1/R3zYP9+JnuIIyHiyS+Z+Y3uoB0sLMD+dvHcDRo7cbb+ZNAvlcPoQ4Hb3+tuxwBMmVkZMaOu8=,AQAB"],["signature",[["keyprint","hxz5pRwS+RFp88qQliXYm3R5uNighktwxqEh4RMOuuk="],["signature","nG6zXX7NDfPgmI2qGbvg/oug2B8uhJbLRDxyWPZeJD6gB+p4BOnzgMq8Hpe6FtnXgyQ407cgiyuQ0p20H4ko1LPEM2qIOZToUXeqmLYSjoNYBy5ctMaN+yATswJgD97nzWlH+YxVdMH+L1k2twhFO3x13URDNlN6WsZTYplmRoY="]]]]'
 
 Lets test without having any keys in the mint
 
 >>> t = ClientTest(issuer.listen)
 >>> walletA.fetchMintKey(t,denominations=['1'])
 Client <Message('HANDSHAKE',[['protocol', 'opencoin 1.0']])>
-Server <Message('HANDSHAKE_ACCEPT',None)>
+Server <Message('HANDSHAKE_ACCEPT',[['protocol', 'opencoin 1.0'], ['cdd_version', '0']])>
 Client <Message('MINT_KEY_FETCH_DENOMINATION',[['1'], '0'])>
 Server <Message('MINT_KEY_FAILURE',[['1', 'Unknown denomination']])>
 Client <Message('GOODBYE',None)>
@@ -32,7 +32,7 @@ Now, lets have a key
 >>> t = ClientTest(issuer.listen)
 >>> walletA.fetchMintKey(t,denominations=['1'])
 Client <Message('HANDSHAKE',[['protocol', 'opencoin 1.0']])>
-Server <Message('HANDSHAKE_ACCEPT',None)>
+Server <Message('HANDSHAKE_ACCEPT',[['protocol', 'opencoin 1.0'], ['cdd_version', '0']])>
 Client <Message('MINT_KEY_FETCH_DENOMINATION',[['1'], '0'])>
 Server <Message('MINT_KEY_PASS',[[...]])>
 Client <Message('GOODBYE',None)>
@@ -46,7 +46,7 @@ Test the transfer token protocol
 >>> walletB.coins = [coin1, coin2]
 >>> walletB.transferTokens(t,'myaccount',[],[coin1, coin2],type='redeem')
 Client <Message('HANDSHAKE',[['protocol', 'opencoin 1.0']])>
-Server <Message('HANDSHAKE_ACCEPT',None)>
+Server <Message('HANDSHAKE_ACCEPT',[['protocol', 'opencoin 1.0'], ['cdd_version', '0']])>
 Client <Message('TRANSFER_TOKEN_REQUEST',['...', 'myaccount', [], [[(...)], [(...)]], [['type', 'redeem']]])>
 Server <Message('TRANSFER_TOKEN_ACCEPT',['...', []])>
 Client <Message('GOODBYE',None)>
@@ -69,7 +69,7 @@ Test the transfer token protocol with an exchange
 
 >>> walletB.transferTokens(t, 'myaccount', blanks, walletB.coins, type='exchange')
 Client <Message('HANDSHAKE',[['protocol', 'opencoin 1.0']])>
-Server <Message('HANDSHAKE_ACCEPT',None)>
+Server <Message('HANDSHAKE_ACCEPT',[['protocol', 'opencoin 1.0'], ['cdd_version', '0']])>
 Client <Message('TRANSFER_TOKEN_REQUEST',['...', 'myaccount', [['...', ['...', '...', '...']]], [[(...)], [(...)]], [['type', 'exchange']]])>
 Server <Message('TRANSFER_TOKEN_ACCEPT',['...', ['...', '...', '...']])>
 Client <Message('GOODBYE',None)>
@@ -86,12 +86,12 @@ Test the coin spend protocol.
 >>> walletA.coins=[coin1]
 >>> walletA.sendCoins(t, target='a book', amount=1)
 walletA <Message('HANDSHAKE',[['protocol', 'opencoin 1.0']])>
-walletB <Message('HANDSHAKE_ACCEPT',None)>
+walletB <Message('HANDSHAKE_ACCEPT',[['protocol', 'opencoin 1.0'], ['cdd_version', '0']])>
 walletA <Message('SUM_ANNOUNCE',['...', '...', '...', '1', 'a book'])>
 walletB <Message('SUM_ACCEPT',None)>
 walletA <Message('SPEND_TOKEN_REQUEST',['...', [[(...)]], 'a book'])>
 walletB <Message('HANDSHAKE',[['protocol', 'opencoin 1.0']])>
-issuer <Message('HANDSHAKE_ACCEPT',None)>
+issuer <Message('HANDSHAKE_ACCEPT',[['protocol', 'opencoin 1.0'], ['cdd_version', '0']])>
 walletB <Message('TRANSFER_TOKEN_REQUEST',['...', 'my account', [], [[(...)]], [['type', 'redeem']]])>
 issuer <Message('TRANSFER_TOKEN_ACCEPT',['...', []])>
 walletB <Message('GOODBYE',None)>
@@ -131,7 +131,7 @@ def generateCDD():
                          issuer_service_location = 'opencoin://issuer.opencent.net:8002',
                          denominations = ['1', '2', '5', '10', '20', '50', '100', '200', '500', '1000'],
                          issuer_cipher_suite = ics,
-                         options = [],
+                         options = [('version', '0')],
                          issuer_public_master_key = public_key)
 
     signature = containers.Signature(keyprint=ics.hashing(str(public_key)).digest(),
