@@ -353,6 +353,8 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
 
     def verify_self(self):
         """Verifies the self-signed certificate."""
+        if 'version' not in dict(self.options):
+            return False # required option
         import crypto        
         ics = self.issuer_cipher_suite
         return self.verifySignature(ics.signing,

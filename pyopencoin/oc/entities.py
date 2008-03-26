@@ -37,16 +37,25 @@ class Wallet(Entity):
         self.otherCoins = [] # Coins we received from another wallet, waiting to Redeem
         self.getTime = getTime # The getTime function
         self.keyids = {} # MintKeys by key_identifier
-        self.cdds = {} # CDDs by CurrencyIdentifier
+        self.cdds = {} # CDDs by [CurrencyIdentifier][version]. version of None gives current version key
         self.issuer_transports = {} # The issuer_transports open by location
 
 
     def addCDD(self, CDD):
         """addCDD adds a CDD to the wallet's CDDs. The CDDs are not trusted, just stored."""
-        if self.cdds.has_key(CDD.currency_identifier):
-            raise Exception('Tried to add a CDD twice!')
-        
-        self.cdds[CDD.currency_identifier] = CDD
+        version = dict(CDD.options)['version']
+        currencydict = self.cdds.setdefault(CDD.currency_identifier, {})
+        if version in currencydict:
+            import warnings
+            warnings.warn('Tried to add version "%s" which already existed' % version) 
+        currencydict[version] = CDD
+
+    def setDefaultCDD(self, CDD):
+        """setDefaultCDD sets the default CDD for a currency to CDD. It adds if necessary."""
+        version = dict(CDD.options)['version']
+        if version not in self.cdds.setdefault(CDD.currency_identifier, {}):
+            self.addCDD(CDD)
+        self.cdds[CDD.currency_identifier][None] = version
 
     def fetchMintKey(self, transport, denominations=None, keyids=None, time=None):
         protocol = protocols.fetchMintKeyProtocol(denominations=denominations, keyids=keyids, time=time)
@@ -59,11 +68,12 @@ class Wallet(Entity):
 
         for key in retreivedKeys:
             try:
-                cdd = self.cdds[key.currency_identifier]
+                cdd_curr = self.cdds[key.currency_identifier]
+                cdd = cdd_curr[cdd_curr[None]]
             except KeyError:
                 continue # try the other currencies
 
-            if not self.keyids.has_key(key.key_identifier):
+            if key.key_identifier not in self.keyids:
                 if key.verify_with_CDD(cdd):
                     self.keyids[key.key_identifier] = key
                 else:
@@ -322,7 +332,8 @@ class Wallet(Entity):
         keydict = {}
 
         if blanks:
-            cdd = self.cdds[blanks[0].currency_identifier] # all blanks are the same currency
+            cdd_currs = self.cdds[blanks[0].currency_identifier] # all blanks are the same currency
+            cdd = cdd_currs[cdd_currs[None]]
 
         for blank in blanks:
             li = keydict.setdefault(blank.encodeField('key_identifier'), [])
@@ -367,10 +378,11 @@ class Wallet(Entity):
         returns True if successful. Nothing if not
         FIXME: It doesn't see to know if the transfer works?
         """
-        # Q: What is reason for?
+        # Q: What is reason for reason?
         # A: reason is describing what the tokens are going to be for, e.g 'a book'
 
-        cdd = self.cdds[coins[0].currency_identifier]
+        cdd_curr = self.cdds[coins[0].currency_identifier]
+        cdd = cdd_curr[cdd_curr[None]] # The default CDD for the currency
 
         # Get the IS location
         issuer_service_location = cdd.issuer_service_location
@@ -884,12 +896,13 @@ class DSDB:
         them to be locked
         """
         
-        if self.locks.has_key(id):
-            raise LockingError('id already locked')
-
         lock_time = lock_duration + self.getTime()
 
-        self.locks[id] = (lock_time, [])
+        my_locks = (lock_time, [])
+        locks = self.locks.setdefault(id, my_locks)
+
+        if my_locks is not locks:
+            raise LockingError('id already locked')
         
         tokens = list(tokens[:])
 
@@ -897,9 +910,9 @@ class DSDB:
         
         while tokens:
             token = tokens.pop()
-            self.database.setdefault(token.key_identifier, {})
-            if self.database[token.key_identifier].has_key(token.serial):
-                lock = self.database[token.key_identifier][token.serial]
+            key_dict = self.database.setdefault(token.key_identifier, {})
+            if token.serial in key_dict:
+                lock = key_dict[token.serial]
                 if lock[0] == 'Spent':
                     tokens = []
                     reason = 'Token already spent'
@@ -916,10 +929,11 @@ class DSDB:
                 else:
                     raise NotImplementedError('Impossible string')
 
-            lock = self.database[token.key_identifier].setdefault(
-                                        token.serial, ('Locked', lock_time, id))
-            if lock != ('Locked', lock_time, id):
+            my_lock = ('Locked', lock_time, id)
+            lock = key_dict.setdefault(token.serial, my_lock)
+            if lock is not my_lock:
                 raise LockingError('Possible race condition detected.')
+
             self.locks[id][1].append(token)
 
         if reason:
@@ -935,17 +949,23 @@ class DSDB:
         completed and the token is spent, it cannot unlock.
         """
         
-        if not self.locks.has_key(id):
+        if id not in self.locks:
             raise LockingError('Unknown transaction_id')
 
+        lock = self.locks[id]
+
         lazy_unlocked = False
-        if self.locks[id][0] < self.getTime(): # unlock and then error
+        if lock[0] < self.getTime(): # unlock and then error
             lazy_unlocked = True
 
-        for token in self.locks[id][1]:
+        for token in lock[1]:
             del self.database[token.key_identifier][token.serial]
             if len(self.database[token.key_identifier]) == 0:
-                del self.database[token.key_identifier]
+                # FIXME: Possible race condition here. We delete the dict of
+                # by key_identifier if it is empty, but another thread can
+                # be writing to it between the if and the del.
+                pass
+                # del self.database[token.key_identifier]
 
         del self.locks[id]
 
@@ -959,10 +979,10 @@ class DSDB:
         FIXME: Small tidbit of code in place for lazy unlocking.
         FIXME: automatic_lock doesn't automatically unlock if it locked and the spending fails (how can it though?)
         """
-        if not self.locks.has_key(id):
+        if id not in self.locks:
             if automatic_lock:
                 # we can spend without locking, so lock now.
-                self.lock(id, tokens, 1)
+                self.lock(id, tokens, 86400)
             else:
                 raise LockingError('Unknown transaction_id')
 

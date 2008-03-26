@@ -252,7 +252,7 @@ class TokenSpendRecipient(Protocol):
     >>> coin1 = coins[0][0].toPython() # Denomination of 1
     >>> coin2 = coins[1][0].toPython() # Denomination of 2
     >>> w = entities.Wallet()
-    >>> w.addCDD(CDD)
+    >>> w.setDefaultCDD(CDD)
     >>> w.makeIssuerTransport = lambda loc: None
     >>> csr = TokenSpendRecipient(w)
     >>> csr.state(Message('SUM_ANNOUNCE',['1234','standard', 'currency', '3','a book']))
@@ -750,10 +750,10 @@ class TransferTokenRecipient(Protocol):
                     return ProtocolErrorMessage('TTRq')
 
             # Decipher options
-            options = {}
-            options.update(options_list)
+            # FIXME: check to make sure we don't have the same key twice
+            options = dict(options_list)
 
-            if not options.has_key('type'):
+            if 'type' not in options:
                 return Message('TRANSFER_TOKEN_REJECT', 'Options', 'Reject', [])
             
             # Start doing things
@@ -1246,7 +1246,9 @@ class giveMintKeyProtocol(Protocol):
         else:
             return Message('MINT_KEY_FAILURE',errors)
 
-############################## CDD Exchange with IS ################################
+############################## CDD Exchange with IS ###########################
+#Between a wallet and the IS, to get a specific CDD                           #
+###############################################################################
 
 class requestCDDProtocol(Protocol):
     """Used by a wallet to fetch new CDDs from the IS 
@@ -1254,7 +1256,7 @@ class requestCDDProtocol(Protocol):
     >>> rcp = requestCDDProtocol('0')
     >>> rcp.state(Message(None))
     <Message('HANDSHAKE',[['protocol', 'opencoin 1.0']])>
-    >>> rcp.state(Message('HANDSHAKE_ACCEPT',None))
+    >>> rcp.state(Message('HANDSHAKE_ACCEPT'))
     <Message('FETCH_CDD_REQUEST','0')>
 
     >>> from tests import CDD
@@ -1305,8 +1307,9 @@ class requestCDDProtocol(Protocol):
                 # FIXME: What should we do here?
                 return ProtocolErrorMessage('FCR')
 
-            # FIXME: A required test
-            # if cdd.options['version'] != self.cdd_version:
+            if dict(cdd.options)['version'] != self.cdd_version:
+                # FIXME: actually do something
+                pass
 
             # FIXME: We should ensure that we have proper follow through
             # so a IS that gets compromised cannot change the issuer_master_public_key.
@@ -1318,14 +1321,15 @@ class requestCDDProtocol(Protocol):
             #     if next_issuer_public_master_key not in prev_ver.options:
             #         This key is invalid
             #     else:
-            #         if prev_ver.options[next_issuer_public_master_key] == cdd.encode('issuer_public_master.key'):
+            #         if (dict(prev_ver.options)[next_issuer_public_master_key] ==
+            #            cdd.encode('issuer_public_master.key')):
             #             This key is valid
             #         else:
             #             This key is invalid
 
             # FIXME: Actually do something with the key
 
-        elif message.type == 'CDD_FAIL':
+        elif message.type == 'FETCH_CDD_FAILURE':
 
             if not isinstance(message.data, types.NoneType):
                 return ProtocolErrorMessage('FCF')
@@ -1333,7 +1337,7 @@ class requestCDDProtocol(Protocol):
             # FIXME: Do something?
 
         elif message.type != 'PROTOCOL_ERROR':
-            return ProtocolErrorMessage('TransferTokenSender')
+            return ProtocolErrorMessage('fCP')
 
         else:
             return ProtocolErrorMessage('fCP')
@@ -1341,13 +1345,58 @@ class requestCDDProtocol(Protocol):
         # Really?!?
         return self.goodbye() 
 
+
 class giveCDDProtocol(Protocol):
-    """Foo!."""
+    """An issuer hands out a CDD. The other side of fetchCDDProtocol.
+    #>>> from entities import Issuer
+    #>>> issuer = Issuer()
+    #>>> issuer.createMasterKey(keylength=512)
+    #>>> issuer.makeCDD(currency_identifier='http://opencent.net/OpenCent2', denominations=['1', '2'],
+    #...                short_currency_identifier='OC', options=[['version', '1']], issuer_service_location='here')
+    #>>> gcp = giveCDDProtocol(issuer)
+    
+    #>>> gcp.state(Message('FETCH_CDD_REQUEST','1'))
+    #<Message('FETCH_CDD_PASS',[[...('version', '1')...]])>
+
+    #>>> gcp.newState(gmp.start)
+    #>>> gcp.state(Message('FETCH_CDD_REQUEST','0'))
+    #<Message('FETCH_CDD_FAILURE',None)>
+
+    #>>> gcp.newState(gmp.start)
+    #>>> gcp.state(Message('FETCH_CDD_REQUEST', ['1']))
+    #<Message('PROTOCOL_ERROR','send again...')>
+
+    #>>> gcp.newState(gmp.start)
+    #>>> gcp.state(Message('foo',None))
+    #<Message('PROTOCOL_ERROR','send again...')>
+    """
 
     def __init__(self, issuer):
 
         self.issuer = issuer
         Protocol.__init__(self)
+
+    def start(self,message):
+
+        self.newState(self.goodbye)
+
+        if message.type == 'FETCH_CDD_REQUEST':
+            version = message.data
+
+            if not isinstance(version, types.StringType):
+                return ProtocolErrorMessage('FCD')
+
+            if version not in self.issuer.cdds:
+                return Message('FETCH_CDD_FAILURE')
+
+            return Message('FETCH_CDD_PASS', self.issuer.cdds[version].toPython())
+
+        elif message.type == 'PROTOCOL_ERROR':
+            pass
+
+        else:
+            return ProtocolErrorMessage('gCP')
+            
 
 
 ############################### For testing ########################################
