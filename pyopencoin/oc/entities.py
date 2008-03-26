@@ -506,42 +506,23 @@ class UnableToDoError(Exception):
 
 #################### Issuer ###############################
 
-class Issuer(Entity):
-    """An isser
-
-    >>> i = Issuer()
+class IssuerEntity(Entity):
+    """The issuer.
+    IssuerEntity contains all the subparts of the issuer,
+    an IS, a DSDB, and a mint
+    
+    >>> i = IssuerEntity()
     >>> i.createMasterKey(keylength=256)
-    >>> #i.keys.public()
-    >>> #i.keys
-    >>> #str(i.keys)
-    >>> #i.keys.stringPrivate()
     """
+    
     def __init__(self):
         self.dsdb = DSDB()
         self.mint = Mint()
+        self.issuer = Issuer(dsdb=self.dsdb, mint=self.mint)
+
         self.masterKey = None
-        self.cdd  = None
+
         self.getTime = getTime
-
-        #Signed minting keys
-        self.signedKeys = {} # dict(denomination=[key,key,...])
-        self.keyids = {}     #
-
-
-    def getKeyByDenomination(self,denomination,time):
-        #FIXME: the time argument is supposed to get all the keys at a certain time
-        try:
-            return self.signedKeys.get(denomination,[])[-1]
-        except (KeyError, IndexError):            
-            raise 'KeyFetchError'
-    
-    
-    def getKeyById(self,keyid):
-        try:
-            return self.keyids[keyid]
-        except KeyError:            
-            raise 'KeyFetchError'
-
     
     def createMasterKey(self,keylength=1024):
         import crypto
@@ -551,10 +532,8 @@ class Issuer(Entity):
         masterKey = self.key_alg(keylength, public=False)
         self.masterKey = masterKey
 
-
     def makeCDD(self, currency_identifier, short_currency_identifier, denominations, 
                 issuer_service_location, options):
-
         from containers import CDD, Signature
         import crypto
         
@@ -578,28 +557,35 @@ class Issuer(Entity):
                               signature=ics.signing(self.masterKey).sign(ics.hashing(cdd.content_part()).digest()))
 
         cdd.signature = signature
+
+        if not cdd.verify_self():
+            raise Exception('Just created an invalid CDD')
      
-        self.cdd = cdd
+        self.issuer.addCDD(cdd)
 
-    def createSignedMintKey(self, denomination, not_before, key_not_after, token_not_after, size=1024):
+    def createSignedMintKey(self, denomination, not_before, key_not_after, token_not_after,
+                            signing_key=None, bypass_cdd_checks=False, size=1024):
         """Have the Mint create a new key and sign the public key."""
+        import containers
 
-        if denomination not in self.cdd.denominations:
+        cdd = self.issuer.getCDD()
+
+        if denomination not in cdd.denominations and not bypass_cdd_checks:
             raise Exception('Trying to create a bad denomination')
        
-        signing_key = self.masterKey
+        if not signing_key:
+            signing_key = self.masterKey
 
-        hash_alg = self.cdd.issuer_cipher_suite.hashing
-        sign_alg = self.cdd.issuer_cipher_suite.signing
+        hash_alg = cdd.issuer_cipher_suite.hashing
+        sign_alg = cdd.issuer_cipher_suite.signing
         key_alg = self.key_alg
 
         public = self.mint.createNewKey(hash_alg, key_alg, size)
 
         keyid = public.key_id(hash_alg)
         
-        import containers
         mintKey = containers.MintKey(key_identifier=keyid,
-                                     currency_identifier=self.cdd.currency_identifier,
+                                     currency_identifier=cdd.currency_identifier,
                                      denomination=denomination,
                                      not_before=not_before,
                                      key_not_after=key_not_after,
@@ -612,13 +598,95 @@ class Issuer(Entity):
                                    signature = signer.sign(hashed_content))
 
         mintKey.signature = sig
+
+        if not bypass_cdd_checks:
+            if not mintKey.verify_with_CDD(cdd):
+                raise Exception('Created a bad mintKey')
         
-        
-        self.signedKeys.setdefault(denomination, []).append(mintKey)
-        self.keyids[keyid] = mintKey
+        self.issuer.addMintKey(mintKey)
 
         return mintKey
 
+
+class Issuer(Entity):
+    """An IS
+
+    >>> ie = IssuerEntity()
+    >>> issuer = ie.issuer
+    """
+    def __init__(self, dsdb, mint):
+        self.dsdb = dsdb 
+        self.mint = mint
+
+        self.cdds = {} # CDDs by version
+        self.current_cdd_version = None
+        
+        self.getTime = getTime
+
+        #Signed minting keys
+        self.mintKeysByDenomination = {} # List of mint keys for a denomination
+        self.mintKeysByKeyID = {}
+
+        self.keyids = self.mintKeysByKeyID
+
+    def getKeyByDenomination(self,denomination,time):
+        #FIXME: the time argument is supposed to get all the keys at a certain time
+        try:
+            return self.mintKeysByDenomination.get(denomination,[])[-1]
+        except (KeyError, IndexError):            
+            raise 'KeyFetchError'
+    
+    def getKeyById(self,keyid):
+        try:
+            return self.mintKeysByKeyID[keyid]
+        except KeyError:            
+            raise 'KeyFetchError'
+
+    def addMintKey(self, mintKey):
+        denomination = mintKey.denomination
+        self.mintKeysByDenomination.setdefault(denomination, []).append(mintKey)
+        self.mintKeysByKeyID[mintKey.key_identifier] = mintKey
+
+    def addCDD(self, cdd):
+        """Adds a CDD to the issuer
+
+        >>> import tests
+        >>> issuer = Issuer(mint=None, dsdb=None)
+        """
+        version = dict(cdd.options)['version']
+
+        if version in self.cdds:
+            import warnings
+            warnings.warn('Trying to add the same version of CDD')
+
+        if not cdd.verify_self():
+            raise Exception('Tried to add an invalid CDD')
+
+        self.cdds[version] = cdd
+
+    def setCurrentCDDVersion(self, version):
+        if self.current_cdd_version == version:
+            import warnings
+            warnings.warn('Setting CDD version to the same version')
+
+        self.current_cdd_version = version
+
+    def getCDD(self, version=None):
+        """Returns a specific CDD. If version=None, returns the current CDD."""
+        if version == None:
+            version = self.current_cdd_version
+
+        return self.cdds[version]
+
+    def getCurrentCDDVersion(self):
+        """Returns the current CDD version."""
+        if not self.current_cdd_version:
+            raise Exception('No current CDD version.')
+
+        return self.current_cdd_version
+
+    #### Entity protocols ####
+    
     def giveMintKey(self,transport):
         protocol = protocols.giveMintKeyProtocol(self)
         transport.setProtocol(protocol)
@@ -628,9 +696,9 @@ class Issuer(Entity):
         """
         >>> import transports, tests,base64
         >>> tid = base64.b64encode('foobar')
-        >>> i = tests.makeIssuer()
+        >>> ie = tests.makeIssuerEntity()
         >>> stt = transports.SimpleTestTransport()
-        >>> i.listen(stt)
+        >>> ie.issuer.listen(stt)
         >>> stt.send('HANDSHAKE',[['protocol', 'opencoin 1.0']])
         <Message('HANDSHAKE_ACCEPT',[['protocol', 'opencoin 1.0'], ['cdd_version', '0']])>
         >>> stt.send('TRANSFER_TOKEN_REQUEST',[tid, 'my account', [], [tests.coinA.toPython()], [['type', 'redeem']]])
@@ -647,7 +715,7 @@ class Issuer(Entity):
             transport.setProtocol(self.protocol)
 
         else:
-            protocol = protocols.answerHandshakeProtocol(handshake_options=[['cdd_version','0']], #FIXME: use real cdd version
+            protocol = protocols.answerHandshakeProtocol(handshake_options=[['cdd_version',self.getCurrentCDDVersion()]],
                                                          arguments=self,
                                                          TRANSFER_TOKEN_REQUEST=protocols.TransferTokenRecipient,
                                                          MINT_KEY_FETCH_DENOMINATION=protocols.giveMintKeyProtocol,
@@ -658,10 +726,20 @@ class Issuer(Entity):
             transport.start()
 
 
+    #### Helper functions ####
+
     def transferToTarget(self,target,coins):
+        """Transfers coins to a target.
+        
+        Returns True if success, False if error.
+        """
         return True
 
     def debitTarget(self,target,blinds):
+        """Debits a target by an amount of what blinds is worth
+        
+        Returns True if success, False if error.
+        """
         return True
         
     def redeemTokens(self, transaction_id, tokens, options):
@@ -683,8 +761,8 @@ class Issuer(Entity):
 
         #check if coins are valid
         for token in tokens:
-            mintKey = self.keyids.get(token.key_identifier, None)
-            if not mintKey or not token.validate_with_CDD_and_MintKey(self.cdd, mintKey):
+            mintKey = self.mintKeysByKeyID.get(token.key_identifier, None)
+            if not mintKey or not token.validate_with_CDD_and_MintKey(self.getCDD(), mintKey):
                 failures.append(token)
         
         if failures: # We don't know exactly how, so give coin by coin information

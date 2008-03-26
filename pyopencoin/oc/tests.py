@@ -1,22 +1,23 @@
 """
->>> from entities import Wallet, Issuer
+>>> from entities import Wallet, IssuerEntity
 >>> from transports import ServerTestTransport, ClientTest
 >>> walletA = Wallet()
 >>> walletB = Wallet()
->>> issuer = Issuer()
->>> issuer.createMasterKey(keylength=512)
->>> issuer.makeCDD(currency_identifier='http://opencent.net/OpenCent', denominations=['1', '2'],
-...                short_currency_identifier='OC', options=[('version', '0')], issuer_service_location='here')
+>>> ie = IssuerEntity()
+>>> ie.createMasterKey(keylength=512)
+>>> ie.makeCDD(currency_identifier='http://opencent.net/OpenCent', denominations=['1', '2'],
+...            short_currency_identifier='OC', options=[('version', '0')], issuer_service_location='here')
+>>> ie.issuer.setCurrentCDDVersion('0')
 
->>> walletA.setDefaultCDD(issuer.cdd)
->>> walletB.setDefaultCDD(issuer.cdd)
+>>> walletA.setDefaultCDD(ie.issuer.getCDD())
+>>> walletB.setDefaultCDD(ie.issuer.getCDD())
 
 >>> CDD.toJson()
 '[["standard_identifier","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["short_currency_identifier","OC"],["issuer_service_location","opencoin://issuer.opencent.net:8002"],["denominations",["1","2","5","10","20","50","100","200","500","1000"]],["issuer_cipher_suite",["RSASigningAlgorithm","RSABlindingAlgorithm","SHA256HashingAlgorithm"]],["options",[["version","0"]]],["issuer_public_master_key","sloGu4+P4rslyC4RiAJrZbG0Z90FwEV88eW1JnNv7BDU33+uIhi2G0f/XL+AoUwmF1VsdhQhzEtGNVjnlx0TViWgqvrYX6AqB1/R3zYP9+JnuIIyHiyS+Z+Y3uoB0sLMD+dvHcDRo7cbb+ZNAvlcPoQ4Hb3+tuxwBMmVkZMaOu8=,AQAB"],["signature",[["keyprint","hxz5pRwS+RFp88qQliXYm3R5uNighktwxqEh4RMOuuk="],["signature","nG6zXX7NDfPgmI2qGbvg/oug2B8uhJbLRDxyWPZeJD6gB+p4BOnzgMq8Hpe6FtnXgyQ407cgiyuQ0p20H4ko1LPEM2qIOZToUXeqmLYSjoNYBy5ctMaN+yATswJgD97nzWlH+YxVdMH+L1k2twhFO3x13URDNlN6WsZTYplmRoY="]]]]'
 
 Lets test without having any keys in the mint
 
->>> t = ClientTest(issuer.listen)
+>>> t = ClientTest(ie.issuer.listen)
 >>> walletA.fetchMintKey(t,denominations=['1'])
 Client <Message('HANDSHAKE',[['protocol', 'opencoin 1.0']])>
 Server <Message('HANDSHAKE_ACCEPT',[['protocol', 'opencoin 1.0'], ['cdd_version', '0']])>
@@ -28,8 +29,8 @@ Server <Message('GOODBYE',None)>
 Now, lets have a key
 
 >>> now = 0; later = 1; much_later = 2
->>> pub1 = issuer.createSignedMintKey('1', now, later, much_later)
->>> t = ClientTest(issuer.listen)
+>>> pub1 = ie.createSignedMintKey('1', now, later, much_later)
+>>> t = ClientTest(ie.issuer.listen)
 >>> walletA.fetchMintKey(t,denominations=['1'])
 Client <Message('HANDSHAKE',[['protocol', 'opencoin 1.0']])>
 Server <Message('HANDSHAKE_ACCEPT',[['protocol', 'opencoin 1.0'], ['cdd_version', '0']])>
@@ -39,7 +40,8 @@ Client <Message('GOODBYE',None)>
 Server <Message('GOODBYE',None)>
 
 Test the transfer token protocol
->>> issuer = makeIssuer()
+>>> ie = makeIssuerEntity()
+>>> issuer = ie.issuer
 >>> t = ClientTest(issuer.listen)
 >>> coin1 = coins[0][0] # denomination of 1
 >>> coin2 = coins[1][0] # denomination of 2
@@ -53,10 +55,10 @@ Client <Message('GOODBYE',None)>
 Server <Message('GOODBYE',None)>
 
 Test the transfer token protocol with an exchange
->>> issuer = makeIssuer()
+>>> ie = makeIssuerEntity()
 >>> import calendar
->>> issuer.getTime = issuer.mint.getTime = lambda: calendar.timegm((2008,01,31,0,0,0))
->>> t = ClientTest(issuer.listen)
+>>> ie.getTime = ie.mint.getTime = ie.issuer.getTime = lambda: calendar.timegm((2008,01,31,0,0,0))
+>>> t = ClientTest(ie.issuer.listen)
 >>> coin1 = coins[0][0] # denomination of 1
 >>> coin2 = coins[1][0] # denomination of 2
 >>> walletB.coins = [coin1, coin2]
@@ -78,10 +80,10 @@ Server <Message('GOODBYE',None)>
 
 Test the coin spend protocol.
 
->>> issuer = makeIssuer()
->>> issuer.getTime = issuer.mint.getTime = lambda: calendar.timegm((2008,01,31,0,0,0))
+>>> ie = makeIssuerEntity()
+>>> ie.getTime = ie.mint.getTime = ie.issuer.getTime = lambda: calendar.timegm((2008,01,31,0,0,0))
 >>> t = ClientTest(walletB.listen,clientnick='walletA',servernick='walletB')
->>> t2 = ClientTest(issuer.listen,clientnick='walletB',servernick='issuer')
+>>> t2 = ClientTest(ie.issuer.listen,clientnick='walletB',servernick='issuer')
 >>> walletB.addIssuerTransport(location='here', transport=t2)
 >>> walletA.coins=[coin1]
 >>> walletA.sendCoins(t, target='a book', amount=1)
@@ -385,29 +387,31 @@ coinC = coins[1][0] # mint_key2
 #entities
 import entities
 
-def makeIssuer():
+def makeIssuerEntity():
     '''
-    >>> issuer = makeIssuer()
+    >>> ie = makeIssuerEntity()
     '''
-    issuer = entities.Issuer()
+    ie = entities.IssuerEntity()
 
-    issuer.signedKeys = {'1':[mint_key1],
-                         '2':[mint_key2]}
+    mint = ie.mint
+    issuer = ie.issuer
+    dsdb = ie.dsdb
 
-    issuer.keyids = {mint_key1.key_identifier:mint_key1, 
-                     mint_key2.key_identifier:mint_key2}
+    issuer.addMintKey(mint_key1)
+    issuer.addMintKey(mint_key2)
 
-    issuer.mint.addMintKey(mint_key1, CDD.issuer_cipher_suite.signing)
-    issuer.mint.addMintKey(mint_key2, CDD.issuer_cipher_suite.signing)
+    mint.addMintKey(mint_key1, CDD.issuer_cipher_suite.signing)
+    mint.addMintKey(mint_key2, CDD.issuer_cipher_suite.signing)
 
-    issuer.mint.privatekeys = {mint_key1.key_identifier: mint_private_key1,
-                               mint_key2.key_identifier: mint_private_key2}
+    mint.privatekeys = {mint_key1.key_identifier: mint_private_key1,
+                        mint_key2.key_identifier: mint_private_key2}
 
-    issuer.masterKey = is_private_key
+    ie.masterKey = is_private_key
 
-    issuer.cdd = CDD
+    issuer.addCDD(CDD)
+    issuer.setCurrentCDDVersion(dict(CDD.options)['version'])
 
-    return issuer
+    return ie
 
 if __name__ == "__main__":
     import doctest

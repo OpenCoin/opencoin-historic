@@ -582,11 +582,11 @@ class TransferTokenSender(Protocol):
 class TransferTokenRecipient(Protocol):
     """
     >>> import entities, tests, containers, base64, copy, calendar
-    >>> issuer = tests.makeIssuer()
-    >>> issuer.getTime = lambda: calendar.timegm((2008,01,31,0,0,0)) 
-    >>> issuer.mint.getTime = issuer.getTime
+    >>> ie = tests.makeIssuerEntity()
+    >>> ie.getTime = lambda: calendar.timegm((2008,01,31,0,0,0)) 
+    >>> ie.mint.getTime = ie.issuer.getTime = ie.getTime
 
-    >>> ttr = TransferTokenRecipient(issuer)
+    >>> ttr = TransferTokenRecipient(ie.issuer)
     >>> coin1 = tests.coins[0][0].toPython() # denomination of 1
     >>> coin2 = tests.coins[1][0].toPython() # denomination of 2
     
@@ -651,12 +651,12 @@ class TransferTokenRecipient(Protocol):
     <Message('PROTOCOL_ERROR','send again...')>
 
     Okay. Have to reset DSDB to do this next trick
-    >>> issuer = tests.makeIssuer()
-    >>> issuer.getTime = lambda: calendar.timegm((2008,01,31,0,0,0)) 
-    >>> issuer.mint.getTime = issuer.getTime
+    >>> ie = tests.makeIssuerEntity()
+    >>> ie.getTime = lambda: calendar.timegm((2008,01,31,0,0,0)) 
+    >>> ie.mint.getTime = ie.issuer.getTime = ie.getTime
     >>> blank = tests.makeBlank(tests.mintKeys[0], 'a'*26, 'a'*26)
     >>> blind = [[tests.mintKeys[0].encodeField('key_identifier'), [base64.b64encode(blank.blind_blank(tests.CDD, tests.mintKeys[0]))]]]
-    >>> ttr = TransferTokenRecipient(issuer)
+    >>> ttr = TransferTokenRecipient(ie.issuer)
     >>> ttr.state = ttr.start
     >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['1234', '', blind, [coin1], [['type', 'exchange']]]))
     <Message('TRANSFER_TOKEN_ACCEPT',['1234', ['UIo2KtqK/6JqSWbtFFVR14fOjnzwr4tDiY/6kOnQ0h92EewY2vJBV2XaS43wK3RsNFg0sHzNh3v2BVDFV8cDvQ==']])>
@@ -1133,21 +1133,22 @@ class fetchMintKeyProtocol(Protocol):
 
 class giveMintKeyProtocol(Protocol):
     """An issuer hands out a key. The other side of fetchMintKeyProtocol.
-    >>> from entities import Issuer
-    >>> issuer = Issuer()
-    >>> issuer.createMasterKey(keylength=512)
-    >>> issuer.makeCDD(currency_identifier='http://opencent.net/OpenCent2', denominations=['1', '2'],
-    ...                short_currency_identifier='OC', options=[], issuer_service_location='here')
+    >>> from entities import IssuerEntity
+    >>> ie = IssuerEntity()
+    >>> ie.createMasterKey(keylength=512)
+    >>> ie.makeCDD(currency_identifier='http://opencent.net/OpenCent2', denominations=['1', '2'],
+    ...            short_currency_identifier='OC', options=[['version', '0']],
+    ...            issuer_service_location='here')
+    >>> ie.issuer.setCurrentCDDVersion('0')
     >>> now = 0; later = 1; much_later = 2
-    >>> pub1 = issuer.createSignedMintKey('1', now, later, much_later)
-    >>> gmp = giveMintKeyProtocol(issuer)
+    >>> pub1 = ie.createSignedMintKey('1', now, later, much_later)
+    >>> gmp = giveMintKeyProtocol(ie.issuer)
     
     >>> gmp.state(Message('MINT_KEY_FETCH_DENOMINATION',[['1'], '0']))
     <Message('MINT_KEY_PASS',[[('key_identifier', '...'), ('currency_identifier', 'http://opencent.net/OpenCent2'), ('denomination', '1'), ('not_before', '...T...Z'), ('key_not_after', '...T...Z'), ('token_not_after', '...T...Z'), ('public_key', '...,...'), ['signature', [('keyprint', '...'), ('signature', '...')]]]])>
 
     >>> gmp.newState(gmp.start)
-    >>> m = gmp.state(Message('MINT_KEY_FETCH_KEYID',[pub1.encodeField('key_identifier')]))
-    >>> m
+    >>> gmp.state(Message('MINT_KEY_FETCH_KEYID',[pub1.encodeField('key_identifier')]))
     <Message('MINT_KEY_PASS',[...])>
 
     >>> gmp.newState(gmp.start)
