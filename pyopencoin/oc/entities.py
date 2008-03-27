@@ -33,7 +33,7 @@ class Wallet(Entity):
     def __init__(self):
         self.coins = [] # The coins in the wallet
         self.waitingTransfers = {} # The transfers we have done a TRANSFER_TOKEN_REQUEST on
-                                   # FIXME: What is the format? key is transaction_id, probably..
+                                   # key is transaction_id, val is the set of blanks
         self.otherCoins = [] # Coins we received from another wallet, waiting to Redeem
         self.getTime = getTime # The getTime function
         self.keyids = {} # MintKeys by key_identifier
@@ -224,10 +224,8 @@ class Wallet(Entity):
             denominations[coin.denomination].append(coin)
             denomination_list.append(coin.denomination)
             
-
-        #FIXME: If we go to string/fraction amount, the sort will have to be changed
-        mysort = lambda x, y: int(x).__cmp__(int(y))
-        denomination_list.sort(mysort, reverse=True) # sort from high to low
+        int_denomination_list = [int(d) for d in denomination_list]
+        int_denomination_list.sort(reverse=True) # sort from high to low
 
         def my_split(piece_list, sum):
             # piece_list must be sorted from high to low
@@ -253,8 +251,6 @@ class Wallet(Entity):
 
             # if we are here, we don't have a set of coins that works
             return []
-
-        int_denomination_list = [int(d) for d in denomination_list]
 
         if sum(int_denomination_list) != sum(self.coins):
             raise Exception('denomination_list and self.coins differ!')
@@ -419,7 +415,7 @@ class Wallet(Entity):
         # overwrite with lambda location: return None if you want things to silently fail,
         # and lambda location: raise FIXME exception to signify the connection failed
         if not location.startswith('opencoin://'):
-            raise Exception #FIXME: Better error should go here, probably
+            raise Exception('Improperly formatted transport')
 
         # strip off opencoin://
         fullstring = location[len('opencoin://'):]
@@ -427,7 +423,7 @@ class Wallet(Entity):
         try:
             address, port = fullstring.split(':')
         except ValueError:
-            raise Exception #FIXME: Better error should go here, probably
+            raise Exception('Improperly formatted transport')
 
         import transports
 
@@ -853,7 +849,6 @@ class DSDB:
     spending a list of tokens. It is designed in a way to make it easier
     to make it race-safe (although that is not done yet).
     
-    FIXME: It does not currently use any real times
     FIXME: It does extremely lazy evaluation of expiration of locks.
            When it tries to lock a token, it may find that there is already
            a lock on the token. It checks the times, and if the time has
@@ -962,10 +957,11 @@ class DSDB:
     def __init__(self, database=None, locks=None):
         self.database = database or {} # a dictionary by MintKey of (dictionaries by
                                        #   serial of tuple of ('Spent',), ('Locked', time_expire, id))
-        self.locks = locks or {}       # a dictionary by id of tuple of (time_expire, tuple(tokens))
+        self.locks = locks or {} # a dictionary by id of tuple of (time_expire, list(tokens), {'lock':[...]})
+                                 # the dict is to ensure only one thread plays with a transaction at a time
         self.getTime = getTime
 
-    def lock(self, id, tokens, lock_duration):
+    def lock(self, id, tokens, lock_duration, lockobj=None):
         """Lock the tokens.
         Tokens are taken as a group. It tries to lock each token one at a time. If it fails,
         it unwinds the locked tokens are reports a failure. If it succeeds, it adds the lock
@@ -976,7 +972,11 @@ class DSDB:
         
         lock_time = lock_duration + self.getTime()
 
-        my_locks = (lock_time, [])
+        unlock = not lockobj # if passed in a lock obj, do not automatically unlock
+
+        if not lockobj:
+            lockobj = ['lock']
+        my_locks = (lock_time, [], {'Lock':lockobj})
         locks = self.locks.setdefault(id, my_locks)
 
         if my_locks is not locks:
@@ -986,51 +986,73 @@ class DSDB:
 
         reason = None
         
-        while tokens:
-            token = tokens.pop()
+        for token in tokens:
             key_dict = self.database.setdefault(token.key_identifier, {})
-            if token.serial in key_dict:
-                lock = key_dict[token.serial]
+            
+            my_lock = ('Locked', lock_time, id)
+            lock = key_dict.setdefault(token.serial, my_lock)
+
+            exit = False
+
+            while lock is not my_lock:
                 if lock[0] == 'Spent':
-                    tokens = []
                     reason = 'Token already spent'
+                    exit = True # break out of the for loop
                     break
                 elif lock[0] == 'Locked':
                     # XXX: This implements lazy unlocking. Possible DoS attack vector
-                    # Active unlocking would remove the if statement
+                    # Active unlocking would just break
                     if lock[1] > self.getTime(): # If the lock hasn't expired 
-                        tokens = []
                         reason = 'Token locked'
+                        exit = True
                         break
                     else:
-                        self.unlock(lock[2])
+                        try:
+                            self.unlock(lock[2])
+                        except LockingError:
+                            pass # Only locking error is if it is already unlocked
+
+                        # It should be unlocked. Now try to lock it again
+                        lock = key_dict.setdefault(token.serial, my_lock)
+                        
                 else:
                     raise NotImplementedError('Impossible string')
 
-            my_lock = ('Locked', lock_time, id)
-            lock = key_dict.setdefault(token.serial, my_lock)
-            if lock is not my_lock:
-                raise LockingError('Possible race condition detected.')
+            if exit: # break out of for loop
+                break
 
             self.locks[id][1].append(token)
 
         if reason:
-            self.unlock(id)
-
+            self.unlock(id, lockobj)
             raise LockingError(reason)
+
+        # clear the lock
+        if unlock:
+            del locks[2]['Lock']
 
         return
 
-    def unlock(self, id):
+    def unlock(self, id, lockobj=None):
         """Unlocks an id from the dsdb.
         This only unlocks if a transaction is locked. If the transaction is
         completed and the token is spent, it cannot unlock.
         """
         
-        if id not in self.locks:
+        lock = self.locks.get(id, None)
+        if not lock:
             raise LockingError('Unknown transaction_id')
 
-        lock = self.locks[id]
+        if not lockobj:
+            lockobj = ['unlock']
+
+        lockcheck = lock[2].setdefault('Lock', lockobj)
+        if lockcheck is not lockobj:
+            raise LockingError('Unknown trasaction_id')
+
+        # check to make sure we have the real and current lock
+        if lock is not self.locks.get(id, None):
+            raise LockingError('Unknown transaction_id')
 
         lazy_unlocked = False
         if lock[0] < self.getTime(): # unlock and then error
@@ -1038,12 +1060,8 @@ class DSDB:
 
         for token in lock[1]:
             del self.database[token.key_identifier][token.serial]
-            if len(self.database[token.key_identifier]) == 0:
-                # FIXME: Possible race condition here. We delete the dict of
-                # by key_identifier if it is empty, but another thread can
-                # be writing to it between the if and the del.
-                pass
-                # del self.database[token.key_identifier]
+            # Can not delete self.database[token.key_identifier] if it
+            # is empty since it introduces a race condition
 
         del self.locks[id]
 
@@ -1052,28 +1070,39 @@ class DSDB:
 
         return
 
-    def spend(self, id, tokens, automatic_lock=True):
+    def spend(self, id, tokens, automatic_lock=True, lockobj=None):
         """Spend verifies the tokens are locked (or locks them) and marks the tokens as spent.
         FIXME: Small tidbit of code in place for lazy unlocking.
         FIXME: automatic_lock doesn't automatically unlock if it locked and the spending fails (how can it though?)
         """
-        if id not in self.locks:
+        if not lockobj:
+            lockobj = ['spend']
+
+        lock = self.locks.get(id, None)
+        if not lock:
             if automatic_lock:
                 # we can spend without locking, so lock now.
-                self.lock(id, tokens, 86400)
+                self.lock(id, tokens, 86400, lockobj)
+                lock = self.locks[id] # We have it locked
             else:
                 raise LockingError('Unknown transaction_id')
 
+        selflock = lock[2].setdefault('Lock', lockobj)
+        if selflock is not lockobj:
+            raise LockingError('Unknown transaction_id')
+
         if self.locks[id][0] < self.getTime():
-            self.unlock(id)
+            self.unlock(id, lockobj)
             raise LockingError('Unknown transaction_id')
         
         # check to ensure locked tokens are the same as current tokens.
         if len(set(tokens)) != len(self.locks[id][1]): # self.locks[id] is guarenteed to have unique values by lock
+            del lock[2]['Lock']
             raise LockingError('Unknown token')
 
         for token in self.locks[id][1]:
             if token not in tokens:
+                del lock[2]['Lock']
                 raise LockingError('Unknown token')
 
         # we know all the tokens are valid. Change them to locked

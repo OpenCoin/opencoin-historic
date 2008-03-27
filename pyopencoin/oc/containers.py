@@ -755,7 +755,6 @@ class CurrencyBlank(CurrencyBase):
     >>> mintKey5.verify_with_CDD(CDD)
     True
     
-    FIXME XXX A blank references a standard identifier, and a CDD uses a standard version!
     >>> blank = CurrencyBlank(standard_identifier=CDD.standard_identifier,
     ...                       currency_identifier=CDD.currency_identifier,
     ...                       denomination='1',
