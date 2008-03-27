@@ -1159,20 +1159,63 @@ class Mint:
         self.sign_algs = {}
         self.getTime = getTime
 
-
-    def getKey(self,denomination,notbefore,notafter):
-        pass
-
     def createNewKey(self, hash_alg, key_generator, size=1024):
+        """creates a new keypair of a certain size.
+        This is used by the IssuerEntity to create a new MintKey. The private
+        key is only stored in the Mint
+
+        Note: A different but seperation of powers would be for the IssuerEntity
+        to send the keypair to the Mint. This would prevent contamination of the
+        IssuerEntity in case the Mint is compromised
+
+        >>> m = Mint()
+        >>> import crypto
+        >>> hash_alg = crypto.SHA256HashingAlgorithm
+        >>> pub = m.createNewKey(hash_alg, crypto.createRSAKeyPair, 512)
+        >>> pub.hasPrivate()
+        False
+        >>> key_id = pub.key_id(hash_alg)
+        >>> pub == m.privatekeys[key_id].newPublicKeyPair()
+        True
+        """
         private, public = key_generator(size)
         self.privatekeys[private.key_id(hash_alg)] = private
         return public
 
     def addMintKey(self, mintKey, sign_alg):
+        """adds a mintkey and sign_alg for a mint key to the mint.
+
+        Requires the key to be in Mint.privateKeys (but verification
+        does not occur to ensure the key is valid)
+
+        >>> import crypto, tests
+        >>> m = Mint()
+        >>> mintKey = tests.mintKeys[0]
+        >>> sign_alg = crypto.RSASigningAlgorithm
+
+        First, make sure it fails when it doesn't know the key
+        >>> m.addMintKey(mintKey, sign_alg)
+        Traceback (most recent call last):
+        KeyError: 'Key not in Mint'
+        >>> mintKey.key_identifier not in m.keyids
+        True
+        >>> mintKey.key_identifier not in m.sign_algs
+        True
+
+        >>> m.privatekeys[mintKey.key_identifier] = None
+        >>> m.addMintKey(mintKey, sign_alg)
+        >>> m.keyids[mintKey.key_identifier] == mintKey
+        True
+        >>> m.sign_algs[mintKey.key_identifier] == sign_alg
+        True
+        """
+        if mintKey.key_identifier not in self.privatekeys:
+            raise KeyError('Key not in Mint')
         self.keyids[mintKey.key_identifier] = mintKey
         self.sign_algs[mintKey.key_identifier] = sign_alg
         
     def signNow(self, key_identifier, blind):
+        """Performs JITM of a blind."""
         from crypto import CryptoError
         try:
             sign_alg = self.sign_algs[key_identifier]
@@ -1191,6 +1234,7 @@ class Mint:
             return signature
         else:
             raise MintError("MintKey not valid for minting")
+
 
 class MintError(Exception):
     pass

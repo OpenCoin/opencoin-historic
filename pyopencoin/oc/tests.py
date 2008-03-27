@@ -247,7 +247,6 @@ def makeMintKeys():
 
     hash_alg = CDD.issuer_cipher_suite.hashing
     sign_alg = CDD.issuer_cipher_suite.signing
-    blind_alg = CDD.issuer_cipher_suite.blinding
                                                   
     def makeMintKey(denomination, public, private):
         mintKey = MintKey(key_identifier=public.key_id(hash_alg),
@@ -400,11 +399,11 @@ def makeIssuerEntity():
     issuer.addMintKey(mint_key1)
     issuer.addMintKey(mint_key2)
 
-    mint.addMintKey(mint_key1, CDD.issuer_cipher_suite.signing)
-    mint.addMintKey(mint_key2, CDD.issuer_cipher_suite.signing)
-
     mint.privatekeys = {mint_key1.key_identifier: mint_private_key1,
                         mint_key2.key_identifier: mint_private_key2}
+
+    mint.addMintKey(mint_key1, CDD.issuer_cipher_suite.signing)
+    mint.addMintKey(mint_key2, CDD.issuer_cipher_suite.signing)
 
     ie.masterKey = is_private_key
 
