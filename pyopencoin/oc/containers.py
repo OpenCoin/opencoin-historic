@@ -160,6 +160,30 @@ def validateIntStringList(l):
 
     return l
 
+def validateOptionsList(l):
+    """Validates an options list is a list of (key, val) pairs of strings."""
+    import types
+    if not isinstance(l, types.ListType):
+        raise TypeError('Not a valid options list')
+    d = {}
+    try:
+        for key, val in l:
+            if key in d:
+                raise TypeError('Not a valid options list')
+            if not isinstance(key, types.StringType):
+                raise TypeError('Not a valid options list')
+            if not isinstance(val, types.StringType):
+                raise TypeError('Not a valid options list')
+            d[key] = val
+    except ValueError:
+        raise TypeError('Not a valid options list')
+
+    if not 'version' in d:
+        raise TypeError('Not a valid options list')
+
+    return l
+        
+
 class Signature(Container):
     """The signature container (a combination of the keyprint and signature fields.
     
@@ -294,12 +318,12 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
     ...           issuer_service_location = 'opencoin://issuer.opencent.net:8002', 
     ...           denominations = ['1', '2', '5', '10', '20', '50', '100', '200', '500', '1000'], 
     ...           issuer_cipher_suite = ics, 
-    ...           options = [],
+    ...           options = [['version', '0']],
     ...           issuer_public_master_key = crypto.RSAKeyPair(e=17L,n=3233L))
 
     >>> j = cdd.content_part()
     >>> j
-    '[["standard_identifier","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["short_currency_identifier","OC"],["issuer_service_location","opencoin://issuer.opencent.net:8002"],["denominations",["1","2","5","10","20","50","100","200","500","1000"]],["issuer_cipher_suite",["RSASigningAlgorithm","RSABlindingAlgorithm","SHA256HashingAlgorithm"]],["options",[]],["issuer_public_master_key","DKE=,EQ=="]]'
+    '[["standard_identifier","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["short_currency_identifier","OC"],["issuer_service_location","opencoin://issuer.opencent.net:8002"],["denominations",["1","2","5","10","20","50","100","200","500","1000"]],["issuer_cipher_suite",["RSASigningAlgorithm","RSABlindingAlgorithm","SHA256HashingAlgorithm"]],["options",[["version","0"]]],["issuer_public_master_key","DKE=,EQ=="]]'
  
     >>> cdd2 = CDD().fromJson(j)
     >>> cdd2 == cdd
@@ -309,7 +333,7 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
     >>> cdd2.signature = sig
 
     >>> cdd2.toJson()
-    '[["standard_identifier","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["short_currency_identifier","OC"],["issuer_service_location","opencoin://issuer.opencent.net:8002"],["denominations",["1","2","5","10","20","50","100","200","500","1000"]],["issuer_cipher_suite",["RSASigningAlgorithm","RSABlindingAlgorithm","SHA256HashingAlgorithm"]],["options",[]],["issuer_public_master_key","DKE=,EQ=="],["signature",[["keyprint","XQ=="],["signature","Vg=="]]]]'
+    '[["standard_identifier","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["short_currency_identifier","OC"],["issuer_service_location","opencoin://issuer.opencent.net:8002"],["denominations",["1","2","5","10","20","50","100","200","500","1000"]],["issuer_cipher_suite",["RSASigningAlgorithm","RSABlindingAlgorithm","SHA256HashingAlgorithm"]],["options",[["version","0"]]],["issuer_public_master_key","DKE=,EQ=="],["signature",[["keyprint","XQ=="],["signature","Vg=="]]]]'
     
     
     >>> from tests import CDD as test_cdd
@@ -344,7 +368,8 @@ class CurrencyDescriptionDocument(ContainerWithSignature):
 
     codecs = {'issuer_cipher_suite':{'encode':encodeCryptoContainer,'decode':decodeCryptoContainer},
               'issuer_public_master_key':{'encode':str, 'decode':decodeRSAKeyPair},
-              'denominations':{'encode':list, 'decode':validateIntStringList}}
+              'denominations':{'encode':list, 'decode':validateIntStringList},
+              'options':{'encode':list, 'decode':validateOptionsList}}
 
 
     def __init__(self,**kwargs):
