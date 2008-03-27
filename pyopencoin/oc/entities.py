@@ -689,20 +689,36 @@ class Issuer(Entity):
         transport.start()
 
     def listen(self,transport):
-        """
-        >>> import transports, tests,base64
+        """Listen is the main operator between an issuer and a wallet.
+        >>> import transports, tests, base64
         >>> tid = base64.b64encode('foobar')
         >>> ie = tests.makeIssuerEntity()
         >>> stt = transports.SimpleTestTransport()
         >>> ie.issuer.listen(stt)
         >>> stt.send('HANDSHAKE',[['protocol', 'opencoin 1.0']])
         <Message('HANDSHAKE_ACCEPT',[['protocol', 'opencoin 1.0'], ['cdd_version', '0']])>
+
         >>> stt.send('TRANSFER_TOKEN_REQUEST',[tid, 'my account', [], [tests.coinA.toPython()], [['type', 'redeem']]])
         <Message('TRANSFER_TOKEN_ACCEPT',['Zm9vYmFy', []])>
 
         >>> stt.send('MINT_KEY_FETCH_DENOMINATION',[['1'], '0'])
         <Message('MINT_KEY_PASS',[...])>
-        
+
+        >>> stt.send('MINT_KEY_FETCH_KEYID', [tests.mint_key1.encodeField('key_identifier')])
+        <Message('MINT_KEY_PASS',[...])>
+
+        >>> stt.send('FETCH_CDD_REQUEST', '0')
+        <Message('FETCH_CDD_PASS',[...])>
+
+        >>> stt.send('foo')
+        <Message('PROTOCOL_ERROR','send again...')>
+
+        FIXME: There is a problem here. If we send anything other than a goodbye
+        next, we go into an infinite loop. I believe that the correct response is
+        another PROTOCOL_ERROR at this point
+        #>>> stt.send('FETCH_CDD_REQUEST', '0')
+        #<Message('FETCH_CDD_PASS',[...])>
+
         >>> stt.send('GOODBYE')
         <Message('GOODBYE',None)>
         >>> stt.send('foobar')
@@ -715,7 +731,8 @@ class Issuer(Entity):
                                                          arguments=self,
                                                          TRANSFER_TOKEN_REQUEST=protocols.TransferTokenRecipient,
                                                          MINT_KEY_FETCH_DENOMINATION=protocols.giveMintKeyProtocol,
-                                                         MINT_KEY_FETCH_KEYID=protocols.giveMintKeyProtocol)
+                                                         MINT_KEY_FETCH_KEYID=protocols.giveMintKeyProtocol,
+                                                         FETCH_CDD_REQUEST=protocols.giveCDDProtocol)
             self.protocol = protocol
             transport.autoreset = self.listen
             transport.setProtocol(protocol)

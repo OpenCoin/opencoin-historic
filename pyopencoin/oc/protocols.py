@@ -149,6 +149,9 @@ class answerHandshakeProtocol(Protocol):
 
         try:
             nextprotocol = self.mapping[message.type](self.arguments)
+        except KeyError:
+            self.newState(self.goodbye)
+            return ProtocolErrorMessage('aHP')
         except AttributeError:
             self.newState(self.goodbye)
             return ProtocolErrorMessage('aHP')
