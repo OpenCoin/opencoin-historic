@@ -1349,27 +1349,28 @@ class requestCDDProtocol(Protocol):
 
 class giveCDDProtocol(Protocol):
     """An issuer hands out a CDD. The other side of fetchCDDProtocol.
-    #>>> from entities import Issuer
-    #>>> issuer = Issuer()
-    #>>> issuer.createMasterKey(keylength=512)
-    #>>> issuer.makeCDD(currency_identifier='http://opencent.net/OpenCent2', denominations=['1', '2'],
-    #...                short_currency_identifier='OC', options=[['version', '1']], issuer_service_location='here')
-    #>>> gcp = giveCDDProtocol(issuer)
+    >>> from entities import IssuerEntity
+    >>> ie = IssuerEntity()
+    >>> ie.createMasterKey(keylength=512)
+    >>> ie.makeCDD(currency_identifier='http://opencent.net/OpenCent2', denominations=['1', '2'],
+    ...            short_currency_identifier='OC', options=[['version', '1']], issuer_service_location='here')
+    >>> ie.issuer.setCurrentCDDVersion('1')
+    >>> gcp = giveCDDProtocol(ie.issuer)
     
-    #>>> gcp.state(Message('FETCH_CDD_REQUEST','1'))
-    #<Message('FETCH_CDD_PASS',[[...('version', '1')...]])>
+    >>> gcp.state(Message('FETCH_CDD_REQUEST','1'))
+    <Message('FETCH_CDD_PASS',[(...['version', '1']...)]]])>
 
-    #>>> gcp.newState(gmp.start)
-    #>>> gcp.state(Message('FETCH_CDD_REQUEST','0'))
-    #<Message('FETCH_CDD_FAILURE',None)>
+    >>> gcp.newState(gcp.start)
+    >>> gcp.state(Message('FETCH_CDD_REQUEST','0'))
+    <Message('FETCH_CDD_FAILURE',None)>
 
-    #>>> gcp.newState(gmp.start)
-    #>>> gcp.state(Message('FETCH_CDD_REQUEST', ['1']))
-    #<Message('PROTOCOL_ERROR','send again...')>
+    >>> gcp.newState(gcp.start)
+    >>> gcp.state(Message('FETCH_CDD_REQUEST', ['1']))
+    <Message('PROTOCOL_ERROR','send again...')>
 
-    #>>> gcp.newState(gmp.start)
-    #>>> gcp.state(Message('foo',None))
-    #<Message('PROTOCOL_ERROR','send again...')>
+    >>> gcp.newState(gcp.start)
+    >>> gcp.state(Message('foo',None))
+    <Message('PROTOCOL_ERROR','send again...')>
     """
 
     def __init__(self, issuer):
