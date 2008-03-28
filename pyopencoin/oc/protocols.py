@@ -522,8 +522,6 @@ class TransferTokenSender(Protocol):
                 #FIXME: This seems like a wrong message....
                 return ProtocolErrorMessage('TTD')
 
-            # FIXME Do some things here, after we work out how delays work
-            
 
         elif message.type == 'TRANSFER_TOKEN_REJECT':
             try:
@@ -660,9 +658,17 @@ class TransferTokenRecipient(Protocol):
     >>> blank = tests.makeBlank(tests.mintKeys[0], 'a'*26, 'a'*26)
     >>> blind = [[tests.mintKeys[0].encodeField('key_identifier'), [base64.b64encode(blank.blind_blank(tests.CDD, tests.mintKeys[0]))]]]
     >>> ttr = TransferTokenRecipient(ie.issuer)
-    >>> ttr.state = ttr.start
+    >>> ttr.newState(ttr.start)
     >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['1234', '', blind, [coin1], [['type', 'exchange']]]))
     <Message('TRANSFER_TOKEN_ACCEPT',['1234', ['UIo2KtqK/6JqSWbtFFVR14fOjnzwr4tDiY/6kOnQ0h92EewY2vJBV2XaS43wK3RsNFg0sHzNh3v2BVDFV8cDvQ==']])>
+
+    >>> ttr.newState(ttr.start)
+    >>> ttr.state(Message('TRANSFER_TOKEN_RESUME','1234'))
+    <Message('TRANSFER_TOKEN_ACCEPT',['1234', ['UIo2KtqK/6JqSWbtFFVR14fOjnzwr4tDiY/6kOnQ0h92EewY2vJBV2XaS43wK3RsNFg0sHzNh3v2BVDFV8cDvQ==']])>
+
+    >>> ttr.newState(ttr.start)
+    >>> ttr.state(Message('TRANSFER_TOKEN_RESUME', '0000'))
+    <Message('TRANSFER_TOKEN_REJECT',['0000', 'Generic', 'Unknown transaction_id', ()])>
 
     """
 
@@ -915,7 +921,19 @@ class TransferTokenRecipient(Protocol):
             except TypeError:
                 return ProtocolErrorMessage('TTRs')
 
-            # FIXME: actually handle TRANSFER_TOKEN_RESUMES
+            response, additional = self.issuer.mint.getBlinds(transaction_id)
+            if response == 'PASS':
+                signed_blinds = additional
+                return Message('TRANSFER_TOKEN_ACCEPT', [encoded_transaction_id, signed_blinds])
+            elif response == 'REJECT':
+                failures = additional
+                type, reason, reason_detail = failures
+                return Message('TRANSFER_TOKEN_REJECT', [encoded_transaction_id, type, reason, reason_detail])
+            elif response == 'DELAY':
+                time = additional
+                return Message('TRANSFER_TOKEN_DELAY', [encoded_transaction_id, time])
+            else:
+                raise NotImplementedError('Got an impossible response')
 
         elif message.type == 'PROTOCOL_ERROR':
             #FIXME: actually do something for a PROTOCOL_ERROR
