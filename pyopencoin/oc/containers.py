@@ -692,7 +692,6 @@ class CurrencyBlank(CurrencyBase):
 
     >>> blank.toJson()
     Traceback (most recent call last):
-    ...
     TypeError: b2a_base64...
 
     >>> blank.serial = '123'
@@ -707,11 +706,9 @@ class CurrencyBlank(CurrencyBase):
 
     >>> blank.generateSerial()
     Traceback (most recent call last):
-    ...
     Exception: Cannot generate a new serial when the serial is set.
     
     
-    Snippet of code from MintKey doctest. Figure out how to use it here
     >>> from calendar import timegm
     >>> from tests import CDD, CDD_private, keys512, addSignature
     >>> import crypto, copy

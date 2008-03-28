@@ -825,29 +825,28 @@ class Issuer(Entity):
             return (True, None)
             
     def submitMintableBlinds(self, transaction_id, blindslist, options):
-        """returns a tuple of (success, time, failures) after submitting blinds to the mint.
+        """returns a tuple of (success, [time|failures]) after submitting blinds to the mint.
         
         success is a boolean set to true if we successfully submitted. False otherwise.
                 Note: it can be false if we have JITM and it has already failed.
-        time is an int of time in seconds to pass with a 'DELAY'
+        time is a stringint time in seconds to pass with a 'DELAY'
         failures is a tuple of (type, reason, reason_detail) to be passed if a 'REJECT'.
         """
-        #FIXME: we only do JITM minting right now
+        #FIXME: Do something with options
+        time = self.mint.submit(transaction_id, blindslist)
 
-        import base64
-        
-        #mint them immediately (the only thing we can do right now with the mint)
-        minted = []
-        for key, blindlist in blindslist:
-            this_set = []
-            for blind in blindlist:
-                signature = self.mint.signNow(key.key_identifier, blind)
-                this_set.append(base64.b64encode(signature))
+        if not time: # we had an error
+            response = self.mint.getBlinds(transaction_id)
+            failure, reasons = response
+            if failure != 'REJECT':
+                raise Exception('Got no time but failure was not reject')
+            return (False, reasons)
 
-            minted.extend(this_set)
-            
-        # FIXME: HACK! Submitting blinds instead of time.
-        return (True, minted, None)
+        remaining = self.getTime() - time
+        if remaining < 0:
+            remaining = 0
+
+        return (True, str(int(remaining)))
         
 class KeyFetchError(Exception):
     pass
@@ -1130,6 +1129,7 @@ class DSDB:
 
         return
 
+
 class Mint:
     """A Mint is the minting agent for a currency. It has the 
     >>> m = Mint()
@@ -1158,6 +1158,7 @@ class Mint:
         self.privatekeys = {}
         self.sign_algs = {}
         self.getTime = getTime
+        self.transactions = {}
 
     def createNewKey(self, hash_alg, key_generator, size=1024):
         """creates a new keypair of a certain size.
@@ -1196,7 +1197,7 @@ class Mint:
         First, make sure it fails when it doesn't know the key
         >>> m.addMintKey(mintKey, sign_alg)
         Traceback (most recent call last):
-        KeyError: 'Key not in Mint'
+        MintError: Key not in Mint
         >>> mintKey.key_identifier not in m.keyids
         True
         >>> mintKey.key_identifier not in m.sign_algs
@@ -1210,21 +1211,50 @@ class Mint:
         True
         """
         if mintKey.key_identifier not in self.privatekeys:
-            raise KeyError('Key not in Mint')
+            raise MintError('Key not in Mint')
         self.keyids[mintKey.key_identifier] = mintKey
         self.sign_algs[mintKey.key_identifier] = sign_alg
         
     def signNow(self, key_identifier, blind):
-        """Performs JITM of a blind."""
+        """Performs JITM of a blind.
+        
+        >>> m = Mint()
+        >>> import crypto, tests, base64, calendar
+        >>> hash_alg = crypto.SHA256HashingAlgorithm
+        >>> sign_alg = crypto.RSASigningAlgorithm
+        >>> mintKey = tests.mint_key1
+        >>> m.privatekeys = {mintKey.key_identifier:tests.mint_private_key1}
+        >>> m.addMintKey(mintKey, sign_alg)
+
+        >>> blind = base64.b64decode('HIck+fim0TkjVupU1AeKpuSGN1CxLnDmT2jpBHMZSgdp' + 
+        ...                          'YhKE90XoAsQVznljEn4NTXvRs5cXslWUNvcUeAuv2A==')
+
+        This one passes
+        >>> m.getTime = lambda: calendar.timegm((2008,01,31,0,0,0))
+        >>> signedBlind = m.signNow(mintKey.key_identifier, blind)
+        >>> base64.b64encode(signedBlind)
+        'BJ597EK2lqlC4HN/C35v1MR5qG/476mzjS12qTomv8bjp6u9//W9RwOk6mijywTM6rg9quFuIXlTiVF9U6RJvA=='
+
+        >>> m.getTime = lambda: mintKey.not_before - 1
+        >>> m.signNow(mintKey.key_identifier, blind)
+        Traceback (most recent call last):
+        MintError: MintKey not valid for minting
+        
+        >>> m.getTime = lambda: mintKey.key_not_after + 1
+        >>> m.signNow(mintKey.key_identifier, blind)
+        Traceback (most recent call last):
+        MintError: MintKey not valid for minting
+        
+        """
         from crypto import CryptoError
         try:
             sign_alg = self.sign_algs[key_identifier]
             signing_key = self.privatekeys[key_identifier]
             mintKey = self.keyids[key_identifier]
-            
-            signer = sign_alg(self.privatekeys[key_identifier])
         except KeyError, reason:
             raise MintError("KeyError: %s" % reason)
+            
+        signer = sign_alg(signing_key)
         
         if mintKey.verify_time(self.getTime())[0]: # if can_sign
             try:
@@ -1235,9 +1265,115 @@ class Mint:
         else:
             raise MintError("MintKey not valid for minting")
 
+    def submit(self, transaction_id, keys_and_blinds):
+        """adds a minting transaction to the mint
+
+        transaction_id is used to allow the transactions to be recalled
+        keys_and_blinds is a list of [key_identifier, [blinds]]
+
+        Returns the expected time the minting will be done
+        """
+        # cheat for now and mint them before returning a time of now
+        import base64
+
+        transaction = {'status':'Minting', 'lock':'submit', 
+                       'kandb':keys_and_blinds, 'added':self.getTime()}
+        if transaction is not self.transactions.setdefault(transaction_id, transaction):
+            raise MintError('transaction_id already exists')
+
+        minted = []
+        for key, blinds in keys_and_blinds:
+            this_set = []
+            for blind in blinds:
+                signature = self.signNow(key.key_identifier, blind)
+                this_set.append(base64.b64encode(signature))
+
+            minted.extend(this_set)
+
+        # Fields when delayed minting: 'expected' with the time expected
+        # Fields when there is an error: 'response' with the full response
+        #    (if the IS delivers a less detailed response, that will be
+        #     handled by the IS, not the mint)
+
+        transaction['status'] = 'Minted'
+        transaction['signed_blinds'] = minted
+        del transaction['kandb']
+        del transaction['added']
+        del transaction['lock']
+            
+        return self.getTime() # time we expect it to finish
+
+    def getBlinds(self, transaction_id, lockobj=None):
+        """get the signed blinds for a mint request.
+        Returns (type, value) where type is the string 'DELAY', 'REJECT',
+        or 'ACCEPT', and value is the rest of the arguments needed (delay time,
+        tuple of reject, or the signed blinds
+        """
+        try:
+            transaction = self.transactions[transaction_id]
+        except KeyError:
+            return ('REJECT', ('Generic', 'Unknown transaction_id', ()))
+
+        if not lockobj:
+            lockobj = 'getBlinds'
+        lock = transaction.setdefault('lock', lockobj)
+        while lock is not lockobj:
+            lock = transaction.setdefault('lock', lockobj)
+
+        if transaction['status'] == 'Deleted':
+            # The transaction has been deleted while we were locking, so
+            # we need to get the transaction again and lock that one.
+            # Ensure that everyone else can find out that the transaction
+            # has been deleted, and call ourselves
+            del transaction['lock']
+            return self.getBlinds(transaction_id)
+
+        if transaction['status'] == 'Minting':
+            del transaction['lock']
+            return ('DELAY', '10') #FIXME: the '10' is how long until it is minted. Use a real guess
+
+        elif transaction['status'] == 'Failure':
+            response = transaction['response']
+            del transaction['lock']
+            return ('REJECT', response)
+
+        elif transaction['status'] == 'Minted':
+            signed_blinds = transaction['signed_blinds']
+            del transaction['lock']
+            return ('PASS', signed_blinds)
+
+        else:
+            raise NotImplementedError('Impossible status string')
+
+    def delTransaction(self, transaction_id, lockobj=None):
+        """deletes a transaction.
+
+        This code is not really expected to be used, except maybe when starting up
+        a mint again. It should be written to be threadsafe though.
+        """
+        try:
+            transaction = self.transactions(transaction_id)
+        except KeyError:
+            # FIXME: what should we do here?
+            pass
+
+        if not lockobj:
+            lockobj = 'delTransaction'
+        lock = transaction.setdefault('lock', lockobj)
+        if lock is not lockobj:
+            #FIXME: what should we do here. I'm just going to fail
+            raise Exception('Trying to delete something in use')
+
+        del self.transactions[transaction_id]
+        transaction['status'] = 'Deleted'
+        del transaction['lock']
+
+        return
+        
 
 class MintError(Exception):
     pass
+
 
 if __name__ == "__main__":
     import doctest

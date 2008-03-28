@@ -786,8 +786,6 @@ class TransferTokenRecipient(Protocol):
             # exchange uses basically mint and redeem (or a modified form thereof)
             # XXX refactor to not have duplicate code
             
-
-
             elif options['type'] == 'mint':
 
                 #check that we have the keys
@@ -803,17 +801,33 @@ class TransferTokenRecipient(Protocol):
                 if not self.issuer.debitTarget(target,blindslist):
                     return ProtocolErrorMessage('TTRq')
 
-
-                success, time, failures = self.issuer.submitMintableBlinds(transaction_id, blinds, options)
+                success, additional = self.issuer.submitMintableBlinds(transaction_id, blinds, options)
                 if not success:
+                    failures = additional
                     type, reason, reason_detail = failures
                     return Message('TRANSFER_TOKEN_REJECT', [encoded_transaction_id, type, reason, reason_detail])
-                    
-                # FIXME: Hack! Using time to pass the minted blinds right now
-                return Message('TRANSFER_TOKEN_ACCEPT', [encoded_transaction_id, time])
-                
-            elif options['type'] == 'exchange':
 
+                delay = additional
+                # FIXME: If we can only send a delay, the only useful logic is in the if
+                if delay != '0':
+                    return Message('TRANSFER_TOKEN_DELAY', [encoded_transaction_id, str(delay)])
+                    
+                else:
+                    response, additional = self.issuer.mint.getBlinds(transaction_id)
+                    if response == 'PASS':
+                        signed_blinds = additional
+                        return Message('TRANSFER_TOKEN_ACCEPT', [encoded_transaction_id, signed_blinds])
+                    elif response == 'REJECT':
+                        failures = additional
+                        type, reason, reason_detail = failures
+                        return Message('TRANSFER_TOKEN_REJECT', [encoded_transaction_id, type, reason, reason_detail])
+                    elif response == 'DELAY':
+                        time = additional
+                        return Message('TRANSFER_TOKEN_DELAY', [encoded_transaction_id, time])
+                    else:
+                        raise NotImplementedError('Got an impossible response')
+                    
+            elif options['type'] == 'exchange':
 
                 # check tokens
                 success, failures = self.issuer.redeemTokens(transaction_id, coins, options)
@@ -847,24 +861,41 @@ class TransferTokenRecipient(Protocol):
                     self.issuer.dsdb.unlock(transaction_id)
                     return Message('TRANSFER_TOKEN_REJECT', [encoded_transaction_id, 'Generic', 'Rejected', []])
 
-                success, time, failures = self.issuer.submitMintableBlinds(transaction_id, blinds, options)
+                # FIXME: This code implements the 'mark as spent if we send a delay'
+                #        method of handling delayed minting and any problems. However
+                # FIXME  we have not implemented the solution, allowing reminting with
+                #        the value of the money stored.
+
+                success, additional = self.issuer.submitMintableBlinds(transaction_id, blinds, options)
                 if not success:
                     self.issuer.dsdb.unlock(transaction_id)
+                    failures = additional
                     type, reason, reason_detail = failures
                     return Message('TRANSFER_TOKEN_REJECT', [encoded_transaction_id, type, reason, reason_detail])
 
-                # And now, we have verified the coins are valid, they aren't double spent, and we've minted.
-
-                # Register the tokens as spent
-                try:
+                delay = additional
+                # FIXME: If we can only send a delay, the only useful logic is in the if
+                if delay != '0':
                     self.issuer.dsdb.spend(transaction_id,coins)
-                except LockingError, e: 
-                    #Note: if we fail here, that means we have large problems, since the coins are locked
-                    return ProtocolErrorMessage('TTRq')
-
-
-                # FIXME: using time as a hack to get tokens from
-                return Message('TRANSFER_TOKEN_ACCEPT', [encoded_transaction_id, time])
+                    return Message('TRANSFER_TOKEN_DELAY', [encoded_transaction_id, str(delay)])
+                    
+                else:
+                    response, additional = self.issuer.mint.getBlinds(transaction_id)
+                    if response == 'PASS':
+                        signed_blinds = additional
+                        self.issuer.dsdb.spend(transaction_id,coins)
+                        return Message('TRANSFER_TOKEN_ACCEPT', [encoded_transaction_id, signed_blinds])
+                    elif response == 'REJECT':
+                        self.issuer.dsdb.unlock(transaction_id)
+                        failures = additional
+                        type, reason, reason_detail = failures
+                        return Message('TRANSFER_TOKEN_REJECT', [encoded_transaction_id, type, reason, reason_detail])
+                    elif response == 'DELAY':
+                        time = additional
+                        self.issuer.dsdb.spend(transaction_id,coins)
+                        return Message('TRANSFER_TOKEN_DELAY', [encoded_transaction_id, time])
+                    else:
+                        raise NotImplementedError('Got an impossible response')
 
 
             else:
