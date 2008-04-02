@@ -50,12 +50,21 @@ class Wallet(Entity):
             warnings.warn('Tried to add version "%s" which already existed' % version) 
         currencydict[version] = CDD
 
-    def setDefaultCDD(self, CDD):
-        """setDefaultCDD sets the default CDD for a currency to CDD. It adds if necessary."""
+    def setCurrentCDD(self, CDD):
+        """setCurrentCDD sets the default CDD for a currency to CDD. It adds if necessary."""
         version = dict(CDD.options)['version']
         if version not in self.cdds.setdefault(CDD.currency_identifier, {}):
             self.addCDD(CDD)
         self.cdds[CDD.currency_identifier][None] = version
+
+    def getCDD(self, currency_identifier, version=None):
+        """Returns a specific version of a CDD.
+        
+        If version is None, returns the current version.
+        """
+        if not version:
+            version = self.cdds[currency_identifier][None]
+        return self.cdds[currency_identifier][version]
 
     def fetchMintKey(self, transport, denominations=None, keyids=None, time=None):
         protocol = protocols.fetchMintKeyProtocol(denominations=denominations, keyids=keyids, time=time)
@@ -68,8 +77,7 @@ class Wallet(Entity):
 
         for key in retreivedKeys:
             try:
-                cdd_curr = self.cdds[key.currency_identifier]
-                cdd = cdd_curr[cdd_curr[None]]
+                cdd = self.getCDD(key.currency_identifier)
             except KeyError:
                 continue # try the other currencies
 
@@ -328,8 +336,7 @@ class Wallet(Entity):
         keydict = {}
 
         if blanks:
-            cdd_currs = self.cdds[blanks[0].currency_identifier] # all blanks are the same currency
-            cdd = cdd_currs[cdd_currs[None]]
+            cdd = self.getCDD(blanks[0].currency_identifier)
 
         for blank in blanks:
             li = keydict.setdefault(blank.encodeField('key_identifier'), [])
@@ -377,8 +384,7 @@ class Wallet(Entity):
         # Q: What is reason for reason?
         # A: reason is describing what the tokens are going to be for, e.g 'a book'
 
-        cdd_curr = self.cdds[coins[0].currency_identifier]
-        cdd = cdd_curr[cdd_curr[None]] # The default CDD for the currency
+        cdd = self.getCDD(coins[0].currency_identifier) # The default CDD for the currency
 
         # Get the IS location
         issuer_service_location = cdd.issuer_service_location
@@ -458,6 +464,7 @@ class Wallet(Entity):
 
     def finishTransfer(self, transaction_id, blinds):
         """Finishes a transfer where we minted. Takes blinds and makes coins."""
+        raise NotImplementedError("We never go here!") #FIXME: Completely untested! Use it!
         from containers import BlankError
 
         #FIXME: What do we do if a coin is bad?
@@ -468,7 +475,7 @@ class Wallet(Entity):
         # We'll try to make as many coins as we can, then error
         shortest = min(len(blanks), len(blinds))
 
-        cdd = self.cdds[blanks[0].currency_identifier] # all blanks have the same CDD in a transaction
+        cdd = self.getCDD(blanks[0].currency_identifier) # all blanks have the same CDD in a transaction
 
         #FIXME: We need to make sure we atleast have the same number of blanks and blinds at the protocol level!
         # Well, maybe not the protocol level. We know we received the full message because we can decode the json.
@@ -847,6 +854,11 @@ class Issuer(Entity):
             remaining = 0
 
         return (True, str(int(remaining)))
+
+    def resumeTransaction(self, transaction_id):
+        """Attempts to resume a transaction."""
+        #FIXME: Only resumes minting/exchanges right now
+        return self.mint.getBlinds(transaction_id)
         
 class KeyFetchError(Exception):
     pass

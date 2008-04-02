@@ -9,8 +9,8 @@
 ...            short_currency_identifier='OC', options=[('version', '0')], issuer_service_location='here')
 >>> ie.issuer.setCurrentCDDVersion('0')
 
->>> walletA.setDefaultCDD(ie.issuer.getCDD())
->>> walletB.setDefaultCDD(ie.issuer.getCDD())
+>>> walletA.setCurrentCDD(ie.issuer.getCDD())
+>>> walletB.setCurrentCDD(ie.issuer.getCDD())
 
 >>> CDD.toJson()
 '[["standard_identifier","http://opencoin.org/OpenCoinProtocol/1.0"],["currency_identifier","http://opencent.net/OpenCent"],["short_currency_identifier","OC"],["issuer_service_location","opencoin://issuer.opencent.net:8002"],["denominations",["1","2","5","10","20","50","100","200","500","1000"]],["issuer_cipher_suite",["RSASigningAlgorithm","RSABlindingAlgorithm","SHA256HashingAlgorithm"]],["options",[["version","0"]]],["issuer_public_master_key","sloGu4+P4rslyC4RiAJrZbG0Z90FwEV88eW1JnNv7BDU33+uIhi2G0f/XL+AoUwmF1VsdhQhzEtGNVjnlx0TViWgqvrYX6AqB1/R3zYP9+JnuIIyHiyS+Z+Y3uoB0sLMD+dvHcDRo7cbb+ZNAvlcPoQ4Hb3+tuxwBMmVkZMaOu8=,AQAB"],["signature",[["keyprint","hxz5pRwS+RFp88qQliXYm3R5uNighktwxqEh4RMOuuk="],["signature","nG6zXX7NDfPgmI2qGbvg/oug2B8uhJbLRDxyWPZeJD6gB+p4BOnzgMq8Hpe6FtnXgyQ407cgiyuQ0p20H4ko1LPEM2qIOZToUXeqmLYSjoNYBy5ctMaN+yATswJgD97nzWlH+YxVdMH+L1k2twhFO3x13URDNlN6WsZTYplmRoY="]]]]'

@@ -19,7 +19,7 @@ t2 = ClientTest(ie.issuer.listen,
 
 # setup things for walletB to be able to perform connection with issuer
 walletB.addIssuerTransport(location=ie.issuer.getCDD().issuer_service_location, transport=t2)
-walletB.setDefaultCDD(ie.issuer.getCDD())
+walletB.setCurrentCDD(ie.issuer.getCDD())
 
 walletA.sendCoins(t,amount=1,target='a book')
 

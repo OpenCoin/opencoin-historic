@@ -255,7 +255,7 @@ class TokenSpendRecipient(Protocol):
     >>> coin1 = coins[0][0].toPython() # Denomination of 1
     >>> coin2 = coins[1][0].toPython() # Denomination of 2
     >>> w = entities.Wallet()
-    >>> w.setDefaultCDD(CDD)
+    >>> w.setCurrentCDD(CDD)
     >>> w.makeIssuerTransport = lambda loc: None
     >>> csr = TokenSpendRecipient(w)
     >>> csr.state(Message('SUM_ANNOUNCE',['1234','standard', 'currency', '3','a book']))
@@ -819,7 +819,7 @@ class TransferTokenRecipient(Protocol):
                     return Message('TRANSFER_TOKEN_DELAY', [encoded_transaction_id, str(delay)])
                     
                 else:
-                    response, additional = self.issuer.mint.getBlinds(transaction_id)
+                    response, additional = self.issuer.resumeTransaction(transaction_id)
                     if response == 'PASS':
                         signed_blinds = additional
                         return Message('TRANSFER_TOKEN_ACCEPT', [encoded_transaction_id, signed_blinds])
@@ -886,7 +886,7 @@ class TransferTokenRecipient(Protocol):
                     return Message('TRANSFER_TOKEN_DELAY', [encoded_transaction_id, str(delay)])
                     
                 else:
-                    response, additional = self.issuer.mint.getBlinds(transaction_id)
+                    response, additional = self.issuer.resumeTransaction(transaction_id)
                     if response == 'PASS':
                         signed_blinds = additional
                         self.issuer.dsdb.spend(transaction_id,coins)
@@ -921,7 +921,7 @@ class TransferTokenRecipient(Protocol):
             except TypeError:
                 return ProtocolErrorMessage('TTRs')
 
-            response, additional = self.issuer.mint.getBlinds(transaction_id)
+            response, additional = self.issuer.resumeTransaction(transaction_id)
             if response == 'PASS':
                 signed_blinds = additional
                 return Message('TRANSFER_TOKEN_ACCEPT', [encoded_transaction_id, signed_blinds])
