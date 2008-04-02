@@ -1225,6 +1225,7 @@ class giveMintKeyProtocol(Protocol):
 
 
     def start(self,message):
+        from entities import KeyFetchError
 
         self.newState(self.goodbye)
 
@@ -1261,7 +1262,7 @@ class giveMintKeyProtocol(Protocol):
                 try:
                     key = self.issuer.getKeyByDenomination(denomination, time)            
                     keys.append(key)
-                except 'KeyFetchError': 
+                except KeyFetchError: 
                     errors.append([denomination, 'Unknown denomination'])
         
         elif message.type == 'MINT_KEY_FETCH_KEYID':                
@@ -1288,7 +1289,7 @@ class giveMintKeyProtocol(Protocol):
                 try:
                     key = self.issuer.getKeyById(keyid)
                     keys.append(key)
-                except 'KeyFetchError':                
+                except KeyFetchError:                
                     errors.append([base64.b64encode(keyid), 'Unknown key_identifier'])
         
         else:
