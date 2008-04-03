@@ -610,6 +610,9 @@ class TransferTokenRecipient(Protocol):
     >>> ttr.state = ttr.start
     >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['0000', 'my account', [], [malformed.toPython()], [['type', 'redeem']]]))
     <Message('TRANSFER_TOKEN_REJECT',['0000', 'Token', 'See detail', ['Invalid token']])>
+    >>> ttr.newState(ttr.start)
+    >>> ttr.state(Message('TRANSFER_TOKEN_RESUME', '0000'))
+    <Message('TRANSFER_TOKEN_REJECT',['0000', 'Token', 'See detail', ['Invalid token']])>
 
     The unknown key_identifier should be rejected
     >>> malformed = copy.deepcopy(tests.coins[0][0])
@@ -617,14 +620,23 @@ class TransferTokenRecipient(Protocol):
     >>> ttr.state = ttr.start
     >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['1111', 'my account', [], [malformed.toPython()], [['type', 'redeem']]]))
     <Message('TRANSFER_TOKEN_REJECT',['1111', 'Token', 'See detail', ['Invalid key_identifier']])>
+    >>> ttr.newState(ttr.start)
+    >>> ttr.state(Message('TRANSFER_TOKEN_RESUME', '1111'))
+    <Message('TRANSFER_TOKEN_REJECT',['1111', 'Token', 'See detail', ['Invalid key_identifier']])>
 
     >>> ttr.state = ttr.start
     >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['2222', 'my account', [], [coin1, coin2], [['type', 'redeem']]]))
+    <Message('TRANSFER_TOKEN_ACCEPT',['2222', []])>
+    >>> ttr.newState(ttr.start)
+    >>> ttr.state(Message('TRANSFER_TOKEN_RESUME', '2222'))
     <Message('TRANSFER_TOKEN_ACCEPT',['2222', []])>
 
     Try to double spend. Should not work.
     >>> ttr.state = ttr.start 
     >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['3333', 'my account', [], [coin1, coin2], [['type', 'redeem']]]))
+    <Message('TRANSFER_TOKEN_REJECT',['3333', 'Token', 'See detail', ['Token already spent', 'Token already spent']])>
+    >>> ttr.newState(ttr.start)
+    >>> ttr.state(Message('TRANSFER_TOKEN_RESUME', '3333'))
     <Message('TRANSFER_TOKEN_REJECT',['3333', 'Token', 'See detail', ['Token already spent', 'Token already spent']])>
 
     >>> blank1 = containers.CurrencyBlank().fromPython(tests.coinA.toPython(nosig=1))
@@ -636,6 +648,9 @@ class TransferTokenRecipient(Protocol):
 
     >>> ttr.state = ttr.start
     >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['4444', 'my account', blindslist, [], [['type', 'mint']]]))
+    <Message('TRANSFER_TOKEN_ACCEPT',['4444', ['Do0el3uxdyFMF8NdXtowBLBOxXM0r7xR9hXkaZWEhPUBQCe8yaYGO09wnxrWEVFlt0r9M6bCZxKtzNGDGw3/XQ==', 'dTnL8yTkdelG9fW//ZoKzUl7LTjBXiElaHkfyMLgVetEM7pmEzfcdfRWhm2PP3IhnkZ8CmAR1uOJ99rJ+XBASA==']])>
+    >>> ttr.newState(ttr.start)
+    >>> ttr.state(Message('TRANSFER_TOKEN_RESUME', '4444'))
     <Message('TRANSFER_TOKEN_ACCEPT',['4444', ['Do0el3uxdyFMF8NdXtowBLBOxXM0r7xR9hXkaZWEhPUBQCe8yaYGO09wnxrWEVFlt0r9M6bCZxKtzNGDGw3/XQ==', 'dTnL8yTkdelG9fW//ZoKzUl7LTjBXiElaHkfyMLgVetEM7pmEzfcdfRWhm2PP3IhnkZ8CmAR1uOJ99rJ+XBASA==']])>
 
     >>> ttr.state == ttr.goodbye
@@ -655,13 +670,21 @@ class TransferTokenRecipient(Protocol):
     >>> ie = tests.makeIssuerEntity()
     >>> ie.getTime = lambda: calendar.timegm((2008,01,31,0,0,0)) 
     >>> ie.mint.getTime = ie.issuer.getTime = ie.getTime
+    >>> performMinting, ie.mint.performMinting = ie.mint.performMinting, lambda: None
     >>> blank = tests.makeBlank(tests.mintKeys[0], 'a'*26, 'a'*26)
     >>> blind = [[tests.mintKeys[0].encodeField('key_identifier'), [base64.b64encode(blank.blind_blank(tests.CDD, tests.mintKeys[0]))]]]
     >>> ttr = TransferTokenRecipient(ie.issuer)
     >>> ttr.newState(ttr.start)
     >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['1234', '', blind, [coin1], [['type', 'exchange']]]))
-    <Message('TRANSFER_TOKEN_ACCEPT',['1234', ['UIo2KtqK/6JqSWbtFFVR14fOjnzwr4tDiY/6kOnQ0h92EewY2vJBV2XaS43wK3RsNFg0sHzNh3v2BVDFV8cDvQ==']])>
+    <Message('TRANSFER_TOKEN_DELAY',['1234', '0'])>
 
+    Test again since it hits a different codepath
+    >>> ttr.newState(ttr.start)
+    >>> ttr.state(Message('TRANSFER_TOKEN_RESUME','1234'))
+    <Message('TRANSFER_TOKEN_DELAY',['1234', '0'])>
+
+    Okay. Mint them and test the resume
+    >>> performMinting()
     >>> ttr.newState(ttr.start)
     >>> ttr.state(Message('TRANSFER_TOKEN_RESUME','1234'))
     <Message('TRANSFER_TOKEN_ACCEPT',['1234', ['UIo2KtqK/6JqSWbtFFVR14fOjnzwr4tDiY/6kOnQ0h92EewY2vJBV2XaS43wK3RsNFg0sHzNh3v2BVDFV8cDvQ==']])>

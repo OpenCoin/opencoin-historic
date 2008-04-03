@@ -938,8 +938,8 @@ class Issuer(Entity):
                 numblinds = numblinds + len(blindslist)
 
             self.addTransaction(transaction_id, type='Exchange', status='Delayed', added=self.getTime(),
-                                obsolete=obsolete, response=failures, numblinds=numblinds,
-                                target=target, options=options, amount=0)
+                                obsolete=obsolete, response=failures, expected=self.getTime() + int(delay),
+                                numblinds=numblinds, target=target, options=options, amount=0)
             # FIXME: If we can only send a delay, the only useful logic is in the if
             if delay != '0':
                 self.updateTransaction(transaction_id, amount=total)
@@ -1221,7 +1221,7 @@ class Issuer(Entity):
         if transaction['status'] == 'Delayed': # Mint or Exchange
             time = max(0, int(self.getTime() - transaction['expected']))
             del transaction['lock']
-            return ('DELAY', time)
+            return ('DELAY', str(time))
 
         elif transaction['status'] == 'Failure': # Mint or Exchange
             response = transaction['response']
