@@ -1,7 +1,8 @@
 from oc import entities, transports, tests
-IS = entities.Issuer()
-IS.cdd = tests.CDD
-IS.masterKey = tests.CDD_private
+ie = entities.IssuerEntity()
+IS = ie.issuer
+IS.addCDD(tests.CDD)
+IS.setCurrentCDDVersion('1')
 ssh = transports.SocketServerHandler('0.0.0.0', 12008, IS.listen)
 ssh.debug = 1
 print 'starting'
