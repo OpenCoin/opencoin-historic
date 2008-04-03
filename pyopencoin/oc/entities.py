@@ -359,6 +359,7 @@ class Wallet(Entity):
         
         elif type == 'exchange':
             if protocol.result == 1: # If set, we got a TRANSFER_TOKEN_ACCEPT
+                1/0
                 self.addTransferBlanks(protocol.transaction_id, blanks)
                 self.finishTransfer(protocol.transaction_id, protocol.blinds)
             elif protocol.result == 2: # If set, we got a TRANSFER_TOKEN_DELAY
@@ -379,7 +380,7 @@ class Wallet(Entity):
         redeem them with the IS.
 
         returns True if successful. Nothing if not
-        FIXME: It doesn't see to know if the transfer works?
+        FIXME: It doesn't seem to know if the transfer works?
         """
         # Q: What is reason for reason?
         # A: reason is describing what the tokens are going to be for, e.g 'a book'
@@ -985,7 +986,7 @@ class Issuer(Entity):
 
         """
         
-        # FIXME: This will fail if we try to lock with an already-known request_id. Maybe a different error?
+        # This will fail if we try to lock with an already-known request_id.
         
         failures = []
         obsolete = self.getTime() + 86400 # FIXME: hardcoded min obsolete
@@ -1023,17 +1024,23 @@ class Issuer(Entity):
             self.dsdb.lock(transaction_id, tokens, 86400)
         except LockingError, e:
             reasons = []
+            locking_error = False
             for token in tokens:
                 status = self.dsdb.check(token)
                 if status == 'Locked':
                     reasons.append('Token already spent')
+                    locking_error = True
                 elif status == 'Spent':
                     reasons.append('Token already spent')
+                    locking_error = True
                 elif status == 'Unlocked':
                     reasons.append('None')
                 else:
                     raise NotImplementedError('Impossible string')
-            return (False, obsolete, ('Token', 'See detail', reasons))
+            if locking_error:
+                return (False, obsolete, ('Token', 'See detail', reasons))
+            else: # The problem is that the transaction_id is locked
+                return (False, obsolete, ('Token', 'Rejected')) #FIXME: Should this be a different error?
 
         return (True, obsolete, None)
 

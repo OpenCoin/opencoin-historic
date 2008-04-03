@@ -243,10 +243,8 @@ class SocketClientTransport(Transport):
                     except Exception, e:
                         raise
 
-                    #FIXME: We need to restart looking for messages if we had found it!
-
-                # read more information
-                if self.socket:
+                # read more information unless we had a message queued
+                if not found and self.socket:
                     try:
                         data = self.socket.recv(2048)
                     except socket.error:

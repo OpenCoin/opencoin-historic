@@ -140,9 +140,32 @@ def encodeTime(seconds):
     return '-'.join(instant[:3]) + 'T' + ':'.join(instant[3:6]) + 'Z'
 
 def decodeTime(s):
+    """decodes a time
+    
+    >>> decodeTime('2008-02-01T00:00:00Z')
+    1201824000
+
+    >>> decodeTime('foo')
+    Traceback (most recent call last):
+    TypeError: ...
+
+    """
     #FIXME: this breaks if we are greater than whatever the epoc is (usually 2038)
     import time, calendar
-    # FIXME: this probably supports reading incorrectly formatted times.
+    try:
+        date, t = s.split('T')
+        year, month, day = date.split('-')
+        if len(year) < 4 or len(month) != 2 or len(day) != 2:
+            raise TypeError('Encoding of date "%s" is incorrect' % s)
+        if t[-1] != 'Z':
+            raise TypeError('Encoding of date "%s" is incorrect' % s)
+        t = t[:-1] # get rid of the 'Z'
+        hour, min, sec = t.split(':')
+        # Okay. If all these splits worked, we know that we have correctly formatted string.
+        # so let strptime deal with anything odd
+    except ValueError:
+        raise TypeError('Encoding of date "%s" is incorrect' % s)
+
     struct = time.strptime(s, '%Y-%m-%dT%H:%M:%SZ')
     return calendar.timegm(struct)
 

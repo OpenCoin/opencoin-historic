@@ -93,6 +93,29 @@ class Protocol:
 ProtocolErrorMessage = lambda x: Message('PROTOCOL_ERROR', 'send again')
 
 class answerHandshakeProtocol(Protocol):
+    """The answering side of a HANDSHAKE.
+
+    >>> ahp = answerHandshakeProtocol(None)
+    >>> ahp.state(Message('HANDSHAKE', [['protocol', 'opencoin 1.0']]))
+    <Message('HANDSHAKE_ACCEPT',[['protocol', 'opencoin 1.0']])>
+
+    >>> ahp = answerHandshakeProtocol(None)
+    >>> ahp.state(Message('HANDSHAKE', [['protocol', 'opencoin 1.0+']]))
+    <Message('HANDSHAKE_ACCEPT',[['protocol', 'opencoin 1.0']])>
+    
+    >>> ahp = answerHandshakeProtocol(None)
+    >>> ahp.state(Message('HANDSHAKE', [['protocol', 'opencoin 1.1']]))
+    <Message('HANDSHAKE_REJECT','did not like the protocol version')>
+    
+    >>> ahp = answerHandshakeProtocol(None)
+    >>> ahp.state(Message('HANDSHAKE', [['not_protocol', 'opencoin 1.0']]))
+    <Message('PROTOCOL_ERROR','please do a handshake')>
+
+    >>> ahp = answerHandshakeProtocol(None)
+    >>> ahp.state(Message('NOT_HANDSHAKE', [['protocol', 'opencoin 1.0']]))
+    <Message('PROTOCOL_ERROR','please do a handshake')>
+
+    """
 
     def __init__(self, arguments, handshake_options=None, **mapping):
         Protocol.__init__(self)
@@ -126,8 +149,10 @@ class answerHandshakeProtocol(Protocol):
                 
                 options[key] = value
 
-            # FIXME: If we allow opencoin 1.0+, we need to check for that as well
-            if options['protocol'] == 'opencoin 1.0':
+            if 'protocol' not in options:
+                return Message('PROTOCOL_ERROR','please do a handshake')
+
+            if options['protocol'] == 'opencoin 1.0' or options['protocol'] == 'opencoin 1.0+':
                 # Set up a state where the handshake no longer is needed.
                 self.old_start = self.start
                 self.start = self.dispatch # Now, if we restart we end up in dispatch
