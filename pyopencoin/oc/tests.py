@@ -106,7 +106,40 @@ walletB <Message('GOODBYE',None)>
 True
 """
 
+def printdict(d):
+    """prints out the normal representation of a dict, except the keys
+    of the dict are sorted.
+    """
+    s = []
+    s.append('{')
+    keys = d.keys()
+    keys.sort()
+    for key in keys:
+        s.append('%s: %s' % (repr(key), repr(d[key])))
+        if key != keys[-1]:
+            s.append(', ')
+    s.append('}')
+    print ''.join(s)
 
+def printdictlist(l):
+    """prints out the normal representation of a list of dicts, except
+    the keys of the dict are sorted.
+    """
+    s = []
+    s.append('[')
+    for d in l:
+        s.append('{')
+        keys = d.keys()
+        keys.sort()
+        for key in keys:
+            s.append('%s: %s' % (repr(key), repr(d[key])))
+            if key != keys[-1]:
+                s.append(', ')
+        s.append('}')
+        if d is not l[-1]:
+            s.append(', ')
+    s.append(']')
+    print ''.join(s)
 
 def generateCDD():
     import crypto, containers, base64

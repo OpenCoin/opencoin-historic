@@ -609,14 +609,14 @@ class TransferTokenRecipient(Protocol):
     >>> malformed.signature = 'Not a valid signature'
     >>> ttr.state = ttr.start
     >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['1234', 'my account', [], [malformed.toPython()], [['type', 'redeem']]]))
-    <Message('TRANSFER_TOKEN_REJECT',['1234', 'Token', 'See detail', ['Rejected']])>
+    <Message('TRANSFER_TOKEN_REJECT',['1234', 'Token', 'See detail', ['Invalid token']])>
 
     The unknown key_identifier should be rejected
     >>> malformed = copy.deepcopy(tests.coins[0][0])
     >>> malformed.key_identifier = 'Not a valid key identifier'
     >>> ttr.state = ttr.start
     >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['1234', 'my account', [], [malformed.toPython()], [['type', 'redeem']]]))
-    <Message('TRANSFER_TOKEN_REJECT',['1234', 'Token', 'See detail', ['Rejected']])>
+    <Message('TRANSFER_TOKEN_REJECT',['1234', 'Token', 'See detail', ['Invalid key_identifier']])>
 
     >>> ttr.state = ttr.start
     >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['1234', 'my account', [], [coin1, coin2], [['type', 'redeem']]]))
@@ -625,7 +625,7 @@ class TransferTokenRecipient(Protocol):
     Try to double spend. Should not work.
     >>> ttr.state = ttr.start 
     >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['1234', 'my account', [], [coin1, coin2], [['type', 'redeem']]]))
-    <Message('TRANSFER_TOKEN_REJECT',['1234', 'Token', 'Invalid token', []])>
+    <Message('TRANSFER_TOKEN_REJECT',['1234', 'Token', 'See detail', ['Token already spent', 'Token already spent']])>
 
     >>> blank1 = containers.CurrencyBlank().fromPython(tests.coinA.toPython(nosig=1))
     >>> blank2 = containers.CurrencyBlank().fromPython(tests.coinB.toPython(nosig=1))
