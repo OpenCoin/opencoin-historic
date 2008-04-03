@@ -1410,9 +1410,22 @@ class Mint:
 
         transaction_id is used to allow the transactions to be recalled
         keys_and_blinds is a list of [key_identifier, [blinds]]
-        minted_function is a callback which happens when the blinds are minted
 
         Returns the expected time the minting will be done
+
+        >>> m = Mint()
+        >>> m.performMinting = lambda: None # Make into a noop
+        >>> m.getTime = lambda: 15180
+        >>> m.submit('abcd', [])
+        15180
+        >>> m.waitingTransactions
+        [{'status': 'Minting', 'added': 15180, 'kandb': [], 'transaction_id': 'abcd'}]
+
+        >>> m.getTime = lambda: 15181
+        >>> m.submit('efgh', [])
+        15181
+        >>> m.waitingTransactions
+        [{'status': 'Minting', 'added': 15180, 'kandb': [], 'transaction_id': 'abcd'}, {'status': 'Minting', 'added': 15181, 'kandb': [], 'transaction_id': 'efgh'}]
         """
         # cheat for now and mint them before returning a time of now
 
@@ -1426,7 +1439,41 @@ class Mint:
         return self.getTime() # expect it to be done right now
 
     def performMinting(self):
-        """Go through self.waitingTransactions and mint them all. Thread safe."""
+        """Go through self.waitingTransactions and mint them all. Thread safe.
+        
+        >>> m = Mint()
+        >>> realPerformMinting = m.performMinting
+        >>> m.performMinting = lambda: None # Make into noop for now
+        >>> m.getTime = lambda: 15180
+        >>> m.submit('abcd', [])
+        15180
+        >>> m.getTime = lambda: 15181
+        >>> m.submit('efgh', [])
+        15181
+        >>> m.getTime = lambda: 15182
+        >>> m.performMinting = realPerformMinting
+
+        We have waiting transactions and no completed transactions
+        >>> m.waitingTransactions and True
+        True
+        >>> m.completedTransactions or False
+        False
+
+        And things work
+        >>> m.performMinting()
+        >>> m.waitingTransactions
+        []
+        >>> m.completedTransactions
+        [{'status': 'Minted', 'added': 15180, 'completed': 15182, 'signed_blinds': [], 'transaction_id': 'abcd'}, {'status': 'Minted', 'added': 15181, 'completed': 15182, 'signed_blinds': [], 'transaction_id': 'efgh'}]
+
+        It doesn't fail if there are no transactions
+        >>> m.waitingTransactions
+        []
+        >>> m.performMinting()
+        >>> m.completedTransactions
+        [{'status': 'Minted', 'added': 15180, 'completed': 15182, 'signed_blinds': [], 'transaction_id': 'abcd'}, {'status': 'Minted', 'added': 15181, 'completed': 15182, 'signed_blinds': [], 'transaction_id': 'efgh'}]
+
+        """
         import base64
         try:
             transaction = self.waitingTransactions.pop(0) # FIFO
@@ -1451,8 +1498,8 @@ class Mint:
 
             transaction['status'] = 'Minted'
             transaction['signed_blinds'] = minted
+            transaction['completed'] = self.getTime()
             del transaction['kandb']
-            del transaction['added']
 
             self.completedTransactions.append(transaction)
 
