@@ -1453,6 +1453,22 @@ class Mint:
         15181
         >>> m.getTime = lambda: 15182
         >>> m.performMinting = realPerformMinting
+        >>> def printlist(l):
+        ...     s = []
+        ...     s.append('[')
+        ...     for d in l:
+        ...         s.append('{')
+        ...         keys = d.keys()
+        ...         keys.sort()
+        ...         for key in keys:
+        ...             s.append('%s: %s' % (repr(key), repr(d[key])))
+        ...             if key != keys[-1]:
+        ...                 s.append(', ')
+        ...         s.append('}')
+        ...         if d is not l[-1]:
+        ...             s.append(', ')
+        ...     s.append(']')
+        ...     print ''.join(s)
 
         We have waiting transactions and no completed transactions
         >>> m.waitingTransactions and True
@@ -1464,15 +1480,15 @@ class Mint:
         >>> m.performMinting()
         >>> m.waitingTransactions
         []
-        >>> m.completedTransactions
-        [{'status': 'Minted', 'added': 15180, 'completed': 15182, 'signed_blinds': [], 'transaction_id': 'abcd'}, {'status': 'Minted', 'added': 15181, 'completed': 15182, 'signed_blinds': [], 'transaction_id': 'efgh'}]
+        >>> printlist(m.completedTransactions)
+        [{'added': 15180, 'completed': 15182, 'signed_blinds': [], 'status': 'Minted', 'transaction_id': 'abcd'}, {'added': 15181, 'completed': 15182, 'signed_blinds': [], 'status': 'Minted', 'transaction_id': 'efgh'}]
 
         It doesn't fail if there are no transactions
         >>> m.waitingTransactions
         []
         >>> m.performMinting()
-        >>> m.completedTransactions
-        [{'status': 'Minted', 'added': 15180, 'completed': 15182, 'signed_blinds': [], 'transaction_id': 'abcd'}, {'status': 'Minted', 'added': 15181, 'completed': 15182, 'signed_blinds': [], 'transaction_id': 'efgh'}]
+        >>> printlist(m.completedTransactions)
+        [{'added': 15180, 'completed': 15182, 'signed_blinds': [], 'status': 'Minted', 'transaction_id': 'abcd'}, {'added': 15181, 'completed': 15182, 'signed_blinds': [], 'status': 'Minted', 'transaction_id': 'efgh'}]
 
         Okay. Now test failures
         >>> ie = tests.makeIssuerEntity()
@@ -1487,8 +1503,8 @@ class Mint:
         >>> m.completedTransactions
         []
         >>> realPerformMinting()
-        >>> m.completedTransactions
-        [{'status': 'Failure', 'added': 1199145600, 'completed': 1199145600, 'response': ['Blind', 'See detail', ['Unable to sign']], 'transaction_id': 'abcd'}]
+        >>> printlist(m.completedTransactions)
+        [{'added': 1199145600, 'completed': 1199145600, 'response': ['Blind', 'See detail', ['Unable to sign']], 'status': 'Failure', 'transaction_id': 'abcd'}]
 
         Test a more complicated failure. Valid should always pass. Invalid has two failures.
         Partial has a good key and a bad key. key_id has a key that the mint doesn't know about.
@@ -1501,8 +1517,8 @@ class Mint:
         >>> m.submit('abcd', [valid, invalid, key_id])
         1199145600
         >>> realPerformMinting()
-        >>> m.completedTransactions
-        [{'status': 'Failure', 'added': 1199145600, 'completed': 1199145600, 'response': ['Blind', 'See detail', ['None', 'Unable to sign', 'Invalid key_identifier']], 'transaction_id': 'abcd'}]
+        >>> printlist(m.completedTransactions)
+        [{'added': 1199145600, 'completed': 1199145600, 'response': ['Blind', 'See detail', ['None', 'Unable to sign', 'Invalid key_identifier']], 'status': 'Failure', 'transaction_id': 'abcd'}]
 
         Now I'm not sure if two sets with the same key_id is invalid or not.
         I'm testing seperately for now with partial since it has the same mintkey
@@ -1511,8 +1527,8 @@ class Mint:
         >>> m.submit('abcd', [partial, valid])
         1199145600
         >>> realPerformMinting()
-        >>> m.completedTransactions
-        [{'status': 'Failure', 'added': 1199145600, 'completed': 1199145600, 'response': ['Blind', 'See detail', ['Unable to sign', 'None']], 'transaction_id': 'abcd'}]
+        >>> printlist(m.completedTransactions)
+        [{'added': 1199145600, 'completed': 1199145600, 'response': ['Blind', 'See detail', ['Unable to sign', 'None']], 'status': 'Failure', 'transaction_id': 'abcd'}]
 
         And Key too soon and Key expired
         >>> m.completedTransactions = []
@@ -1520,16 +1536,16 @@ class Mint:
         >>> m.submit('abcd', [invalid])
         1199145599
         >>> realPerformMinting()
-        >>> m.completedTransactions
-        [{'status': 'Failure', 'added': 1199145599, 'completed': 1199145599, 'response': ['Blind', 'See detail', ['Key too soon']], 'transaction_id': 'abcd'}]
+        >>> printlist(m.completedTransactions)
+        [{'added': 1199145599, 'completed': 1199145599, 'response': ['Blind', 'See detail', ['Key too soon']], 'status': 'Failure', 'transaction_id': 'abcd'}]
 
         >>> m.completedTransactions = []
         >>> m.getTime = lambda: tests.mint_key1.key_not_after + 1
         >>> m.submit('abcd', [invalid])
         1201824001
         >>> realPerformMinting()
-        >>> m.completedTransactions
-        [{'status': 'Failure', 'added': 1201824001, 'completed': 1201824001, 'response': ['Blind', 'See detail', ['Key expired']], 'transaction_id': 'abcd'}]
+        >>> printlist(m.completedTransactions)
+        [{'added': 1201824001, 'completed': 1201824001, 'response': ['Blind', 'See detail', ['Key expired']], 'status': 'Failure', 'transaction_id': 'abcd'}]
 
         """
         import base64
