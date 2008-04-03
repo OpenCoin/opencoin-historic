@@ -763,12 +763,223 @@ class Issuer(Entity):
         """
         return True
         
+    def transferTokenRequestHelper(self, transaction_id, target, blindslist, tokens, options):
+        if 'type' not in options:
+            return 'REJECT', ['Options', 'Reject', []]
+
+        # Start doing things
+        if options['type'] == 'redeem':
+
+            success, obsolete, failures = self.redeemTokens(transaction_id, tokens, options)
+
+            if not success:
+                # tokens are not locked if not successful
+                self.addTransaction(transaction_id, type='Redeem', status='Reject', added=self.getTime(),
+                                    obsolete=obsolete, response=failures)
+                return 'REJECT', failures
+
+            # transmit funds
+            if not self.transferToTarget(target, tokens):
+                self.dsdb.unlock(transaction_id)
+                failures = ['Target', 'Rejected', []]
+                self.addTransaction(transaction_id, type='Redeem', status='Reject', added=self.getTime(),
+                                    obsolete=obsolete, response=failures)
+                return 'REJECT', failures
+
+            # register the tokens as spent
+            self.dsdb.spend(transaction_id, tokens)
+
+            self.addTransaction(transaction_id, type='Redeem', status='Accept', added=self.getTime(),
+                                obsolete=obsolete, response=failures, signed_blinds=[])
+            return 'ACCEPT', []
+
+        elif options['type'] == 'mint':
+
+            # check that we have the keys
+            try:
+                blinds = [[self.keyids[keyid], blinds] for keyid, blinds in blindslist]
+            except KeyError:
+                obsolete = self.getTime() + 86400 # FIXME: Hardcoded min obsolete
+                details = []
+                for keyid, blinds in blindslist:
+                    try:
+                        mintKey = self.keyids[keyid]
+                        details.append('None')
+                        obsolete = max(obsolete, mintKey.token_not_after)
+                    except KeyError:
+                        details.append('None')
+                self.addTransaction(transaction_id, type='Mint', status='Failure', added=self.getTime(),
+                                    obsolete=obsolete, response=['Blind', 'See detail', details], numblinds=0)
+                return 'REJECT', ['Blind', 'See detail', details]
+
+            numblinds = 0
+            for key, blindslist in blinds:
+                numblinds = numblinds + len(blindslist)
+
+            # check that the keys are usable
+            success, obsolete, failures = self.verifyMintableBlinds(blinds, options)
+            if not success:
+                self.addTransaction(transaction_id, type='Mint', status='Failure', added=self.getTime(),
+                                    obsolete=obsolete, numblinds=numblinds, response=failures)
+                return 'REJECT', failures
+
+            #check target
+            if not self.debitTarget(target,blindslist):
+                self.addTransaction(transaction_id, type='Mint', status='Failure', added=self.getTime(),
+                                    obsolete=obsolete, numblinds=numblinds, response=['Target', 'Rejected', []])
+                return 'REJECT', ['Target', 'Rejected', []]
+
+            success, additional = self.submitMintableBlinds(transaction_id, blinds, options)
+            if not success:
+                failures = additional
+                self.addTransaction(transaction_id, type='Mint', status='Failure', added=self.getTime(),
+                                    obsolete=obsolete, numblinds=numblinds, response=failures)
+                return 'REJECT', failures
+
+            delay = additional
+            self.addTransaction(transaction_id, type='Mint', status='Delayed', added=self.getTime(),
+                                obsolete=obsolete, numblinds=numblinds, expected=self.getTime() + int(delay))
+            # FIXME: If we can only send a delay, the only useful logic is in the if
+            if delay != '0':
+                return 'DELAY', str(delay)
+
+            else:
+                response, additional = self.resumeTransaction(transaction_id)
+                if response == 'PASS':
+                    signed_blinds = additional
+                    return 'ACCEPT', signed_blinds
+                elif response == 'REJECT':
+                    failures = additional
+                    return 'REJECT', failures
+                elif response == 'DELAY':
+                    time = additional
+                    return 'DELAY', time
+                else:
+                    raise NotImplementedError('Got an impossible response')
+
+        elif options['type'] == 'exchange':
+
+            # check tokens
+            success, obsolete, failures = self.redeemTokens(transaction_id, tokens, options)
+            if not success:
+                self.addTransaction(transaction_id, type='Exchange', status='Reject', added=self.getTime(),
+                                    obsolete=obsolete, target=target, options=options, amount=0,
+                                    response=failures)
+                return 'REJECT', failures
+
+            # And onto the blinds
+
+            # check that we have the keys
+            try:
+                blinds = [[self.keyids[keyid], blinds] for keyid, blinds in blindslist]
+            except KeyError:
+                details = []
+                for keyid, blinds in blindslist:
+                    try:
+                        mintKey = self.keyids[keyid]
+                        details.append('None')
+                        obsolete = max(obsolete, mintKey.token_not_after)
+                    except KeyError:
+                        details.append('None')
+                self.addTransaction(transaction_id, type='Exchange', status='Failure', added=self.getTime(),
+                                    obsolete=obsolete, response=['Blind', 'See detail', details], numblinds=0,
+                                    target=target, options=options, amount=0)
+                return 'REJECT', ['Blind', 'See detail', details]
+
+            #check target
+            if not self.debitTarget(target,blindslist):
+                self.dsdb.unlock(transaction_id)
+                self.addTransaction(transaction_id, type='Exchange', status='Failure', added=self.getTime(),
+                                    obsolete=obsolete, response=['Target', 'Rejected', []], numblinds=0,
+                                    target=target, options=options, amount=0)
+                return 'REJECT', ['Target', 'Rejected', []]
+
+            # check mintifyable blinds
+            success, an_obsolete, failures = self.verifyMintableBlinds(blinds, options)
+            obsolete = max(obsolete, an_obsolete)
+
+            if not success:
+                self.addTransaction(transaction_id, type='Exchange', status='Failure', added=self.getTime(),
+                                    obsolete=obsolete, response=failures, numblinds=0,
+                                    target=target, options=options, amount=0)
+                return 'REJECT', failures
+
+            # Make sure that we have the same amount of tokens as mintings
+            total = 0
+            for b in blinds:
+                total += int(b[0].denomination) * len(b[1])
+
+            if total != sum(tokens):
+                self.dsdb.unlock(transaction_id)
+                self.addTransaction(transaction_id, type='Exchange', status='Failure', added=self.getTime(),
+                                    obsolete=obsolete, response=['Generic', 'Rejected', []], numblinds=0,
+                                    target=target, options=options, amount=0)
+                return 'REJECT', ['Generic', 'Rejected', []]
+
+            # FIXME: This code implements the 'mark as spent if we send a delay'
+            #        method of handling delayed minting and any problems. However
+            # FIXME  we have not implemented the solution, allowing reminting with
+            #        the value of the money stored.
+
+            success, additional = self.submitMintableBlinds(transaction_id, blinds, options)
+            if not success:
+                self.dsdb.unlock(transaction_id)
+                failures = additional
+                self.addTransaction(transaction_id, type='Exchange', status='Failure', added=self.getTime(),
+                                    obsolete=obsolete, response=failures, numblinds=0,
+                                    target=target, options=options, amount=0)
+                return 'REJECT', failures
+
+            delay = additional
+
+            # calculate numblinds and amount
+            numblinds = 0
+            for key, blindslist in blinds:
+                numblinds = numblinds + len(blindslist)
+
+            self.addTransaction(transaction_id, type='Exchange', status='Delayed', added=self.getTime(),
+                                obsolete=obsolete, response=failures, numblinds=numblinds,
+                                target=target, options=options, amount=0)
+            # FIXME: If we can only send a delay, the only useful logic is in the if
+            if delay != '0':
+                self.updateTransaction(transaction_id, amount=total)
+                self.spend(transaction_id, tokens)
+                return 'DELAY', str(delay)
+
+            else:
+                response, additional = self.resumeTransaction(transaction_id)
+                if response == 'PASS':
+                    signed_blinds = additional
+                    self.updateTransaction(transaction_id, amount=total)
+                    self.dsdb.spend(transaction_id, tokens)
+                    return 'ACCEPT', signed_blinds
+                elif response == 'REJECT':
+                    self.dsdb.unlock(transaction_id)
+                    failures = additional
+                    return 'REJECT', failures
+                elif response == 'DELAY':
+                    time = additional
+                    self.updateTransaction(transaction_id, amount=total)
+                    self.dsdb.spend(transaction_id, tokens)
+                    return 'DELAY', str(time)
+                else:
+                    raise NotImplementedError('Got an impossible response')
+
+        else:
+            # FIXME: the transaction added pretends to be a Redeem since that carries little state
+            # FIXME: hardcoded obsolete
+            self.addTransaction(transaction_id, type='Redeem', status='Reject', added=self.getTime(),
+                                obsolete=self.getTime() + 86400, response=['Options', 'Rejected', []])
+            return 'REJECT', ['Option', 'Rejected', []]
+
+
     def redeemTokens(self, transaction_id, tokens, options):
         """verifies the tokens and locks them.
         
-        Returns a tuple of (locked, failures).
+        Returns a tuple of (locked, obsolete, [failures|None]).
         Locked is a boolean specifying if the tokens are locked or not
-        Failures is a tuple of (type, reason, reason_detail) to return in case of a reject.
+        Obsolete is the time for obsolete
+        Failures is a tuple of (type, reason, reason_detail) to return in case locked is false
         
         failures may be None if there were no failures
 
@@ -777,38 +988,34 @@ class Issuer(Entity):
         # FIXME: This will fail if we try to lock with an already-known request_id. Maybe a different error?
         
         failures = []
+        obsolete = self.getTime() + 86400 # FIXME: hardcoded min obsolete
 
         if not tokens:
-            type = dict(options)['type'].capitalize()
-            #self.addTransaction(transaction_id, type=type, status='Rejected', added=self.getTime(),
-            #        obsolete=self.getTime() + 86400, response=('Token', 'See detail', [])) # FIXME: hardcoded obsolete
-            return ('TRANSFER_TOKEN_REJECT', ('Token', 'Rejected', []))
+            return ('TRANSFER_TOKEN_REJECT', obsolete, ('Token', 'Rejected', []))
 
-        #check if coins are valid
+        #check if tokens are valid
         for token in tokens:
             mintKey = self.mintKeysByKeyID.get(token.key_identifier, None)
-            if not mintKey or not token.validate_with_CDD_and_MintKey(self.getCDD(), mintKey):
+            if mintKey:
+                obsolete = max(obsolete, mintKey.token_not_after)
+                if not token.validate_with_CDD_and_MintKey(self.getCDD(), mintKey):
+                    failures.append(token)
+            else:
                 failures.append(token)
         
-        if failures: # We don't know exactly how, so give coin by coin information
+        if failures:
             details = []
-            obsolete = self.getTime() + 86400 # FIXME: hardcoded min obsolete
             for token in tokens:
                 mintKey = self.mintKeysByKeyID.get(token.key_identifier, None)
                 if not mintKey:
                     details.append('Invalid key_identifier')
                     continue
-                obsolete = max(obsolete, mintKey.token_not_after)
-                
                 if token not in failures:
                     details.append('None')
                 else:
                     details.append('Invalid token')
 
-            type = dict(options)['type'].capitalize()
-            #self.addTransaction(transaction_id, type=type, status='Rejected', added=self.getTime(),
-            #        obsolete=obsolete, response=('Token', 'See detail', details))
-            return (False, ('Token', 'See detail', details))
+            return (False, obsolete, ('Token', 'See detail', details))
 
         #and not double spent
         try:
@@ -826,14 +1033,15 @@ class Issuer(Entity):
                     reasons.append('None')
                 else:
                     raise NotImplementedError('Impossible string')
-            return (False, ('Token', 'See detail', reasons))
-            
-        return (True, None)
+            return (False, obsolete, ('Token', 'See detail', reasons))
+
+        return (True, obsolete, None)
 
     def verifyMintableBlinds(self, blindslist, options):
-        """returns a tuple of (success, failures) if the blinds in blindslist are mintable.
+        """returns a tuple of (success, obsolete, [failures|None]).
         
         success is a boolean set to true if they are mintable, otherwise false
+        obsolete is the time till obsolescence
         failures is a tuple of (type, reason, reason-detail) to return in case of a reject
         
         blindslist is a list of [ [MintKey, [blind1, blind2...]], [MintKey....]]
@@ -841,6 +1049,7 @@ class Issuer(Entity):
         
         #check the MintKeys for validity
         timeNow = self.getTime()
+        obsolete = timeNow + 86400 # FIXME: Hardcoded min obsolete
         failures = []
         for mintKey, blindlist in blindslist:
             can_mint, can_redeem = mintKey.verify_time(timeNow)
@@ -849,13 +1058,25 @@ class Issuer(Entity):
                 # between not_before and key_not_after. We may also need to do the
                 # checking of the period of time the mint can mint but the IS cannot
                 # send the key to the mint.
-                failures.append(mintKey.encodeField('key_identifier'))
+                failures.append(mintKey.key_identifier)
+            obsolete = max(obsolete, mintKey.token_not_after)
 
         if failures:
-            return (False, ('Blind', 'Invalid key_identifier', []))
+            reasons = []
+            for mintKey, blindlist in blindslist:
+                if mintKey.key_identifier not in failures:
+                    reasons.append('None')
+                else:
+                    if timeNow < mintKey.not_before:
+                        reasons.append('Key too soon')
+                    elif timeNow > mintKey.key_not_after: # TODO: Another place to put fudge time
+                        reasons.append('Key expired')
+                    else:
+                        raise NotImplementedError('We failed for no reason')
+            return (False, obsolete, ('Blind', 'See detail', reasons))
 
         else:
-            return (True, None)
+            return (True, obsolete, None)
             
     def submitMintableBlinds(self, transaction_id, blindslist, options):
         """returns a tuple of (success, [time|failures]) after submitting blinds to the mint.
@@ -895,9 +1116,10 @@ class Issuer(Entity):
             return
 
         while True:
-            tr = self.transactions.setdefault(transaction['transaction_id'], transaction)
-            if tr is not transaction:
-                raise Exception('Trying to add with an existing transaction_id')
+            transaction_id = transaction['transaction_id']
+            del transaction['transaction_id']
+            
+            self.updateTransaction(transaction_id, **transaction)
 
             try:
                 transaction = self.mint.completedTransactions.pop(0) # FIFO
@@ -948,16 +1170,33 @@ class Issuer(Entity):
             If 'status' is 'Minted':
                 All the fields of a 'Minted' of type mint
 
+        If the 'type' is 'Deleted':
+            No other fields
+
         Now, it should be easy to see than an exchange just stores some extra
         information but otherwise works exactly like minting or redeeming.
 
         """
-        pass # Not implemented yet
+        transaction = kwargs
+        transaction['type'] = type
+        transaction['status'] = status
+        transaction['added'] = added
+        transaction['obsolete'] = obsolete
+
+        transaction['lock'] = 'addTransaction'
+
+        the_transaction = self.transactions.setdefault(transaction_id, transaction)
+        if the_transaction is not transaction:
+            raise Exception('Trying to add a transaction that already exists')
+
+        del transaction['lock']
+        return
 
     def getTransaction(self, transaction_id, lockobj=None):
-        """get the signed blinds for a mint request.
-        Returns (type, value) where type is the string 'DELAY', 'REJECT',
-        or 'ACCEPT', and value is the rest of the arguments needed (delay time,
+        """Looks up the transaction and returns information for the protocol.
+
+        Returns (type, value) where type is the string 'DELAY', 'REJECT', or
+        'ACCEPT', and the value is the rest of the arguments needed (delay time,
         tuple of reject, or the signed blinds
         """
         try:
@@ -966,35 +1205,74 @@ class Issuer(Entity):
             return ('REJECT', ('Generic', 'Unknown transaction_id', ()))
 
         if not lockobj:
-            lockobj = 'getBlinds'
+            lockobj = 'getTransaction'
         lock = transaction.setdefault('lock', lockobj)
         while lock is not lockobj:
             lock = transaction.setdefault('lock', lockobj)
 
-        if transaction['status'] == 'Deleted':
+        if transaction['type'] == 'Deleted':
             # The transaction has been deleted while we were locking, so
             # we need to get the transaction again and lock that one.
             # Ensure that everyone else can find out that the transaction
             # has been deleted, and call ourselves
             del transaction['lock']
-            return self.getBlinds(transaction_id)
+            return self.getTransaction(transaction_id)
 
-        if transaction['status'] == 'Minting':
+        if transaction['status'] == 'Delayed': # Mint or Exchange
+            time = max(0, int(self.getTime() - transaction['expected']))
             del transaction['lock']
-            return ('DELAY', '10') #FIXME: the '10' is how long until it is minted. Use a real guess
+            return ('DELAY', time)
 
-        elif transaction['status'] == 'Failure':
+        elif transaction['status'] == 'Failure': # Mint or Exchange
             response = transaction['response']
             del transaction['lock']
             return ('REJECT', response)
 
-        elif transaction['status'] == 'Minted':
+        elif transaction['status'] == 'Reject': # Redeem or Exchange
+            response = transaction['response']
+            del transaction['lock']
+            return ('REJECT', response)
+
+        elif transaction['status'] == 'Minted': # Mint or Exchange
             signed_blinds = transaction['signed_blinds']
             del transaction['lock']
             return ('PASS', signed_blinds)
 
+        elif transaction['status'] == 'Accept': # Redeem
+            del transaction['lock']
+            return ('PASS', [])
+
         else:
-            raise NotImplementedError('Impossible status string')
+            raise NotImplementedError('Impossible status string: %s' % transaction['status'])
+
+    def updateTransaction(self, transaction_id, lockobj=None, **kwargs):
+        transaction = self.transactions[transaction_id]
+
+        if not lockobj:
+            lockobj = 'updateTransaction'
+        lock = transaction.setdefault('lock', lockobj)
+        while lock is not lockobj:
+            lock = transaction.setdefault('lock', lockobj)
+
+        if transaction['type'] == 'Deleted':
+            del transaction['lock']
+            return self.updateTransaction(transaction_id, kwargs)
+
+        if transaction['type'] != 'Mint' and transaction['type'] != 'Exchange':
+            del transaction['lock']
+            raise Exception('Unable to update. Wrong type: %s' % transaction['type'])
+
+        try:
+            transaction.update(kwargs)
+        except:
+            del transaction['lock']
+            raise
+
+        if transaction['status'] != 'Delayed' and 'expected' in transaction:
+            del transaction['expected']
+
+        del transaction['lock']
+
 
     def delTransaction(self, transaction_id, lockobj=None):
         """deletes a transaction."""

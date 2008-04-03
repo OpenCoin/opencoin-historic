@@ -608,24 +608,24 @@ class TransferTokenRecipient(Protocol):
     >>> malformed = copy.deepcopy(tests.coins[0][0])
     >>> malformed.signature = 'Not a valid signature'
     >>> ttr.state = ttr.start
-    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['1234', 'my account', [], [malformed.toPython()], [['type', 'redeem']]]))
-    <Message('TRANSFER_TOKEN_REJECT',['1234', 'Token', 'See detail', ['Invalid token']])>
+    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['0000', 'my account', [], [malformed.toPython()], [['type', 'redeem']]]))
+    <Message('TRANSFER_TOKEN_REJECT',['0000', 'Token', 'See detail', ['Invalid token']])>
 
     The unknown key_identifier should be rejected
     >>> malformed = copy.deepcopy(tests.coins[0][0])
     >>> malformed.key_identifier = 'Not a valid key identifier'
     >>> ttr.state = ttr.start
-    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['1234', 'my account', [], [malformed.toPython()], [['type', 'redeem']]]))
-    <Message('TRANSFER_TOKEN_REJECT',['1234', 'Token', 'See detail', ['Invalid key_identifier']])>
+    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['1111', 'my account', [], [malformed.toPython()], [['type', 'redeem']]]))
+    <Message('TRANSFER_TOKEN_REJECT',['1111', 'Token', 'See detail', ['Invalid key_identifier']])>
 
     >>> ttr.state = ttr.start
-    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['1234', 'my account', [], [coin1, coin2], [['type', 'redeem']]]))
-    <Message('TRANSFER_TOKEN_ACCEPT',['1234', []])>
+    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['2222', 'my account', [], [coin1, coin2], [['type', 'redeem']]]))
+    <Message('TRANSFER_TOKEN_ACCEPT',['2222', []])>
 
     Try to double spend. Should not work.
     >>> ttr.state = ttr.start 
-    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['1234', 'my account', [], [coin1, coin2], [['type', 'redeem']]]))
-    <Message('TRANSFER_TOKEN_REJECT',['1234', 'Token', 'See detail', ['Token already spent', 'Token already spent']])>
+    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['3333', 'my account', [], [coin1, coin2], [['type', 'redeem']]]))
+    <Message('TRANSFER_TOKEN_REJECT',['3333', 'Token', 'See detail', ['Token already spent', 'Token already spent']])>
 
     >>> blank1 = containers.CurrencyBlank().fromPython(tests.coinA.toPython(nosig=1))
     >>> blank2 = containers.CurrencyBlank().fromPython(tests.coinB.toPython(nosig=1))
@@ -635,8 +635,8 @@ class TransferTokenRecipient(Protocol):
     ...               [tests.mint_key2.encodeField('key_identifier'),[blind2]]]
 
     >>> ttr.state = ttr.start
-    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['1234', 'my account', blindslist, [], [['type', 'mint']]]))
-    <Message('TRANSFER_TOKEN_ACCEPT',['1234', ['Do0el3uxdyFMF8NdXtowBLBOxXM0r7xR9hXkaZWEhPUBQCe8yaYGO09wnxrWEVFlt0r9M6bCZxKtzNGDGw3/XQ==', 'dTnL8yTkdelG9fW//ZoKzUl7LTjBXiElaHkfyMLgVetEM7pmEzfcdfRWhm2PP3IhnkZ8CmAR1uOJ99rJ+XBASA==']])>
+    >>> ttr.state(Message('TRANSFER_TOKEN_REQUEST',['4444', 'my account', blindslist, [], [['type', 'mint']]]))
+    <Message('TRANSFER_TOKEN_ACCEPT',['4444', ['Do0el3uxdyFMF8NdXtowBLBOxXM0r7xR9hXkaZWEhPUBQCe8yaYGO09wnxrWEVFlt0r9M6bCZxKtzNGDGw3/XQ==', 'dTnL8yTkdelG9fW//ZoKzUl7LTjBXiElaHkfyMLgVetEM7pmEzfcdfRWhm2PP3IhnkZ8CmAR1uOJ99rJ+XBASA==']])>
 
     >>> ttr.state == ttr.goodbye
     True
@@ -727,6 +727,7 @@ class TransferTokenRecipient(Protocol):
             except TypeError:
                 return ProtocolErrorMessage('TTRq')
 
+            #convert coins
             if not isinstance(coins, types.ListType):
                 return ProtocolErrorMessage('TTRq')
             
@@ -734,7 +735,6 @@ class TransferTokenRecipient(Protocol):
                 if not isinstance(coin, types.ListType):
                     return ProtocolErrorMessage('TTRq')
 
-            #convert coins
             try:
                 coins = [containers.CurrencyCoin().fromPython(c) for c in coins]
             except TypeError:
@@ -762,152 +762,21 @@ class TransferTokenRecipient(Protocol):
             # FIXME: check to make sure we don't have the same key twice
             options = dict(options_list)
 
-            if 'type' not in options:
-                return Message('TRANSFER_TOKEN_REJECT', 'Options', 'Reject', [])
-            
-            # Start doing things
-            if options['type'] == 'redeem':
-
-                success, failures = self.issuer.redeemTokens(transaction_id, coins, options)
-                
-                if not success:
-                    type, reason, reason_detail = failures
-                    return Message('TRANSFER_TOKEN_REJECT', [encoded_transaction_id, type, reason, reason_detail])
-                    
-                # XXX transmit funds
-                if not self.issuer.transferToTarget(target,coins):
-                    self.issuer.dsdb.unlock(transaction_id)
-                    return ProtocolErrorMessage('TTRq')
-
-                #register them as spent
-                try:
-                    self.issuer.dsdb.spend(transaction_id, coins)
-                except LockingError, e: 
-                    #Note: if we fail here, that means we have large problems, since the coins are locked
-                    return ProtocolErrorMessage('TTRq')
-
-                return Message('TRANSFER_TOKEN_ACCEPT',[encoded_transaction_id, []])
-
-
-            # exchange uses basically mint and redeem (or a modified form thereof)
-            # XXX refactor to not have duplicate code
-            
-            elif options['type'] == 'mint':
-
-                #check that we have the keys
-                blinds = [[self.issuer.keyids[keyid], blinds] for keyid, blinds in blindslist]
-
-                success, failures = self.issuer.verifyMintableBlinds(blinds, options)
-                
-                if not success:
-                    type, reason, reason_detail = failures
-                    return Message('TRANSFER_TOKEN_REJECT', [encoded_transaction_id, type, reason, reason_detail])
-
-                #check target
-                if not self.issuer.debitTarget(target,blindslist):
-                    return ProtocolErrorMessage('TTRq')
-
-                success, additional = self.issuer.submitMintableBlinds(transaction_id, blinds, options)
-                if not success:
-                    failures = additional
-                    type, reason, reason_detail = failures
-                    return Message('TRANSFER_TOKEN_REJECT', [encoded_transaction_id, type, reason, reason_detail])
-
-                delay = additional
-                # FIXME: If we can only send a delay, the only useful logic is in the if
-                if delay != '0':
-                    return Message('TRANSFER_TOKEN_DELAY', [encoded_transaction_id, str(delay)])
-                    
-                else:
-                    response, additional = self.issuer.resumeTransaction(transaction_id)
-                    if response == 'PASS':
-                        signed_blinds = additional
-                        return Message('TRANSFER_TOKEN_ACCEPT', [encoded_transaction_id, signed_blinds])
-                    elif response == 'REJECT':
-                        failures = additional
-                        type, reason, reason_detail = failures
-                        return Message('TRANSFER_TOKEN_REJECT', [encoded_transaction_id, type, reason, reason_detail])
-                    elif response == 'DELAY':
-                        time = additional
-                        return Message('TRANSFER_TOKEN_DELAY', [encoded_transaction_id, time])
-                    else:
-                        raise NotImplementedError('Got an impossible response')
-                    
-            elif options['type'] == 'exchange':
-
-                # check tokens
-                success, failures = self.issuer.redeemTokens(transaction_id, coins, options)
-                if not success:
-                    type, reason, reason_detail = failures
-                    return Message('TRANSFER_TOKEN_REJECT', [encoded_transaction_id, type, reason, reason_detail])
-                                    
-                # And onto the blinds
-
-                #check that we have the keys
-                blinds = [[self.issuer.keyids[keyid], blinds] for keyid, blinds in blindslist]
-
-                #check target
-                if not self.issuer.debitTarget(target,blindslist):
-                    self.issuer.dsdb.unlock(transaction_id)
-                    return ProtocolErrorMessage('TTRq')
-
-                # check mintifyable blinds
-                success, failures = self.issuer.verifyMintableBlinds(blinds, options)
-                
-                if not success:
-                    type, reason, reason_detail = failures
-                    return Message('TRANSFER_TOKEN_REJECT', [encoded_transaction_id, type, reason, reason_detail])
-
-                # Make sure that we have the same amount of coins as mintings
-                total = 0
-                for b in blinds:
-                    total += int(b[0].denomination) * len(b[1])
-
-                if total != sum(coins):
-                    self.issuer.dsdb.unlock(transaction_id)
-                    return Message('TRANSFER_TOKEN_REJECT', [encoded_transaction_id, 'Generic', 'Rejected', []])
-
-                # FIXME: This code implements the 'mark as spent if we send a delay'
-                #        method of handling delayed minting and any problems. However
-                # FIXME  we have not implemented the solution, allowing reminting with
-                #        the value of the money stored.
-
-                success, additional = self.issuer.submitMintableBlinds(transaction_id, blinds, options)
-                if not success:
-                    self.issuer.dsdb.unlock(transaction_id)
-                    failures = additional
-                    type, reason, reason_detail = failures
-                    return Message('TRANSFER_TOKEN_REJECT', [encoded_transaction_id, type, reason, reason_detail])
-
-                delay = additional
-                # FIXME: If we can only send a delay, the only useful logic is in the if
-                if delay != '0':
-                    self.issuer.dsdb.spend(transaction_id,coins)
-                    return Message('TRANSFER_TOKEN_DELAY', [encoded_transaction_id, str(delay)])
-                    
-                else:
-                    response, additional = self.issuer.resumeTransaction(transaction_id)
-                    if response == 'PASS':
-                        signed_blinds = additional
-                        self.issuer.dsdb.spend(transaction_id,coins)
-                        return Message('TRANSFER_TOKEN_ACCEPT', [encoded_transaction_id, signed_blinds])
-                    elif response == 'REJECT':
-                        self.issuer.dsdb.unlock(transaction_id)
-                        failures = additional
-                        type, reason, reason_detail = failures
-                        return Message('TRANSFER_TOKEN_REJECT', [encoded_transaction_id, type, reason, reason_detail])
-                    elif response == 'DELAY':
-                        time = additional
-                        self.issuer.dsdb.spend(transaction_id,coins)
-                        return Message('TRANSFER_TOKEN_DELAY', [encoded_transaction_id, time])
-                    else:
-                        raise NotImplementedError('Got an impossible response')
-
-
+            # And have the IS to all the work.
+            response, additional = self.issuer.transferTokenRequestHelper(transaction_id, target,
+                                                                    blindslist, coins, options)
+            if response == 'ACCEPT':
+                signed_blinds = additional
+                return Message('TRANSFER_TOKEN_ACCEPT', [encoded_transaction_id, signed_blinds])
+            elif response == 'REJECT':
+                failures = additional
+                type, reason, reason_detail = failures
+                return Message('TRANSFER_TOKEN_REJECT', [encoded_transaction_id, type, reason, reason_detail])
+            elif response == 'DELAY':
+                time = additional
+                return Message('TRANSFER_TOKEN_DELAY', [encoded_transaction_id, time])
             else:
-                #FIXME: This could rightfully be a PROTOCOL_ERROR, since we don't have a 'type' that we like.
-                # -or- maybe we should check to see if we set it, and if we didn't then do a PROTOCOL_ERROR
-                return Message('TRANSFER_TOKEN_REJECT', ['Option', 'Rejected', []])
+                raise NotImplementedError('Got an impossible response')
 
         elif message.type == 'TRANSFER_TOKEN_RESUME':
             encoded_transaction_id = message.data
