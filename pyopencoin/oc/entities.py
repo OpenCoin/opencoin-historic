@@ -1442,6 +1442,7 @@ class Mint:
         """Go through self.waitingTransactions and mint them all. Thread safe.
         
         >>> m = Mint()
+        >>> import tests
         >>> realPerformMinting = m.performMinting
         >>> m.performMinting = lambda: None # Make into noop for now
         >>> m.getTime = lambda: 15180
@@ -1473,6 +1474,63 @@ class Mint:
         >>> m.completedTransactions
         [{'status': 'Minted', 'added': 15180, 'completed': 15182, 'signed_blinds': [], 'transaction_id': 'abcd'}, {'status': 'Minted', 'added': 15181, 'completed': 15182, 'signed_blinds': [], 'transaction_id': 'efgh'}]
 
+        Okay. Now test failures
+        >>> ie = tests.makeIssuerEntity()
+        >>> m = ie.mint
+        >>> m.getTime = lambda: tests.mint_key1.not_before
+        >>> realPerformMinting = m.performMinting
+        >>> m.performMinting = lambda: None
+        >>> m.submit('abcd', [[tests.mint_key1, ['a' * (520/8)]]])
+        1199145600
+        >>> m.waitingTransactions and True
+        True
+        >>> m.completedTransactions
+        []
+        >>> realPerformMinting()
+        >>> m.completedTransactions
+        [{'status': 'Failure', 'added': 1199145600, 'completed': 1199145600, 'response': ['Blind', 'See detail', ['Unable to sign']], 'transaction_id': 'abcd'}]
+
+        Test a more complicated failure. Valid should always pass. Invalid has two failures.
+        Partial has a good key and a bad key. key_id has a key that the mint doesn't know about.
+        We make sure we only get one failure per mint_key.
+        >>> m.completedTransactions = []
+        >>> valid = [tests.mint_key1, ['a' * 40, 'b' * 40]]
+        >>> invalid = [tests.mint_key2, ['a' * (520/8), 'b' * (520/8)]]
+        >>> partial = [tests.mint_key2, ['a' * 40, 'b' * (520/8)]]
+        >>> key_id = [tests.mint_key3, ['a' * 40, 'b' * (520/8)]]
+        >>> m.submit('abcd', [valid, invalid, key_id])
+        1199145600
+        >>> realPerformMinting()
+        >>> m.completedTransactions
+        [{'status': 'Failure', 'added': 1199145600, 'completed': 1199145600, 'response': ['Blind', 'See detail', ['None', 'Unable to sign', 'Invalid key_identifier']], 'transaction_id': 'abcd'}]
+
+        Now I'm not sure if two sets with the same key_id is invalid or not.
+        I'm testing seperately for now with partial since it has the same mintkey
+        as invalid.
+        >>> m.completedTransactions = []
+        >>> m.submit('abcd', [partial, valid])
+        1199145600
+        >>> realPerformMinting()
+        >>> m.completedTransactions
+        [{'status': 'Failure', 'added': 1199145600, 'completed': 1199145600, 'response': ['Blind', 'See detail', ['Unable to sign', 'None']], 'transaction_id': 'abcd'}]
+
+        And Key too soon and Key expired
+        >>> m.completedTransactions = []
+        >>> m.getTime = lambda: tests.mint_key1.not_before - 1
+        >>> m.submit('abcd', [invalid])
+        1199145599
+        >>> realPerformMinting()
+        >>> m.completedTransactions
+        [{'status': 'Failure', 'added': 1199145599, 'completed': 1199145599, 'response': ['Blind', 'See detail', ['Key too soon']], 'transaction_id': 'abcd'}]
+
+        >>> m.completedTransactions = []
+        >>> m.getTime = lambda: tests.mint_key1.key_not_after + 1
+        >>> m.submit('abcd', [invalid])
+        1201824001
+        >>> realPerformMinting()
+        >>> m.completedTransactions
+        [{'status': 'Failure', 'added': 1201824001, 'completed': 1201824001, 'response': ['Blind', 'See detail', ['Key expired']], 'transaction_id': 'abcd'}]
+
         """
         import base64
         try:
@@ -1484,22 +1542,51 @@ class Mint:
             keys_and_blinds = transaction['kandb']
             minted = []
             for key, blinds in keys_and_blinds:
-                this_set = []
+                this_set = ['Success']
                 for blind in blinds:
-                    signature = self.signNow(key.key_identifier, blind)
+                    try:
+                        signature = self.signNow(key.key_identifier, blind)
+                    except MintError, reason:
+                        this_set = ['Failure']
+                        if reason.args[0].startswith('CryptoError'):
+                            this_set.append('Unable to sign')
+                        elif reason.args[0].startswith('KeyError'):
+                            this_set.append('Invalid key_identifier')
+                        elif reason.args[0] == 'MintKey not valid for minting':
+                            if key.not_before > self.getTime():
+                                this_set.append('Key too soon')
+                            elif key.key_not_after < self.getTime():
+                                this_set.append('Key expired')
+                            else:
+                                raise
+                                # FIXME: This is where revoked key checks would go
+                        else:
+                            raise
+                        break # Stop this key
+
                     this_set.append(base64.b64encode(signature))
 
-                minted.extend(this_set)
+                minted.append(this_set)
 
-            # Fields when delayed minting: 'expected' with the time expected
-            # Fields when there is an error: 'response' with the full response
-            #    (if the IS delivers a less detailed response, that will be
-            #     handled by the IS, not the mint)
-
-            transaction['status'] = 'Minted'
-            transaction['signed_blinds'] = minted
-            transaction['completed'] = self.getTime()
-            del transaction['kandb']
+            if 'Failure' not in [k[0] for k in minted]:
+                signed = []
+                for k in minted:
+                    signed.extend(k[1:])
+                transaction['status'] = 'Minted'
+                transaction['signed_blinds'] = signed
+                transaction['completed'] = self.getTime()
+                del transaction['kandb']
+            else:
+                details = []
+                for m in minted:
+                    if m[0] == 'Success':
+                        details.append('None')
+                    else:
+                        details.append(m[1])
+                transaction['status'] = 'Failure'
+                transaction['response'] = ['Blind', 'See detail', details]
+                transaction['completed'] = self.getTime()
+                del transaction['kandb']
 
             self.completedTransactions.append(transaction)
 
