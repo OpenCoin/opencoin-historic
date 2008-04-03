@@ -649,6 +649,9 @@ class Issuer(Entity):
             if k in key_not_after:
                 response.append(k)
 
+        if not response: # No denominations found valid at that time
+            raise KeyFetchError
+
         return response
     
     def getKeyById(self,keyid):
@@ -712,6 +715,9 @@ class Issuer(Entity):
         >>> import transports, tests, base64
         >>> tid = base64.b64encode('foobar')
         >>> ie = tests.makeIssuerEntity()
+        >>> import calendar
+        >>> ie.getTime = lambda: calendar.timegm((2008,01,31,0,0,0)) 
+        >>> ie.issuer.getTime = ie.mint.getTime = ie.dsdb.getTime = ie.getTime
         >>> stt = transports.SimpleTestTransport()
         >>> ie.issuer.listen(stt)
         >>> stt.send('HANDSHAKE',[['protocol', 'opencoin 1.0']])

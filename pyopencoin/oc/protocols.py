@@ -1105,17 +1105,41 @@ class giveMintKeyProtocol(Protocol):
     >>> from entities import IssuerEntity
     >>> ie = IssuerEntity()
     >>> ie.createMasterKey(keylength=512)
-    >>> ie.makeCDD(currency_identifier='http://opencent.net/OpenCent2', denominations=['1', '2'],
+    >>> ie.makeCDD(currency_identifier='http://opencent.net/OpenCent2', denominations=['1', '2', '5'],
     ...            short_currency_identifier='OC', options=[['version', '0']],
     ...            issuer_service_location='here')
     >>> ie.issuer.setCurrentCDDVersion('0')
     >>> ie.issuer.getTime = lambda: 750
-    >>> now = 500; later = 1000; much_later = 2000
+    >>> now = 500; later = 1000; much_later = 2000; much_much_later = 3000
     >>> pub1 = ie.createSignedMintKey('1', now, later, much_later)
+    >>> pub2 = ie.createSignedMintKey('1', later, much_later, much_much_later)
+    >>> pub3 = ie.createSignedMintKey('5', now, later, much_later)
     >>> gmp = giveMintKeyProtocol(ie.issuer)
     
     >>> gmp.state(Message('MINT_KEY_FETCH_DENOMINATION',[['1'], '0']))
-    <Message('MINT_KEY_PASS',[[('key_identifier', '...'), ('currency_identifier', 'http://opencent.net/OpenCent2'), ('denomination', '1'), ('not_before', '...T...Z'), ('key_not_after', '...T...Z'), ('token_not_after', '...T...Z'), ('public_key', '...,...'), ['signature', [('keyprint', '...'), ('signature', '...')]]]])>
+    <Message('MINT_KEY_PASS',[[('key_identifier'...('denomination', '1'), ('not_before', '1970-01-01T00:08:20Z')...')]]]])>
+
+    >>> ie.issuer.getTime = lambda: 1500
+    >>> gmp.newState(gmp.start)
+    >>> gmp.state(Message('MINT_KEY_FETCH_DENOMINATION',[['1'], '0']))
+    <Message('MINT_KEY_PASS',[[('key_identifier'...('denomination', '1'), ('not_before', '1970-01-01T00:16:40Z')...')]]]])>
+
+    >>> ie.issuer.getTime = lambda: 1000
+    >>> gmp.newState(gmp.start)
+    >>> gmp.state(Message('MINT_KEY_FETCH_DENOMINATION',[['1'], '0']))
+    <Message('MINT_KEY_PASS',[[('key_identifier'...('denomination', '1'), ('not_before', '1970-01-01T00:08:20Z')...')]]], [('key_identifier'...('denomination', '1'), ('not_before', '1970-01-01T00:16:40Z')...')]]]])>
+
+    Get two keys valid at time 750
+    >>> ie.issuer.getTime = lambda: 750
+    >>> gmp.newState(gmp.start)
+    >>> gmp.state(Message('MINT_KEY_FETCH_DENOMINATION',[['1', '5'], '0']))
+    <Message('MINT_KEY_PASS',[[('key_identifier'...('denomination', '1'), ('not_before', '1970-01-01T00:08:20Z')...')]]], [('key_identifier'...('denomination', '5'), ('not_before', '1970-01-01T00:08:20Z')...')]]]])>
+
+    Try to get keys from two denominations, but we only have one.
+    >>> ie.issuer.getTime = lambda: 1500
+    >>> gmp.newState(gmp.start)
+    >>> gmp.state(Message('MINT_KEY_FETCH_DENOMINATION',[['1', '5'], '0']))
+    <Message('MINT_KEY_FAILURE',[['5', 'Unknown denomination']])>
 
     >>> gmp.newState(gmp.start)
     >>> gmp.state(Message('MINT_KEY_FETCH_KEYID',[pub1.encodeField('key_identifier')]))
