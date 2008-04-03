@@ -359,7 +359,6 @@ class Wallet(Entity):
         
         elif type == 'exchange':
             if protocol.result == 1: # If set, we got a TRANSFER_TOKEN_ACCEPT
-                1/0
                 self.addTransferBlanks(protocol.transaction_id, blanks)
                 self.finishTransfer(protocol.transaction_id, protocol.blinds)
             elif protocol.result == 2: # If set, we got a TRANSFER_TOKEN_DELAY
@@ -634,12 +633,23 @@ class Issuer(Entity):
 
         self.keyids = self.mintKeysByKeyID
 
-    def getKeyByDenomination(self,denomination,time):
-        #FIXME: the time argument is supposed to get all the keys at a certain time
+    def getKeyByDenomination(self, denomination, time):
+        #FIXME: Is this supposed to return the mint keys valid for minting at a certain time?
         try:
-            return self.mintKeysByDenomination.get(denomination,[])[-1]
-        except (KeyError, IndexError):            
+            keys = self.mintKeysByDenomination[denomination]
+        except KeyError:
             raise KeyFetchError
+
+        not_before = [k for k in keys if time >= k.not_before]
+        key_not_after = [k for k in keys if time <= k.key_not_after]
+
+        # If we were python2.4+, we could use sets and take the intersection
+        response = []
+        for k in not_before:
+            if k in key_not_after:
+                response.append(k)
+
+        return response
     
     def getKeyById(self,keyid):
         try:

@@ -28,9 +28,10 @@ Server <Message('GOODBYE',None)>
 
 Now, lets have a key
 
->>> now = 0; later = 1; much_later = 2
+>>> now = 500; later = 1000; much_later = 2000
 >>> pub1 = ie.createSignedMintKey('1', now, later, much_later)
 >>> t = ClientTest(ie.issuer.listen)
+>>> ie.issuer.getTime = lambda: 750
 >>> walletA.fetchMintKey(t,denominations=['1'])
 Client <Message('HANDSHAKE',[['protocol', 'opencoin 1.0']])>
 Server <Message('HANDSHAKE_ACCEPT',[['protocol', 'opencoin 1.0'], ['cdd_version', '0']])>

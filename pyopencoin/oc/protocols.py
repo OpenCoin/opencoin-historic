@@ -1109,7 +1109,8 @@ class giveMintKeyProtocol(Protocol):
     ...            short_currency_identifier='OC', options=[['version', '0']],
     ...            issuer_service_location='here')
     >>> ie.issuer.setCurrentCDDVersion('0')
-    >>> now = 0; later = 1; much_later = 2
+    >>> ie.issuer.getTime = lambda: 750
+    >>> now = 500; later = 1000; much_later = 2000
     >>> pub1 = ie.createSignedMintKey('1', now, later, much_later)
     >>> gmp = giveMintKeyProtocol(ie.issuer)
     
@@ -1166,7 +1167,6 @@ class giveMintKeyProtocol(Protocol):
             if not isinstance(time, types.StringType):
                 return ProtocolErrorMessage('MKFD')
 
-
             if time == '0':
                 time = self.issuer.getTime()
             else:
@@ -1181,6 +1181,12 @@ class giveMintKeyProtocol(Protocol):
                     keys.append(key)
                 except KeyFetchError: 
                     errors.append([denomination, 'Unknown denomination'])
+
+            if not errors: # flatten the keys
+                flat = []
+                for denomination in keys:
+                    flat.extend(denomination)
+                keys = flat
         
         elif message.type == 'MINT_KEY_FETCH_KEYID':                
 
