@@ -727,13 +727,13 @@ class Issuer(Entity):
         <Message('TRANSFER_TOKEN_ACCEPT',['Zm9vYmFy', []])>
 
         >>> stt.send('MINT_KEY_FETCH_DENOMINATION',[['1'], '0'])
-        <Message('MINT_KEY_PASS',[...])>
+        <Message('MINT_KEY_PASS',[...]])>
 
         >>> stt.send('MINT_KEY_FETCH_KEYID', [tests.mint_key1.encodeField('key_identifier')])
-        <Message('MINT_KEY_PASS',[...])>
+        <Message('MINT_KEY_PASS',[...]])>
 
         >>> stt.send('FETCH_CDD_REQUEST', '0')
-        <Message('FETCH_CDD_PASS',[...])>
+        <Message('FETCH_CDD_PASS',[...]])>
 
         >>> stt.send('foo')
         <Message('PROTOCOL_ERROR','send again...')>

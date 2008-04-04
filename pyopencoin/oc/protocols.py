@@ -1143,7 +1143,7 @@ class giveMintKeyProtocol(Protocol):
 
     >>> gmp.newState(gmp.start)
     >>> gmp.state(Message('MINT_KEY_FETCH_KEYID',[pub1.encodeField('key_identifier')]))
-    <Message('MINT_KEY_PASS',[...])>
+    <Message('MINT_KEY_PASS',[...]])>
 
     >>> gmp.newState(gmp.start)
     >>> gmp.state(Message('MINT_KEY_FETCH_DENOMINATION',[['2'], '0']))
