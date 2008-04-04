@@ -733,23 +733,24 @@ class Issuer(Entity):
         <Message('MINT_KEY_PASS',[...]])>
 
         >>> stt.send('FETCH_CDD_REQUEST', '0')
-        <Message('FETCH_CDD_PASS',[...]])>
+        <Message('FETCH_CDD_PASS',[...])>
 
         >>> stt.send('foo')
         <Message('PROTOCOL_ERROR','send again...')>
 
-        FIXME: There is a problem here. If we send anything other than a goodbye
-        next, we go into an infinite loop. I believe that the correct response is
-        another PROTOCOL_ERROR at this point
-        #>>> stt.send('FETCH_CDD_REQUEST', '0')
-        #<Message('FETCH_CDD_PASS',[...])>
+        >>> stt.send('FETCH_CDD_REQUEST', '0')
+        <Message('FETCH_CDD_PASS',[...])>
 
         >>> stt.send('GOODBYE')
         <Message('GOODBYE',None)>
         >>> stt.send('foobar')
         """
         if hasattr(transport, 'protocol') and transport.protocol:
+            # transport will only have protocol if we are looping on ourselves. Don't
+            # setup protocol again. Just reset the transport to use the protocol and
+            # reset the protocol itself
             transport.setProtocol(self.protocol)
+            self.protocol.newState(self.protocol.start) 
 
         else:
             protocol = protocols.answerHandshakeProtocol(handshake_options=[['cdd_version',self.getCurrentCDDVersion()]],

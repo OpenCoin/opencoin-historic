@@ -48,8 +48,8 @@ class Protocol:
             #FIXME: Setting a blank message to goodbye forces a GOODBYE message to be sent automatically
             message = Message('GOODBYE')
         #we are not done
-        if not self.done:                       
-            #maybe we need to reset?                
+        if not self.done:
+            #maybe we need to reset?
             if message.type != 'GOODBYE' and hasattr(self, 'transport') and hasattr(self.transport, 'autoreset'):
                 self.transport.autoreset(self.transport)
                 return self.transport.protocol.state(message)
@@ -70,7 +70,7 @@ class Protocol:
     def newState(self,method):
         self.state = method
         
-    def initiateHandshake(self,message):   
+    def initiateHandshake(self,message):
         self.newState(self.verifyHandshake)
         return Message('HANDSHAKE',[['protocol', 'opencoin 1.0']])
 
@@ -175,9 +175,6 @@ class answerHandshakeProtocol(Protocol):
         try:
             nextprotocol = self.mapping[message.type](self.arguments)
         except KeyError:
-            self.newState(self.goodbye)
-            return ProtocolErrorMessage('aHP')
-        except AttributeError:
             self.newState(self.goodbye)
             return ProtocolErrorMessage('aHP')
 
