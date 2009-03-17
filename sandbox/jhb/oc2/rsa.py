@@ -1,0 +1,635 @@
+"""RSA module
+
+!!! This is just a playground, for understanding some bits and pieces,
+this is not at all the production code!!!
+
+
+
+Module for calculating large primes, and RSA encryption, decryption,
+signing and verification. Includes generating public and private keys.
+"""
+
+__author__ = "Sybren Stuvel, Marloes de Boer and Ivo Tamboer"
+__date__ = "2004-11-17"
+
+# NOTE: Python's modulo can return negative numbers. We compensate for
+# this behaviour using the abs() function
+
+import math
+import sys
+import random    # For picking semi-random numbers
+import types
+from pickle import dumps, loads
+import base64
+import zlib
+
+RANDOM_DEV="/dev/urandom"
+testing = False
+has_broken_randint = False
+
+try:
+    #random.randint(1, 10000000000000000000000000L)
+    1+1
+    pass
+except:
+    has_broken_randint = True
+    print "This system's random.randint() can't handle large numbers"
+    print "Random integers will all be read from %s" % RANDOM_DEV
+
+
+def log(x, base = 10):
+    return math.log(x) / math.log(base)
+
+def gcd(a,b):
+    a, b = max(a,b), min(a,b)
+    while b:
+        a, b = b, a % b
+    return a
+
+def gcd_old(p, q):
+    """Returns the greatest common divisor of p and q
+
+
+    >>> gcd(42, 6)
+    6
+    """
+    if p<q: return gcd(q, p)
+    if q == 0: return p
+    return gcd(q, abs(p%q))
+
+def bytes2int(bytes):
+    """Converts a list of bytes or a string to an integer
+
+    >>> (128*256 + 64)*256 + + 15
+    8405007
+    >>> l = [128, 64, 15]
+    >>> bytes2int(l)
+    8405007
+    """
+
+    #if not (type(bytes) is types.ListType or type(bytes) is types.StringType):
+    #    raise TypeError("You must pass a string or a list")
+
+    # Convert byte stream to integer
+    integer = 0
+    for byte in bytes:
+        integer *= 256
+        if type(byte) is types.StringType: byte = ord(byte)
+        integer += byte
+
+    return integer
+
+def int2bytes(number):
+    """Converts a number to a string of bytes
+    
+    >>> bytes2int(int2bytes(123456789))
+    123456789
+    """
+
+    if not (type(number) is types.LongType or type(number) is types.IntType):
+        raise TypeError("You must pass a long or an int")
+
+    string = ""
+
+    while number > 0:
+        string = "%s%s" % (chr(number & 0xFF), string)
+        number /= 256
+    
+    return string
+
+
+def read_random_int(nbits):
+    """Reads a random integer from RANDOM_DEV of approximately nbits
+    bits rounded up to whole bytes"""
+    #print nbits    
+    nbytes  = ceil(nbits/8)
+    
+    bytes = []
+    for i in range(nbytes):
+        bytes.append(random.randint(0,255))        
+    return bytes2int(bytes)
+
+    if len(randomdata) != nbytes:
+        raise Exception("Unable to read enough random bytes")
+
+    return bytes2int(randomdata)
+
+def ceil(x):
+    """Returns int(math.ceil(x))"""
+
+    return int(math.ceil(x))
+    
+def randint(minvalue, maxvalue):
+    """Returns a random integer x with minvalue <= x <= maxvalue"""
+    # Safety - get a lot of random data even if the range is fairly
+    # small
+    min_nbits  = 32
+
+    # The range of the random numbers we need to generate
+    range      = maxvalue - minvalue
+
+    # Which is this number of bytes
+    rangebytes = ceil(log(range, 2) / 8)
+
+    # Convert to bits, but make sure it's always at least min_nbits*2
+    rangebits  = max(rangebytes * 8, min_nbits * 2)
+    
+    # Take a random number of bits between min_nbits and rangebits
+    nbits      = random.randint(min_nbits, rangebits)
+    
+    return (read_random_int(nbits) % range) + minvalue
+
+def fermat_little_theorem(p):
+    """Returns 1 if p may be prime, and something else if p definitely
+    is not prime"""
+
+    a = randint(1, p-1)
+    return fast_exponentiation(a, p-1, p)
+
+def jacobi(a, b):
+    """Calculates the value of the Jacobi symbol (a/b)
+    """
+
+    if a == 0: return 0
+    if a == 1: return 1
+
+    if a % 2 == 0:
+        if (b**2-1)/8 % 2 == 0:
+            return jacobi(a/2, b)
+        return -jacobi(a/2, b)
+    
+    if (a-1) * (b-1) / 4 % 2 == 0:
+        return jacobi(b % a, a)
+
+    return -jacobi(b % a, a)
+
+def jacobi_witness(x, n):
+    """Returns False if n is an Euler pseudo-prime with base x, and
+    True otherwise.
+    """
+
+    j = jacobi(x, n) % n
+    f = fast_exponentiation(x, (n-1)/2, n)
+
+    if j == f: return False
+    return True
+
+def randomized_primality_testing(n, k):
+    """Calculates whether n is composite (which is always correct) or
+    prime (which is incorrect with error probability 2**-k)
+
+    Returns False if the number if composite, and True if it's
+    probably prime.
+    """
+
+    q = 0.5        # Property of the jacobi_witness function
+
+    # t = int(math.ceil(k / log(1/q, 2)))
+    t = ceil(k / log(1/q, 2))
+    for i in range(t+1):
+        x = randint(1, n-1)
+        if jacobi_witness(x, n): return False
+    
+    return True
+
+def is_prime(number):
+    """Returns True if the number is prime, and False otherwise.
+
+    >>> is_prime(42)
+    0
+    >>> is_prime(41)
+    1
+    """
+
+    """
+    if not fermat_little_theorem(number) == 1:
+        # Not prime, according to Fermat's little theorem
+        return False
+    """
+
+    if randomized_primality_testing(number, 5):
+        # Prime, according to Jacobi
+        return True
+    
+    # Not prime
+    return False
+
+    
+def getprime(nbits):
+    """Returns a prime number of max. 'math.ceil(nbits/8)*8' bits. In
+    other words: nbits is rounded up to whole bytes.
+
+    >>> p = getprime(8)
+    >>> is_prime(p-1)
+    0
+    >>> is_prime(p)
+    1
+    >>> is_prime(p+1)
+    0
+    """
+
+    nbytes  = int(math.ceil(nbits/8))
+
+    while True:
+        integer = read_random_int(nbits)
+
+        # Make sure it's odd
+        integer |= 1
+
+        # Test for primeness
+        if is_prime(integer): break
+
+        # Retry if not prime
+
+    return integer
+
+def are_relatively_prime(a, b):
+    """Returns True if a and b are relatively prime, and False if they
+    are not.
+
+    >>> are_relatively_prime(2, 3)
+    1
+    >>> are_relatively_prime(2, 4)
+    0
+    """
+
+    d = gcd(a, b)
+    return (d == 1)
+
+def find_p_q(nbits):
+    """Returns a tuple of two different primes of nbits bits"""
+
+    print 'finding p'
+    p = getprime(nbits)
+    while True:
+        print 'finding q'
+        q = getprime(nbits)
+        if not q == p: break
+    
+    return (p, q)
+
+def extended_euclid_gcd(a, b):
+    """Returns a tuple (d, i, j) such that d = gcd(a, b) = ia + jb
+    """
+
+    if b == 0:
+        return (a, 1, 0)
+
+    q = abs(a % b)
+    r = long(a / b)
+    (d, k, l) = extended_euclid_gcd(b, q)
+
+    return (d, l, k - l*r)
+
+# Main function: calculate encryption and decryption keys
+def calculate_keys(p, q, nbits):
+    """Calculates an encryption and a decryption key for p and q, and
+    returns them as a tuple (e, d)"""
+
+    n     = p * q
+    phi_n = (p-1) * (q-1)
+
+    while True:
+        print 'c'
+        # Make sure e has enough bits so we ensure "wrapping" through
+        # modulo n
+        e = getprime(max(8, nbits/2))
+        if are_relatively_prime(e, n) and are_relatively_prime(e, phi_n): break
+
+    (d, i, j) = extended_euclid_gcd(e, phi_n)
+
+    if not d == 1:
+        raise Exception("e (%d) and phi_n (%d) are not relatively prime" % (e, phi_n))
+
+    if not (e * i) % phi_n == 1:
+        raise Exception("e (%d) and i (%d) are not mult. inv. modulo phi_n (%d)" % (e, i, phi_n))
+
+    return (e, i)
+
+
+def gen_keys(nbits):
+    """Generate RSA keys of nbits bits. Returns (p, q, e, d).
+    """
+
+    while True:
+        print 'find'
+        (p, q) = find_p_q(nbits)
+        print 'calculate'
+        (e, d) = calculate_keys(p, q, nbits)
+
+        # For some reason, d is sometimes negative. We don't know how
+        # to fix it (yet), so we keep trying until everything is shiny
+        if d > 0: break
+
+    return (p, q, e, d)
+
+def gen_pubpriv_keys(nbits):
+    """Generates public and private keys, and returns them as (pub,
+    priv).
+
+    The public key consists of a dict {e: ..., , n: ....). The private
+    key consists of a dict {d: ...., p: ...., q: ....).
+    """
+    
+    (p, q, e, d) = gen_keys(nbits)
+
+    return ( {'e': e, 'n': p*q}, {'d': d, 'p': p, 'q': q} )
+
+def encrypt_int(message, ekey, n):
+    """Encrypts a message using encryption key 'ekey', working modulo
+    n"""
+
+    if type(message) is types.IntType:
+        return encrypt_int(long(message), ekey, n)
+
+    if not type(message) is types.LongType:
+        raise TypeError("You must pass a long or an int")
+
+    #if math.floor(log(message, 2)) > math.floor(log(n, 2)):
+    #    raise OverflowError("The message is too long")
+
+    return fast_exponentiation(message, ekey, n)
+
+def decrypt_int(cyphertext, dkey, n):
+    """Decrypts a cypher text using the decryption key 'dkey', working
+    modulo n"""
+
+    return encrypt_int(cyphertext, dkey, n)
+
+def sign_int(message, dkey, n):
+    """Signs 'message' using key 'dkey', working modulo n"""
+
+    return decrypt_int(message, dkey, n)
+
+def verify_int(signed, ekey, n):
+    """verifies 'signed' using key 'ekey', working modulo n"""
+
+    return encrypt_int(signed, ekey, n)
+
+def blinding_int(m,secret,n):
+    return (m * secret) % n
+
+    
+
+def picklechops(chops):
+    """Pickles and base64encodes it's argument chops"""
+
+    value   = zlib.compress(dumps(chops))
+    encoded = base64.encodestring(value)
+    return encoded.strip()
+
+def unpicklechops(string):
+    """base64decodes and unpickes it's argument string into chops"""
+
+    return loads(zlib.decompress(base64.decodestring(string)))
+
+def chopstring(message, key, n, funcref):
+    """Splits 'message' into chops that are at most as long as n,
+    converts these into integers, and calls funcref(integer, key, n)
+    for each chop.
+
+    Used by 'encrypt' and 'sign'.
+    """
+
+    msglen = len(message)
+    mbits  = msglen * 8
+    #nbits  = int(math.floor(log(n, 2)))
+    nbits = 1024
+    nbytes = nbits / 8
+    blocks = msglen / nbytes
+
+    if msglen % nbytes > 0:
+        blocks += 1
+
+    cypher = []
+    
+    for bindex in range(blocks):
+        offset = bindex * nbytes
+        block  = message[offset:offset+nbytes]
+        value  = bytes2int(block)
+        cypher.append(funcref(value, key, n))
+
+    #return picklechops(cypher)
+    return cypher[0]
+
+def gluechops(chops, key, n, funcref):
+    """Glues chops back together into a string.  calls
+    funcref(integer, key, n) for each chop.
+
+    Used by 'decrypt' and 'verify'.
+    """
+    message = ""
+    chops = [chops]
+    #chops = unpicklechops(chops)
+    
+    for cpart in chops:
+        mpart = funcref(cpart, key, n)
+        message += int2bytes(mpart)
+    
+    return message
+
+def encrypt(message, key):
+    """Encrypts a string 'message' with the public key 'key'"""
+    
+    return chopstring(message, key['e'], key['n'], encrypt_int)
+
+def sign(message, key):
+    """Signs a string 'message' with the private key 'key'"""
+    
+    return chopstring(message, key['d'], key['p']*key['q'], decrypt_int)
+
+def decrypt(cypher, key):
+    """Decrypts a cypher with the private key 'key'"""
+
+    return gluechops(cypher, key['d'], key['p']*key['q'], decrypt_int)
+
+def verify(cypher, key):
+    """Verifies a cypher with the public key 'key'"""
+
+    return gluechops(cypher, key['e'], key['n'], encrypt_int)
+
+def blind(message,secret,key):
+    return chopstring(message,secret,key['n'],blinding_int)
+
+def unblind(message,secret,key):
+    return gluechops(message,secret,key['n'],blinding_int)
+
+
+#import math
+
+def bits(integer): #Gets number of bits in integer
+   result = 0
+   while integer:
+      integer >>= 1
+      result += 1
+   return result
+
+
+def invMod(a, b):
+    c, d = a, b
+    uc, ud = 1, 0
+    while c != 0:
+        #This will break when python division changes, but we can't use //
+        #cause of Jython
+        q = d / c
+        c, d = d-(q*c), c
+        uc, ud = ud - (q * uc), uc
+    if d == 1:
+        return ud % b
+    return 0
+
+def powMod(base, power, modulus):
+    nBitScan = 5
+
+    """ Return base**power mod modulus, using multi bit scanning
+    with nBitScan bits at a time."""
+
+    #TREV - Added support for negative exponents
+    negativeResult = False
+    if (power < 0):
+        power *= -1
+        negativeResult = True
+
+    exp2 = 2**nBitScan
+    mask = exp2 - 1
+
+    # Break power into a list of digits of nBitScan bits.
+    # The list is recursive so easy to read in reverse direction.
+    nibbles = None
+    while power:
+        nibbles = int(power & mask), nibbles
+        power = power >> nBitScan
+
+    # Make a table of powers of base up to 2**nBitScan - 1
+    lowPowers = [1]
+    for i in xrange(1, exp2):
+        lowPowers.append((lowPowers[i-1] * base) % modulus)
+
+    # To exponentiate by the first nibble, look it up in the table
+    nib, nibbles = nibbles
+    prod = lowPowers[nib]
+
+    # For the rest, square nBitScan times, then multiply by
+    # base^nibble
+    while nibbles:
+        nib, nibbles = nibbles
+        for i in xrange(nBitScan):
+            prod = (prod * prod) % modulus
+        if nib: prod = (prod * lowPowers[nib]) % modulus
+
+    #TREV - Added support for negative exponents
+    if negativeResult:
+        prodInv = invMod(prod, modulus)
+        #Check to make sure the inverse is correct
+        if (prod * prodInv) % modulus != 1:
+            raise AssertionError()
+        return prodInv
+    return prod
+
+
+def getUnblinder(n):
+    while 1:
+        r = randint(0,n) 
+        if  are_relatively_prime(r,n):
+            break
+    return r            
+
+
+
+
+
+
+
+
+
+
+fast_exponentiation = pow
+
+
+
+
+
+
+
+# Do doctest if we're not imported
+if __name__ == "__main__":
+    if 1:
+        import time
+        #(pub,priv) =  gen_pubpriv_keys(512)
+        pub = {'e': 59343568823711559206614914329434374961303042335788099534897501357955675804133L, 
+               'n': 32793647770017443581051908007908006621376604150499221366839445678176407494654130256572721798731647281073382247358431120858829497973290288823842062554766872356043862368004460824686561544242774370448685624290963022007959843337482265073763255429596031300239158232169931316001844162136279539357507455710562227577L}
+        priv = {'q': 3660876769483489857077409618418989781902917148342703560038011826242773069902176126219730148875372119227365538620396693688963051979724315365417720940740849L, 
+                'p': 8957867154497055858370988090953024497950216741166048812169220114248696092230327733254526217831517389137130597830562133311139440841609128753512364848094473L, 
+                'd': 12619589565384678078150569778102981741046267149118420445896125941979396328586657133712760591528167393457329828435758755256948329844592838106750783634900284025380032774546264335257012829516042607077111098646252442031819834114954318384114125879377117610343879752299012777002244350133926279173002674800640331117L}
+        if 0:
+            #full
+            t = time.time()
+            message = 'serial '*5
+            #print 'cleartext ', message
+            cypher = encrypt(message,pub)
+            #print 'cyphertext: ',cypher
+            #print 'decrypted', decrypt(cypher,priv)
+            decrypt(cypher,priv)
+            signed = sign(message,priv)
+            #print 'signed', signed
+            #print 'verified', message == verify(signed,pub)
+            unblinder = getUnblinder(pub['n'])
+            blinder = pow(invMod(unblinder, pub['n']), pub['e'],pub['n'])
+            blinded = blind(message,blinder,pub)
+            #print 'blinded', blinded
+            #signedblind = sign(blinded,priv)
+            signedblind = encrypt_int(blinded, priv['d'], priv['p']*priv['q'])
+            #print 'signedblind', signedblind
+            #unblinded = unblind(signedblind,unblinder,pub)
+            unblinded = (signedblind * unblinder) % pub['n']
+            #print 'unblinded', unblinded
+            #print 'verified', message == verify(unblinded,pub)
+            print time.time() - t
+            
+            
+            print '=' * 40
+            #no blinding
+            t = time.time()
+            message = 'serial '*5
+            #print 'cleartext ', message
+            cypher = encrypt(message,pub)
+            #print 'cyphertext: ',cypher
+            #print 'decrypted', decrypt(cypher,priv)
+            decrypt(cypher,priv)
+            signed = sign(message,priv)
+            #print 'signed', signed
+            #print 'verified', message == verify(signed,pub)
+            print time.time() - t 
+
+      
+        print '=' * 40
+        times = []
+        #blinding
+        t = time.time()
+        message = 'serial '*10
+        #print 'cleartext ', message
+        unblinder = getUnblinder(pub['n'])
+        blinder = pow(invMod(unblinder, pub['n']), pub['e'],pub['n'])
+        times.append(time.time() - t)
+        t = time.time()
+        
+        blinded = blind(message,blinder,pub)
+        times.append(time.time() - t)
+        t = time.time()
+        
+        signedblind = encrypt_int(blinded, priv['d'], priv['p']*priv['q'])
+        times.append(time.time() - t)
+        t = time.time()
+        
+        unblinded = (signedblind * unblinder) % pub['n']
+        times.append(time.time() - t)
+        t = time.time()
+        
+        print 'verifyied', message == verify(unblinded,pub)
+        times.append(time.time() - t)
+        print sum(times) - times[2]
+
+        
+        
+__all__ = ["gen_pubpriv_keys", "encrypt", "decrypt", "sign", "verify"]
+
