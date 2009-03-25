@@ -7,34 +7,13 @@
 
 import simplejson
 
-class Codec(object):
 
-    def encode(self,data, field = None):
-        return data
-
-    def decode(self,data, field = None):
-        return data
-
-class Subitems(Codec):
-    
-    def encode(self,data, field = None):
-        out = []
-        for item in data:
-            out.append(item.getData())
-        return out
-
-    def decode(self,data, field = None):
-        return data
-
-codecs = dict(default=Codec(),
-              subitems=Subitems())
 
 
 class Field(object):
-    def __init__(self,name,signing=True,codec='default',default=''):
+    def __init__(self,name,signing=True,default=''):
         self.name = name
         self.signing = signing
-        self.codec = codec
         self.default = default
 
     def getencoded(self,object):
@@ -46,8 +25,8 @@ class Field(object):
 
 class SubitemField(Field):
     
-    def __init__(self,name,signing=True,codec='default',default='',klass=dict):
-        Field.__init__(self,name=name,signing=signing,codec=codec,default=default)
+    def __init__(self,name,signing=True,default='',klass=dict):
+        Field.__init__(self,name=name,signing=signing,default=default)
         self.klass = klass
 
 
