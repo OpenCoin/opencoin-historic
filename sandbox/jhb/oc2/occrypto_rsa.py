@@ -1,6 +1,6 @@
 """This is a playground to develop the api for the pubkey and secret key.
 Don't take the crypto seriously"""
-from container import Container,Field
+from containerbase import *
 import hashlib
 import rsa
 
@@ -12,7 +12,14 @@ class KeyField(Field):
         Field.__init__(self,name=name,signing=signing,default=default)
         self.isPrivate = isPrivate
 
-   
+    def getencoded(self,object,allData=False):
+        value = getattr(object,self.name,self.default)
+        items = value.items()
+        items.sort()
+        return items
+
+    def setdecoded(self,object,data):
+        setattr(object,self.name,dict(data))
 
 class PubKey(Container):
 
@@ -28,7 +35,7 @@ class PubKey(Container):
 
     def verifyContainerSignature(self,container):
         signature = container.signature
-        data = container.toString()
+        data = container.hash()
         return self.verifySignature(signature=signature,data=data)
 
     def createBlindingSecret(self):
@@ -60,13 +67,17 @@ class PrivKey(Container):
         return rsa.encrypt_int(number,self.key['d'],self.key['p']*self.key['q'])
 
     def signContainer(self,container):
-        signature =  self.sign(container.toString())
+        signature =  self.sign(container.hash())
         container.signature = signature
         return container
 
 def hash(data):
-    return hashlib.sha256(data).digest()
+    return hashlib.sha256(data).hexdigest()
 
+def hashContainer(container,allData=False):
+    return hash(container.toString(allData=allData))
+
+Container.hash = hashContainer
 def KeyFactory(bitlen):
     pub,priv = rsa.gen_pubpriv_keys(bitlen)
     pubkey = PubKey()
