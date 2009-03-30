@@ -57,7 +57,7 @@ class PubKey(Container):
     def unblind(self,secret,data):
         #number =  cryptomath.stringToNumber(data)
         number = data
-        return pow(number,secret,self.key.n)
+        return cryptomath.numberToString((number * secret) % self.key.n)
 
 class PrivKey(Container):
     
@@ -73,7 +73,7 @@ class PrivKey(Container):
         dataBytes = compat.stringToBytes(data)
         return compat.bytesToString(self.key.sign(dataBytes))
 
-    def signnumber(self,number):
+    def signblind(self,number):
         return pow(number,self.key.d,self.key.n)
 
     def signContainer(self,container):

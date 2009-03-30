@@ -1,5 +1,7 @@
+"""This is a playground to develop the api for the pubkey and secret key.
+Don't take the crypto seriously"""
 from container import Container,Field
-import sha
+import hashlib
 import rsa
 
   
@@ -10,17 +12,7 @@ class KeyField(Field):
         Field.__init__(self,name=name,signing=signing,default=default)
         self.isPrivate = isPrivate
 
-    def getencoded(self,object,allData=False):
-        key = getattr(object,self.name,self.default)
-        return key.write() 
-
-    def setdecoded(self,object,data):
-        if self.isPrivate:
-            key = keyfactory.parsePrivateKey(data)
-        else:
-            key = keyfactory.parseAsPublicKey(data)
-        setattr(object,self.name,key)
-
+   
 
 class PubKey(Container):
 
@@ -73,7 +65,7 @@ class PrivKey(Container):
         return container
 
 def hash(data):
-    return sha.sha(data).digest()
+    return hashlib.sha256(data).digest()
 
 def KeyFactory(bitlen):
     pub,priv = rsa.gen_pubpriv_keys(bitlen)

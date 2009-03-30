@@ -1,7 +1,7 @@
 """RSA module
 
 !!! This is just a playground, for understanding some bits and pieces,
-this is not at all the production code!!!
+this is not at all serious crypto production code!!!
 
 
 
