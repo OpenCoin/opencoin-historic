@@ -17,7 +17,7 @@ True
 >>> mint = Mint(Item())
 >>> mint.setCDD(cdd)
 >>> keys = mint.newMintKeys()
->>> mkcs = issuer.signMintKeys('oca',keys=keys,cdd = cdd)
+>>> mkcs = issuer.signMintKeys(keys=keys,cdd = cdd)
 >>> issuer.getMasterPubKey().verifyContainerSignature(mkcs['20'])
 True
 """

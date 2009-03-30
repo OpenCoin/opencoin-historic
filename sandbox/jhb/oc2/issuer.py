@@ -45,8 +45,7 @@ class Issuer(Entity):
     def _getMasterPrivKey(self):
         return self.storage.masterPrivKey
 
-    def signMintKeys(self,shortCurrencyId,
-                         keys,
+    def signMintKeys(self,keys,
                          cdd=None,
                          notBefore=None,
                          keyNotAfter=None,
@@ -71,18 +70,17 @@ class Issuer(Entity):
             masterKey.signContainer(mkc)
             self.addMKC(cdd,mkc)
 
-        return self.getCurrentMKC(shortCurrencyId)
+        return self.getCurrentMKCs()
 
     def addMKC(self,cdd,mkc):
 
         if not self.has('mkclist'):
-            self.set('mkclist',{})
+            self.set('mkclist',[])
         mkclist = self.get('mkclist')            
-        versions = mkclist.setdefault(cdd.shortCurrencyId,[])
-        if len(versions) <= cdd.version:
-            versions.append({})
-        versions[cdd.version][mkc.denomination]=mkc    
+        if len(mkclist) <= cdd.version:
+            mkclist.append({})
+        mkclist[cdd.version][mkc.denomination]=mkc    
         
-    def getCurrentMKC(self,shortCurrencyId,version=-1):
-        return self.get('mkclist')[shortCurrencyId][version]
+    def getCurrentMKCs(self,version=-1):
+        return self.get('mkclist')[version]
 
