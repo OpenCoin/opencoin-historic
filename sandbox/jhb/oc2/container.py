@@ -1,14 +1,6 @@
-"""
->>> 
->>> 
-"""
+import simplejson, datetime, binascii
 
-
-
-import simplejson
-
-
-
+################################### Fields ##################################
 
 class Field(object):
     def __init__(self,name,signing=True,default=''):
@@ -16,24 +8,71 @@ class Field(object):
         self.signing = signing
         self.default = default
 
-    def getencoded(self,object):
+    def getencoded(self,object,allData=False):
         value = getattr(object,self.name,self.default)
         return value
 
     def setdecoded(self,object,data):
         setattr(object,self.name,data)
 
-class SubitemField(Field):
+class DateField(Field):
+
+    format = '%d.%m.%Y %H:%M:%S'
+
+    def getencoded(self,object,allData=False):
+        value = getattr(object,self.name,self.default)
+        if not value:
+            value = datetime.datetime.now()
+        return value.strftime(self.format)
+
+    def setdecoded(self,object,data):
+        dt = datetime.datetime.strptime(data,self.format)
+        setattr(object,self.name,dt)
+
+        
+
+class BinaryField(Field):
+    
+    def getencoded(self,object,allData=False):
+        value = getattr(object,self.name,self.default)
+        return binascii.b2a_base64(value).strip()
+
+    def setdecoded(self,object,data):
+        setattr(object,self.name,binascii.a2b_base64(data))
+     
+    
+class OneItemField(Field):
     
     def __init__(self,name,signing=True,default='',klass=dict):
         Field.__init__(self,name=name,signing=signing,default=default)
         self.klass = klass
 
 
-    def getencoded(self,object):
+    def getencoded(self,object,allData=False):
+        value = getattr(object,self.name)
+        if value:
+            value = value.getData(allData=allData)
+        else:
+            value = self.default
+        return  value
+        
+    def setdecoded(self,object,data):
+        setattr(object,self.name,self.klass(data))
+
+
+
+
+class SubitemsField(Field):
+    
+    def __init__(self,name,signing=True,default='',klass=dict):
+        Field.__init__(self,name=name,signing=signing,default=default)
+        self.klass = klass
+
+
+    def getencoded(self,object,allData=False):
         out = []
         for item in getattr(object,self.name):
-            out.append(item.getData())
+            out.append(item.getData(allData=allData))
         return out       
         
     def setdecoded(self,object,data):
@@ -42,11 +81,24 @@ class SubitemField(Field):
             value.append(self.klass(item))
         setattr(object,self.name,value)     
 
+
+################################### Containers ##################################
               
 
 class Container(object):   
+    
     fields = []
+
     def __init__(self,data={}):
+        self.fromData(data)
+
+    def __xrepr__(self):
+        return "<%s(%s)>" % (self.__class__.__name__,self.getData(True))
+
+    def __xstr__(self):
+        return self.toString()
+
+    def fromData(self,data):
         if type(data) == type(''):
             data = simplejson.loads(data)
         if type(data) != type({}):
@@ -56,66 +108,75 @@ class Container(object):
                 field.setdecoded(self,data[field.name])
             else:               
                 setattr(self,field.name,field.default)
-        setattr(self,'signature',data.get('signature',''))
-        
 
-    def getData(self,signingOnly=False,signature=False):
+
+    def getData(self,allData=False):
         certdata = []
         for field in self.fields:
-            if signingOnly and not field.signing:
+            if not (allData or field.signing):
                 continue
-            certdata.append((field.name,field.getencoded(self)))
-        if signature:
-            certdata.append(('signature',self.signature))
+            certdata.append((field.name,field.getencoded(self,allData=allData)))
         return certdata
 
-    def toString(self,signature=False):
-        #encoding stuff should be here as well
-        return simplejson.dumps(self.getData(signature=signature))
-        
+    def toString(self,allData=False):
+        return simplejson.dumps(self.getData(allData=allData))
+
+
+class CDD (Container):
+    "Currency Description Document"
+
+    fields = [
+        Field('standard_id'),
+        Field('currency_id'),
+        Field('short_currency_id'),
+        Field('issuer_service_location'),
+        Field('denominations'),
+        Field('issuer_cipher_suite'),
+        Field('options'),
+        Field('issuer_public_master_key'),
+        Field('issuer'),
+        Field('signature',signing=False)
+    ]
+
+class PublicKey(Container):
+    "A public key"
+    fields = [
+        BinaryField('a'),
+        BinaryField('b'),
+        BinaryField('c')
+    ]        
+
+
+class MintKey(Container):
+    "A mintkey, contains key + metadata"
+
+    fields = [
+        Field('key_id'),
+        Field('currency_id'),
+        Field('denomination'),
+        DateField('not_before'),
+        DateField('key_not_after'),
+        DateField('coin_not_after'),
+        OneItemField('public_key',klass=PublicKey),
+        Field('issuer'),
+        Field('signature',signing=False)
+    ]
 
 
 class Token(Container):
     fields = [
         Field('currency'),
-        Field('amount')
+        Field('amount'),
+        Field('signature',signing=False)
     ]
 
 class Message(Container):
     fields = [
         Field('subject'),
-        SubitemField('tokens',klass=Token)
+        SubitemsField('tokens',klass=Token),
     ]        
-class Tests(object):
-     """
-    >>> t = Token()
-    >>> t.currency='opencent'
-    >>> t.amount = 2
-    >>> t.toString()
-    '[["currency", "opencent"], ["amount", 2]]'
-    >>> t.toString(signature=True)
-    '[["currency", "opencent"], ["amount", 2], ["signature", ""]]'
-    >>> t.getData()
-    [('currency', 'opencent'), ('amount', 2)]
-    >>> t2 = Token(t.getData())
-    >>> t2.getData()
-    [('currency', 'opencent'), ('amount', 2)]
-    >>> t.signature = 'mysignature'
-    >>> t.toString(signature=True)
-    '[["currency", "opencent"], ["amount", 2], ["signature", "mysignature"]]'
-    >>> m = Message()
-    >>> m.subject = 'test'
-    >>> m.tokens = [t,t2]
-    >>> m.toString()
-    '[["subject", "test"], ["tokens", [[["currency", "opencent"], ["amount", 2]], [["currency", "opencent"], ["amount", 2]]]]]'
-    >>> m.getData()
-    [('subject', 'test'), ('tokens', [[('currency', 'opencent'), ('amount', 2)], [('currency', 'opencent'), ('amount', 2)]])]
-    >>> m2 = Message(m.getData())
-    >>> m2.getData() == m.getData()
-    True
-    >>> m2.toString() == m2.toString()
-    True
-    """
+    
+
 
 
 if __name__ == "__main__":
