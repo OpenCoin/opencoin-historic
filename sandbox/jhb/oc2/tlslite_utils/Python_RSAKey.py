@@ -100,7 +100,7 @@ class Python_RSAKey(RSAKey):
         t = lcm(p-1, q-1)
         key.n = p * q
         key.e = 3L  #Needed to be long, for Java
-        key.d = invMod(key.e, t)
+        key.d = invMod(e, t)
         key.p = p
         key.q = q
         key.dP = key.d % (p-1)

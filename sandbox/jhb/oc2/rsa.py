@@ -320,18 +320,6 @@ def gen_keys(nbits):
 
     return (p, q, e, d)
 
-def gen_pubpriv_keys(nbits):
-    """Generates public and private keys, and returns them as (pub,
-    priv).
-
-    The public key consists of a dict {e: ..., , n: ....). The private
-    key consists of a dict {d: ...., p: ...., q: ....).
-    """
-    return (dummypub,dummypriv) 
-    (p, q, e, d) = gen_keys(nbits)
-
-    return ( {'e': e, 'n': p*q}, {'d': d, 'p': p, 'q': q} )
-
 def encrypt_int(message, ekey, n):
     """Encrypts a message using encryption key 'ekey', working modulo
     n"""
@@ -515,11 +503,102 @@ def getUnblinder(n):
             break
     return r            
 
+def gen_pubpriv_keys_old(nbits):
+    """Generates public and private keys, and returns them as (pub,
+    priv).
+
+    The public key consists of a dict {e: ..., , n: ....). The private
+    key consists of a dict {d: ...., p: ...., q: ....).
+    """
+    #return (dummypub,dummypriv) 
+    (p, q, e, d) = gen_keys(nbits)
+
+    return ( {'e': e, 'n': p*q}, {'d': d, 'p': p, 'q': q} )
 
 
 
+def generate(bits):
+    p = getRandomPrime(bits/2, False)
+    q = getRandomPrime(bits/2, False)
+    t = lcm(p-1, q-1)
+    n = p * q
+    e = 3L  #Needed to be long, for Java
+    d = invMod(e, t)
+    p = p
+    q = q
+    #dP = key.d % (p-1)
+    #dQ = key.d % (q-1)
+    #qInv = invMod(q, p)
+    return ( {'e': e, 'n': n}, {'d': d, 'p': p, 'q': q} )
 
+gen_pubpriv_keys = generate
+def getRandomPrime(bits, display=False):
+    if bits < 10:
+        raise AssertionError()
+    #The 1.5 ensures the 2 MSBs are set
+    #Thus, when used for p,q in RSA, n will have its MSB set
+    #
+    #Since 30 is lcm(2,3,5), we'll set our test numbers to
+    #29 % 30 and keep them there
+    low = (2L ** (bits-1)) * 3/2
+    high = 2L ** bits - 30
+    p = randint(low, high)
+    p += 29 - (p % 30)
+    while 1:
+        if display: print ".",
+        p += 30
+        if p >= high:
+            p = randint(low, high)
+            p += 29 - (p % 30)
+        if isPrime(p, display=display):
+            return p
 
+#Pre-calculate a sieve of the ~100 primes < 1000:
+def makeSieve(n):
+    sieve = range(n)
+    for count in range(2, int(math.sqrt(n))):
+        if sieve[count] == 0:
+            continue
+        x = sieve[count] * 2
+        while x < len(sieve):
+            sieve[x] = 0
+            x += sieve[count]
+    sieve = [x for x in sieve[2:] if x]
+    return sieve
+
+sieve = makeSieve(1000)
+
+def isPrime(n, iterations=5, display=False):
+    #Trial division with sieve
+    for x in sieve:
+        if x >= n: return True
+        if n % x == 0: return False
+    #Passed trial division, proceed to Rabin-Miller
+    #Rabin-Miller implemented per Ferguson & Schneier
+    #Compute s, t for Rabin-Miller
+    if display: print "*",
+    s, t = n-1, 0
+    while s % 2 == 0:
+        s, t = s/2, t+1
+    #Repeat Rabin-Miller x times
+    a = 2 #Use 2 as a base for first iteration speedup, per HAC
+    for count in range(iterations):
+        v = powMod(a, s, n)
+        if v==1:
+            continue
+        i = 0
+        while v != n-1:
+            if i == t-1:
+                return False
+            else:
+                v, i = powMod(v, 2, n), i+1
+        a = randint(2, n)
+    return True
+
+def lcm(a, b):
+    #This will break when python division changes, but we can't use // cause
+    #of Jython
+    return (a * b) / gcd(a, b)
 
 
 
