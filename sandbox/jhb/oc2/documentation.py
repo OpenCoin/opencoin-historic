@@ -216,11 +216,11 @@ the latter two usually happening at the same time ('online case').
 
 
 ###############################################################################
-
+>>> port = 9090
 >>> cdd = issuer.makeCDD('OpenCentA',
 ...                      'oca',
 ...                      [str(d) for d in [0,1,2,5,10,20]],
-...                      'http://localhost:8000',
+...                      'http://localhost:%s/' % port,
 ...                      '')
 >>> issuer.getMasterPubKey().verifyContainerSignature(cdd)
 True
@@ -269,6 +269,29 @@ True
 3.2 Wallet setup
 
 * fetch "currency description document" from issuer
+
+###############################################################################
+
+>>> #faked request
+>>> from wallet import Wallet
+>>> wallet = Wallet(Item())
+>>> import protocols
+>>> serverside = protocols.GiveLatestCDD(issuer)
+>>> clientside = protocols.AskLatestCDD(wallet,serverside.run)
+>>> cdd == clientside.run()
+True
+
+>>> #using http
+>>> import transports
+>>> import testserver
+>>> transport = transports.HTTPTransport('http://localhost:%s/' % port)
+>>> clientside = protocols.AskLatestCDD(wallet,transport)
+>>> testserver.run_once(port,issuer)
+>>> cdd2 =  clientside.run()
+>>> cdd2.toString(True) == cdd.toString(True)
+True
+
+###############################################################################
 
 
 3.3 Wallet creates blanks

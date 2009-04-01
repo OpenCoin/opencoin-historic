@@ -1,13 +1,36 @@
+import messages
+
 class Protocol(object):
 
-    def __init__(self):
-        self.digest = self.dummy
+    def __init__(self,transport):
+        self.transport = transport
 
-    def dummy(self,message):
-        
-        return ''
+    def getResponse(self):
+        return self.transport.readMessage()
 
+class AskLatestCDD(Protocol):
 
+    def __init__(self,wallet,transport):
+        self.transport = transport
+        self.wallet = wallet
+    
+    def run(self,message=None):
+        message = messages.AskLatestCDD()  
+        response = self.transport(message)
+        return response.cdd 
+
+class GiveLatestCDD(Protocol):
+    
+    def __init__(self,issuer):
+        self.issuer = issuer
+    
+    def run(self,message=None):
+        if message:
+            answer = messages.GiveLatestCDD()
+            answer.cdd = self.issuer.getCDD()
+            return answer
+        else:
+            pass
 
 class CoinsSpendSender(Protocol):
 
@@ -63,18 +86,6 @@ class FetchMintKeys(Protocol):
 class GiveMintKeys(Protocol):
 
     def giveKeys(self,message):
-    
-
-class requestCDD(Protocol):
-    
-    def __init__(self,cdd_version):
-        self.cdd_version = cdd_version
+        pass    
 
 
-    def getCDD(self,message):
-        return ''
-
-class giveCDD(Protocol):
-
-    def giveCDD(self,message):
-        return ''

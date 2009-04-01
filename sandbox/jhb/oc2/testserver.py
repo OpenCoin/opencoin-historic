@@ -1,31 +1,30 @@
 import BaseHTTPServer, threading
+import protocols, issuer, mint, transports, urllib
+
 
 class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
 
-    def do_GET(self):
-        self.send_response(200)
+    def do_POST(self):
+        #print self.server
         if self.path == '/stop':
             raise 'foobar'
+        length = self.headers.get('Content-Length')
+        data = self.rfile.read(int(length))
+        data = urllib.unquote(data)
+        message = transports.createMessage(data)
+        if message.header == 'AskLatestCDD':
+            protocol = protocols.GiveLatestCDD(self.issuer)
+        answer = protocol.run(message)
+        self.send_response(200)
         self.send_header("Content-type", "text/plain")
-        self.end_headers()
-        self.wfile.write('foo')
-        
-PORT = 8000
+        self.wfile.write('\r\n')
+        self.wfile.write(answer.toString(True))
 
-httpd = BaseHTTPServer.HTTPServer(("", PORT), Handler)
-import threading
-def run_once():
+
+def run_once(port,issuer=None):
+    Handler.issuer = issuer
+    httpd = BaseHTTPServer.HTTPServer(("", port), Handler)
+    import threading
     t = threading.Thread(target=httpd.handle_request)     
     t.start()
-
-
-#print "serving at port", PORT
-#t = threading.Thread(target=httpd.handle_request)
-#t.start()
-#import time
-#for i in range(10):
-#    time.sleep(3)
-#print 'foobar'
-
-#httpd.serve_forever()
 

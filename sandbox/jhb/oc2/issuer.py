@@ -24,20 +24,19 @@ class Issuer(Entity):
         cdd.masterPubKey = self.storage.masterPubKey
         cdd.issuer = self.storage.masterPubKey.hash()
         if not hasattr(self.storage,'cdds'):
-            self.storage.cdds = Item()
-        cddlist = getattr(self.storage.cdds,shortCurrencyId,[])
-        setattr(self.storage.cdds,shortCurrencyId,cddlist)
-        cdd.version = len(cddlist)   
+            self.storage.cdds = []
+        cdds = self.get('cdds')
+        cdd.version = len(cdds)   
         self.storage.masterPrivKey.signContainer(cdd)
-        cddlist.append(cdd)
+        cdds.append(cdd)
         return cdd
 
-    def getCDD(self,shortCurrencyId,version=None):
-        cddlist = getattr(self.storage.cdds,shortCurrencyId,None)
+    def getCDD(self,version=None):
+        cdds = self.get('cdds')
         if version:
-            return cddlist[version]
+            return cdds[version]
         else:
-            return cddlist[-1]
+            return cdds[-1]
 
     def getMasterPubKey(self):
         return self.storage.masterPubKey
