@@ -3,7 +3,7 @@ from storage import Item
 
 class Entity(object):
     
-    def __init__(self,storage):
+    def __init__(self,storage=None):
         self.storage = storage
 
     def get(self,key,default=None):

@@ -5,8 +5,8 @@ class Issuer(Entity):
  
     def createMasterKeys(self):
         priv,pub = occrypto.KeyFactory(1024)
-        self.storage.masterPrivKey = priv
-        self.storage.masterPubKey = pub
+        self.storage['masterPrivKey'] = priv
+        self.storage['masterPubKey'] = pub
 
     def makeCDD(self, currencyId, 
                       shortCurrencyId, 
@@ -21,28 +21,27 @@ class Issuer(Entity):
         cdd.denominations = denominations
         cdd.issuerServiceLocation = issuerServiceLocation
         cdd.options = options
-        cdd.masterPubKey = self.storage.masterPubKey
-        cdd.issuer = self.storage.masterPubKey.hash()
-        if not hasattr(self.storage,'cdds'):
-            self.storage.cdds = []
-        cdds = self.get('cdds')
+        cdd.masterPubKey = self.getMasterPubKey()
+        cdd.issuer = self.getMasterPubKey().hash()
+
+        cdds = self.storage.setdefault('cdds',[])
         cdd.version = len(cdds)   
-        self.storage.masterPrivKey.signContainer(cdd)
+        self.storage['masterPrivKey'].signContainer(cdd)
         cdds.append(cdd)
         return cdd
 
     def getCDD(self,version=None):
-        cdds = self.get('cdds')
+        cdds = self.storage['cdds']
         if version:
             return cdds[version]
         else:
             return cdds[-1]
 
     def getMasterPubKey(self):
-        return self.storage.masterPubKey
+        return self.storage['masterPubKey']
 
     def _getMasterPrivKey(self):
-        return self.storage.masterPrivKey
+        return self.storage['masterPrivKey']
 
     def signMintKeys(self,keys,
                          cdd=None,
@@ -72,14 +71,11 @@ class Issuer(Entity):
         return self.getCurrentMKCs()
 
     def addMKC(self,cdd,mkc):
-
-        if not self.has('mkclist'):
-            self.set('mkclist',[])
-        mkclist = self.get('mkclist')            
+        mkclist = self.storage.setdefault('mkclist',[])            
         if len(mkclist) <= cdd.version:
             mkclist.append({})
         mkclist[cdd.version][mkc.denomination]=mkc    
         
     def getCurrentMKCs(self,version=-1):
-        return self.get('mkclist')[version]
+        return self.storage['mkclist'][version]
 

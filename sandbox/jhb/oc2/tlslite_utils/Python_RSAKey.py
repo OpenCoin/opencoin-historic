@@ -100,7 +100,7 @@ class Python_RSAKey(RSAKey):
         t = lcm(p-1, q-1)
         key.n = p * q
         key.e = 3L  #Needed to be long, for Java
-        key.d = invMod(e, t)
+        key.d = invMod(key.e, t)
         key.p = p
         key.q = q
         key.dP = key.d % (p-1)
@@ -207,3 +207,8 @@ class Python_RSAKey(RSAKey):
             qInv = base64ToNumber(xmltools.getText(xmltools.getLastChild(element, 7, "qInv"), xmltools.base64RegEx))
         return Python_RSAKey(n, e, d, p, q, dP, dQ, qInv)
     _parseXML = staticmethod(_parseXML)
+
+if __name__ == '__main__':
+    tmp = Python_RSAKey()
+    key = tmp.generate(1024)
+    print key.__dict__

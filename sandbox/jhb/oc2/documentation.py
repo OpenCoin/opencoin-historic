@@ -190,7 +190,7 @@ the latter two usually happening at the same time ('online case').
 
 >>> from storage import Item
 >>> from issuer import Issuer
->>> issuer = Issuer(Item())
+>>> issuer = Issuer({})
 >>> issuer.createMasterKeys()
 
 ###############################################################################
@@ -250,7 +250,7 @@ True
 ###############################################################################
 
 >>> from mint import Mint
->>> mint = Mint(Item())
+>>> mint = Mint({})
 >>> mint.setCDD(cdd)
 >>> keys = mint.newMintKeys()
 >>> mkcs = issuer.signMintKeys(keys=keys,cdd = cdd)

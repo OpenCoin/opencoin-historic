@@ -3,10 +3,10 @@ from entity import *
 class Mint(Entity):
 
     def setCDD(self,cdd):
-        self.storage.cdd = cdd
+        self.storage['cdd'] = cdd
     
     def getCDD(self):
-        return self.storage.cdd
+        return self.storage['cdd']
     
     def newMintKeys(self):
         cdd = self.getCDD()    
@@ -20,13 +20,11 @@ class Mint(Entity):
         return out
 
     def _addMintKey(self,priv,pub,denomination,version=-1):
-        if not self.has('keys'):
-            self.set('keys',[])
-        keylist = self.get('keys')
+        keylist = self.storage.setdefault('keys',[])
         if version -1 > len(keylist) or len(keylist)==0:
             keylist.append({})
         keylist[version][denomination] = (priv,pub)
 
     def getMintKey(self,denomination,version=-1):
-        keylist = self.get('keys')
+        keylist = self.storage['keys']
         return keylist[version][denomination][version] 

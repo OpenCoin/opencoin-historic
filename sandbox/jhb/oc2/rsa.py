@@ -20,19 +20,22 @@ import sys
 import random    # For picking semi-random numbers
 import types
 
-RANDOM_DEV="/dev/urandom"
-testing = False
-has_broken_randint = False
-
+# Get os.urandom PRNG
+import os
 try:
-    #random.randint(1, 10000000000000000000000000L)
-    1+1
-    pass
+    raise Exception
+    os.urandom(1)
+    def getRandomBytes(howMany):
+        return stringToBytes(os.urandom(howMany))
+    grbname = 'urandom'        
 except:
-    has_broken_randint = True
-    print "This system's random.randint() can't handle large numbers"
-    print "Random integers will all be read from %s" % RANDOM_DEV
 
+    def getRandomBytes(howMany):
+        bits = howMany * 8
+        number = random.getrandbits(bits)
+        return numberToBytes(number)
+        pass
+    grbname = 'randint'        
 
 def log(x, base = 10):
     return math.log(x) / math.log(base)
@@ -42,17 +45,6 @@ def gcd(a,b):
     while b:
         a, b = b, a % b
     return a
-
-def gcd_old(p, q):
-    """Returns the greatest common divisor of p and q
-
-
-    >>> gcd(42, 6)
-    6
-    """
-    if p<q: return gcd(q, p)
-    if q == 0: return p
-    return gcd(q, abs(p%q))
 
 def bytes2int(bytes):
     """Converts a list of bytes or a string to an integer
@@ -95,230 +87,12 @@ def int2bytes(number):
     return string
 
 
-def read_random_int(nbits):
-    """Reads a random integer from RANDOM_DEV of approximately nbits
-    bits rounded up to whole bytes"""
-    #print nbits    
-    nbytes  = ceil(nbits/8)
-    
-    bytes = []
-    for i in range(nbytes):
-        bytes.append(random.randint(0,255))        
-    return bytes2int(bytes)
-
-    if len(randomdata) != nbytes:
-        raise Exception("Unable to read enough random bytes")
-
-    return bytes2int(randomdata)
 
 def ceil(x):
     """Returns int(math.ceil(x))"""
 
     return int(math.ceil(x))
-    
-def randint(minvalue, maxvalue):
-    """Returns a random integer x with minvalue <= x <= maxvalue"""
-    # Safety - get a lot of random data even if the range is fairly
-    # small
-    min_nbits  = 32
 
-    # The range of the random numbers we need to generate
-    range      = maxvalue - minvalue
-
-    # Which is this number of bytes
-    rangebytes = ceil(log(range, 2) / 8)
-
-    # Convert to bits, but make sure it's always at least min_nbits*2
-    rangebits  = max(rangebytes * 8, min_nbits * 2)
-    
-    # Take a random number of bits between min_nbits and rangebits
-    nbits      = random.randint(min_nbits, rangebits)
-    
-    return (read_random_int(nbits) % range) + minvalue
-
-def fermat_little_theorem(p):
-    """Returns 1 if p may be prime, and something else if p definitely
-    is not prime"""
-
-    a = randint(1, p-1)
-    return fast_exponentiation(a, p-1, p)
-
-def jacobi(a, b):
-    """Calculates the value of the Jacobi symbol (a/b)
-    """
-
-    if a == 0: return 0
-    if a == 1: return 1
-
-    if a % 2 == 0:
-        if (b**2-1)/8 % 2 == 0:
-            return jacobi(a/2, b)
-        return -jacobi(a/2, b)
-    
-    if (a-1) * (b-1) / 4 % 2 == 0:
-        return jacobi(b % a, a)
-
-    return -jacobi(b % a, a)
-
-def jacobi_witness(x, n):
-    """Returns False if n is an Euler pseudo-prime with base x, and
-    True otherwise.
-    """
-
-    j = jacobi(x, n) % n
-    f = fast_exponentiation(x, (n-1)/2, n)
-
-    if j == f: return False
-    return True
-
-def randomized_primality_testing(n, k):
-    """Calculates whether n is composite (which is always correct) or
-    prime (which is incorrect with error probability 2**-k)
-
-    Returns False if the number if composite, and True if it's
-    probably prime.
-    """
-
-    q = 0.5        # Property of the jacobi_witness function
-
-    # t = int(math.ceil(k / log(1/q, 2)))
-    t = ceil(k / log(1/q, 2))
-    for i in range(t+1):
-        x = randint(1, n-1)
-        if jacobi_witness(x, n): return False
-    
-    return True
-
-def is_prime(number):
-    """Returns True if the number is prime, and False otherwise.
-
-    >>> is_prime(42)
-    0
-    >>> is_prime(41)
-    1
-    """
-
-    """
-    if not fermat_little_theorem(number) == 1:
-        # Not prime, according to Fermat's little theorem
-        return False
-    """
-
-    if randomized_primality_testing(number, 5):
-        # Prime, according to Jacobi
-        return True
-    
-    # Not prime
-    return False
-
-    
-def getprime(nbits):
-    """Returns a prime number of max. 'math.ceil(nbits/8)*8' bits. In
-    other words: nbits is rounded up to whole bytes.
-
-    >>> p = getprime(8)
-    >>> is_prime(p-1)
-    0
-    >>> is_prime(p)
-    1
-    >>> is_prime(p+1)
-    0
-    """
-
-    nbytes  = int(math.ceil(nbits/8))
-
-    while True:
-        integer = read_random_int(nbits)
-
-        # Make sure it's odd
-        integer |= 1
-
-        # Test for primeness
-        if is_prime(integer): break
-
-        # Retry if not prime
-
-    return integer
-
-def are_relatively_prime(a, b):
-    """Returns True if a and b are relatively prime, and False if they
-    are not.
-
-    >>> are_relatively_prime(2, 3)
-    1
-    >>> are_relatively_prime(2, 4)
-    0
-    """
-
-    d = gcd(a, b)
-    return (d == 1)
-
-def find_p_q(nbits):
-    """Returns a tuple of two different primes of nbits bits"""
-
-    print 'finding p'
-    p = getprime(nbits)
-    while True:
-        print 'finding q'
-        q = getprime(nbits)
-        if not q == p: break
-    
-    return (p, q)
-
-def extended_euclid_gcd(a, b):
-    """Returns a tuple (d, i, j) such that d = gcd(a, b) = ia + jb
-    """
-
-    if b == 0:
-        return (a, 1, 0)
-
-    q = abs(a % b)
-    r = long(a / b)
-    (d, k, l) = extended_euclid_gcd(b, q)
-
-    return (d, l, k - l*r)
-
-# Main function: calculate encryption and decryption keys
-def calculate_keys(p, q, nbits):
-    """Calculates an encryption and a decryption key for p and q, and
-    returns them as a tuple (e, d)"""
-
-    n     = p * q
-    phi_n = (p-1) * (q-1)
-
-    while True:
-        print 'c'
-        # Make sure e has enough bits so we ensure "wrapping" through
-        # modulo n
-        e = getprime(max(8, nbits/2))
-        if are_relatively_prime(e, n) and are_relatively_prime(e, phi_n): break
-
-    (d, i, j) = extended_euclid_gcd(e, phi_n)
-
-    if not d == 1:
-        raise Exception("e (%d) and phi_n (%d) are not relatively prime" % (e, phi_n))
-
-    if not (e * i) % phi_n == 1:
-        raise Exception("e (%d) and i (%d) are not mult. inv. modulo phi_n (%d)" % (e, i, phi_n))
-
-    return (e, i)
-
-
-def gen_keys(nbits):
-    """Generate RSA keys of nbits bits. Returns (p, q, e, d).
-    """
-
-    while True:
-        print 'find'
-        (p, q) = find_p_q(nbits)
-        print 'calculate'
-        (e, d) = calculate_keys(p, q, nbits)
-
-        # For some reason, d is sometimes negative. We don't know how
-        # to fix it (yet), so we keep trying until everything is shiny
-        if d > 0: break
-
-    return (p, q, e, d)
 
 def encrypt_int(message, ekey, n):
     """Encrypts a message using encryption key 'ekey', working modulo
@@ -498,26 +272,13 @@ def powMod(base, power, modulus):
 
 def getUnblinder(n):
     while 1:
-        r = randint(0,n) 
-        if  are_relatively_prime(r,n):
+        r = getRandomNumber(0,n) 
+        if  gcd(r, n) == 1: #relative prime
             break
     return r            
 
-def gen_pubpriv_keys_old(nbits):
-    """Generates public and private keys, and returns them as (pub,
-    priv).
 
-    The public key consists of a dict {e: ..., , n: ....). The private
-    key consists of a dict {d: ...., p: ...., q: ....).
-    """
-    #return (dummypub,dummypriv) 
-    (p, q, e, d) = gen_keys(nbits)
-
-    return ( {'e': e, 'n': p*q}, {'d': d, 'p': p, 'q': q} )
-
-
-
-def generate(bits):
+def generate(bits):  #needed
     p = getRandomPrime(bits/2, False)
     q = getRandomPrime(bits/2, False)
     t = lcm(p-1, q-1)
@@ -529,10 +290,12 @@ def generate(bits):
     #dP = key.d % (p-1)
     #dQ = key.d % (q-1)
     #qInv = invMod(q, p)
-    return ( {'e': e, 'n': n}, {'d': d, 'p': p, 'q': q} )
+    keys =  ( {'e': e, 'n': n}, {'d': d, 'p': p, 'q': q} )
+    return keys
 
 gen_pubpriv_keys = generate
-def getRandomPrime(bits, display=False):
+
+def getRandomPrime(bits, display=False): 
     if bits < 10:
         raise AssertionError()
     #The 1.5 ensures the 2 MSBs are set
@@ -542,13 +305,13 @@ def getRandomPrime(bits, display=False):
     #29 % 30 and keep them there
     low = (2L ** (bits-1)) * 3/2
     high = 2L ** bits - 30
-    p = randint(low, high)
+    p = getRandomNumber(low, high)
     p += 29 - (p % 30)
     while 1:
         if display: print ".",
         p += 30
         if p >= high:
-            p = randint(low, high)
+            p = getRandomNumber(low, high)
             p += 29 - (p % 30)
         if isPrime(p, display=display):
             return p
@@ -592,7 +355,7 @@ def isPrime(n, iterations=5, display=False):
                 return False
             else:
                 v, i = powMod(v, 2, n), i+1
-        a = randint(2, n)
+        a = getRandomNumber(2, n)
     return True
 
 def lcm(a, b):
@@ -600,7 +363,69 @@ def lcm(a, b):
     #of Jython
     return (a * b) / gcd(a, b)
 
+def getRandomNumber(low, high):
+    if low >= high:
+        raise AssertionError()
+    howManyBits = numBits(high)
+    howManyBytes = numBytes(high)
+    lastBits = howManyBits % 8
+    while 1:
+        bytes = getRandomBytes(howManyBytes)
+        if lastBits:
+            bytes[0] = bytes[0] % (1 << lastBits)
+        n = bytesToNumber(bytes)
+        if n >= low and n < high:
+            return n
 
+
+
+def numberToBytes(n):
+    howManyBytes = numBytes(n)
+    bytes = createByteArrayZeros(howManyBytes)
+    for count in range(howManyBytes-1, -1, -1):
+        bytes[count] = int(n % 256)
+        n >>= 8
+    return bytes
+
+def stringToBytes(s):
+    bytes = createByteArrayZeros(0)
+    bytes.fromstring(s)
+    return bytes   
+
+
+import array
+def createByteArraySequence(seq):
+    return array.array('B', seq)
+def createByteArrayZeros(howMany):
+    return array.array('B', [0] * howMany)
+    
+def bytesToNumber(bytes):
+    total = 0L
+    multiplier = 1L
+    for count in range(len(bytes)-1, -1, -1):
+        byte = bytes[count]
+        total += multiplier * byte
+        multiplier *= 256
+    return total
+
+import math
+def numBits(n):
+    if n==0:
+        return 0
+    s = "%x" % n
+    return ((len(s)-1)*4) + \
+    {'0':0, '1':1, '2':2, '3':2,
+     '4':3, '5':3, '6':3, '7':3,
+     '8':4, '9':4, 'a':4, 'b':4,
+     'c':4, 'd':4, 'e':4, 'f':4,
+     }[s[0]]
+    return int(math.floor(math.log(n, 2))+1)
+
+def numBytes(n):
+    if n==0:
+        return 0
+    bits = numBits(n)
+    return int(math.ceil(bits / 8.0))
 
 
 fast_exponentiation = pow
@@ -621,84 +446,79 @@ dummypriv = {
 
 # Do doctest if we're not imported
 if __name__ == "__main__":
-    if 1:
-        import time
-        (pub,priv) =  gen_pubpriv_keys(1024)
-        if 1:
-            pass   
-        if 0:                    
-            (pub,priv) = ({'e': 3197601411731116245564574341873883965700807663084732800379376818822337768214254275271880556652543127861042149268538435129289119875433847550131501030387489L, 'n': 10010369815382334240798530070718437854966721919010883362239947723044651469296597049454697875962523892167961291050690952736009970933207150773523631818070845272169487515533531012017986671583117870935704791444203091193928433685036216475710517809854134259468721246954372989146266743601614235731605829521314456547427727170490340220674730134652649494795255568521600458207445549064461533102227417295842548674337715761362209701734789853469920681184060067484771558465649908138716260602630770402224385695023184536234858539880642604697788322269392260439339765412460944589951571879796455505538134420317166479947358156062601693631L}, {'q': 71965600310892660429596898829670710653460148180418095123381449844052583795523012040229068564004895983101524115981347946055591335247903874583493068435665706247560257067715751690858970054084093796406191757154228889454862489531588573733962647071944624542539072044760521321849853532919544810806179365743581833777L, 'p': 139099372090795607726534110588106724714748422622835743921578772078079056922772905042826722454890797681407412421239584468016215098928247799729322355221381502409668675456356288320338371140589835466925402699800592201081119770108520423450701555386146286042071274331899104700802281153510654832285005494641183409903L, 'd': 2303141903135405741196770316647349478451046851656460345238126953851335354457956582261071364112927329063172609648667594153989314522741915259780604774082900187421379799944807777478001765690017634728386784574675440128718738783220812396390380020488828055736972630556491383856716073773079586029351343732817861978611326631064317705218919924700761528865528832464733884127079042865050020476303293874373222849912706661252250304706695160160822827622086731394008802874568358702895903468129589361385276702313798198182238681153517515581052056557552995405472004415453043300567819425403784410663519000867938462388941313183838315329L})                    
-        if 0:
-            #full
-            t = time.time()
-            message = 'serial '*5
-            #print 'cleartext ', message
-            cypher = encrypt(message,pub)
-            #print 'cyphertext: ',cypher
-            #print 'decrypted', decrypt(cypher,priv)
-            decrypt(cypher,priv)
-            signed = sign(message,priv)
-            #print 'signed', signed
-            #print 'verified', message == verify(signed,pub)
-            unblinder = getUnblinder(pub['n'])
-            blinder = pow(invMod(unblinder, pub['n']), pub['e'],pub['n'])
-            blinded = blind(message,blinder,pub)
-            #print 'blinded', blinded
-            #signedblind = sign(blinded,priv)
-            signedblind = encrypt_int(blinded, priv['d'], priv['p']*priv['q'])
-            #print 'signedblind', signedblind
-            #unblinded = unblind(signedblind,unblinder,pub)
-            unblinded = (signedblind * unblinder) % pub['n']
-            #print 'unblinded', unblinded
-            #print 'verified', message == verify(unblinded,pub)
-            print time.time() - t
-            
-            
-            print '=' * 40
-            #no blinding
-            t = time.time()
-            message = 'serial '*5
-            #print 'cleartext ', message
-            cypher = encrypt(message,pub)
-            #print 'cyphertext: ',cypher
-            #print 'decrypted', decrypt(cypher,priv)
-            decrypt(cypher,priv)
-            signed = sign(message,priv)
-            #print 'signed', signed
-            #print 'verified', message == verify(signed,pub)
-            print time.time() - t 
+    import time
+    t = time.time()
+    #(pub,priv) =  gen_pubpriv_keys(1024)
+    (pub,priv) = (dummypub,dummypriv)          
+    print '=' * 40
+    times = []
+    #blinding
+    #message = 'f'*65
+    message = 'c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2'
+    #print 'cleartext ', message
+    unblinder = getUnblinder(pub['n'])
+    blinder = pow(invMod(unblinder, pub['n']), pub['e'],pub['n'])
+    times.append(time.time() - t)
+    t = time.time()
+    
+    blinded = blind(message,blinder,pub)
+    times.append(time.time() - t)
+    t = time.time()
+    
+    signedblind = encrypt_int(blinded, priv['d'], priv['p']*priv['q'])
+    times.append(time.time() - t)
+    t = time.time()
+    
+    unblinded = (signedblind * unblinder) % pub['n']
+    times.append(time.time() - t)
+    t = time.time()
+    
+    print 'verifyied', message == verify(unblinded,pub)
+    times.append(time.time() - t)
+    print sum(times) - times[2]
 
-      
-        print '=' * 40
-        times = []
-        #blinding
+    if 0:
+        #full
         t = time.time()
-        #message = 'f'*65
-        message = 'c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2'
-        print len(message)
+        message = 'serial '*5
         #print 'cleartext ', message
+        cypher = encrypt(message,pub)
+        #print 'cyphertext: ',cypher
+        #print 'decrypted', decrypt(cypher,priv)
+        decrypt(cypher,priv)
+        signed = sign(message,priv)
+        #print 'signed', signed
+        #print 'verified', message == verify(signed,pub)
         unblinder = getUnblinder(pub['n'])
         blinder = pow(invMod(unblinder, pub['n']), pub['e'],pub['n'])
-        times.append(time.time() - t)
-        t = time.time()
-        
         blinded = blind(message,blinder,pub)
-        times.append(time.time() - t)
-        t = time.time()
-        
+        #print 'blinded', blinded
+        #signedblind = sign(blinded,priv)
         signedblind = encrypt_int(blinded, priv['d'], priv['p']*priv['q'])
-        times.append(time.time() - t)
-        t = time.time()
-        
+        #print 'signedblind', signedblind
+        #unblinded = unblind(signedblind,unblinder,pub)
         unblinded = (signedblind * unblinder) % pub['n']
-        times.append(time.time() - t)
+        #print 'unblinded', unblinded
+        #print 'verified', message == verify(unblinded,pub)
+        print time.time() - t
+        
+        
+        print '=' * 40
+        #no blinding
         t = time.time()
-        
-        print 'verifyied', message == verify(unblinded,pub)
-        times.append(time.time() - t)
-        print sum(times) - times[2]
+        message = 'serial '*5
+        #print 'cleartext ', message
+        cypher = encrypt(message,pub)
+        #print 'cyphertext: ',cypher
+        #print 'decrypted', decrypt(cypher,priv)
+        decrypt(cypher,priv)
+        signed = sign(message,priv)
+        #print 'signed', signed
+        #print 'verified', message == verify(signed,pub)
+        print time.time() - t 
 
-        
+      
+
         
 __all__ = ["gen_pubpriv_keys", "encrypt", "decrypt", "sign", "verify"]
 
