@@ -94,7 +94,7 @@ def ceil(x):
     return int(math.ceil(x))
 
 
-def encrypt_int(message, ekey, n):
+def rsa_operation(message, ekey, n):
     """Encrypts a message using encryption key 'ekey', working modulo
     n"""
 
@@ -110,56 +110,32 @@ def encrypt_int(message, ekey, n):
     
     return pow(message, ekey, n)
 
-def decrypt_int(cyphertext, dkey, n):
-    """Decrypts a cypher text using the decryption key 'dkey', working
-    modulo n"""
 
-    return encrypt_int(cyphertext, dkey, n)
-
-def sign_int(message, dkey, n):
-    """Signs 'message' using key 'dkey', working modulo n"""
-
-    return decrypt_int(message, dkey, n)
-
-def verify_int(signed, ekey, n):
-    """verifies 'signed' using key 'ekey', working modulo n"""
-
-    return encrypt_int(signed, ekey, n)
-
-def blinding_int(m,secret,n):
+def blinding_operation(m,secret,n):
     return (m * secret) % n
 
 
 def encrypt(message, key):
     """Encrypts a string 'message' with the public key 'key'"""
-    
-    #return chopstring(message, key['e'], key['n'], encrypt_int)
-    return encrypt_int(message,key['e'],key['n'])
+    return rsa_operation(message,key['e'],key['n'])
+
 def sign(message, key):
     """Signs a string 'message' with the private key 'key'"""
-      
-    #return chopstring(message, key['d'], key['p']*key['q'], decrypt_int)
-    return decrypt_int(message,key['d'],key['n'])
+    return rsa_operation(message,key['d'],key['n'])
 
 def decrypt(cypher, key):
     """Decrypts a cypher with the private key 'key'"""
-
-    #return gluechops(cypher, key['d'], key['p']*key['q'], decrypt_int)
-    return decrypt_int(cypher,key['d'],key['n'])
+    return rsa_operation(cypher,key['d'],key['n'])
 
 def verify(cypher, key):
     """Verifies a cypher with the public key 'key'"""
-
-    #return gluechops(cypher, key['e'], key['n'], encrypt_int)
-    return encrypt_int(cypher,key['e'],key['n'])
+    return rsa_operation(cypher,key['e'],key['n'])
 
 def blind(message,secret,key):
-    #return chopstring(message,secret,key['n'],blinding_int)
-    return blinding_int(message,secret,key['n'])
+    return blinding_operation(message,secret,key['n'])
 
 def unblind(message,secret,key):
-    #return gluechops(message,secret,key['n'],blinding_int)
-    return blinding_int(message,secret,key['n'])
+    return blinding_operation(message,secret,key['n'])
 
 
 #import math
@@ -397,17 +373,10 @@ fast_exponentiation = pow
 
 
 
-dummypub = {
-'e': 59343568823711559206614914329434374961303042335788099534897501357955675804133L, 
-'n': 32793647770017443581051908007908006621376604150499221366839445678176407494654130256572721798731647281073382247358431120858829497973290288823842062554766872356043862368004460824686561544242774370448685624290963022007959843337482265073763255429596031300239158232169931316001844162136279539357507455710562227577L
-}
-
-dummypriv = {
-'q': 3660876769483489857077409618418989781902917148342703560038011826242773069902176126219730148875372119227365538620396693688963051979724315365417720940740849L, 
-'p': 8957867154497055858370988090953024497950216741166048812169220114248696092230327733254526217831517389137130597830562133311139440841609128753512364848094473L, 
-'d': 12619589565384678078150569778102981741046267149118420445896125941979396328586657133712760591528167393457329828435758755256948329844592838106750783634900284025380032774546264335257012829516042607077111098646252442031819834114954318384114125879377117610343879752299012777002244350133926279173002674800640331117L}
+dummypub = {'e': 14113314172904951708574681727178419945334488710884393819171664976779680200797597414114771594818675165309793637334221026797603177014256605018822198106314722836374110842070715219892097224490412698863094421694900145536562274616319932131625829121465675029881660966735997768513498069724329875965098488010383588739L, 'n': 145150538976217551367176809671350273750494602624899590324368244897722593745479036259822375443517603452852324994768211967284921909083542545166771234362330874393991730925949129652583929144910470338348353919907753285823861580558682180771896411177636929426768872822501699256786375850666075860261984182867372954251L}
 
 
+dummypriv = {'d': 123696117147104176428005963321746675718965595231084565714315557894285965050935507764060028854105522904648614509261060002795161536846964129662796047291190706239685012795528994459464895585008580460376045227460501329077360873393533273710765442351670778999647836893911520692642555450158992572095458544095097599595L, 'n': 145150538976217551367176809671350273750494602624899590324368244897722593745479036259822375443517603452852324994768211967284921909083542545166771234362330874393991730925949129652583929144910470338348353919907753285823861580558682180771896411177636929426768872822501699256786375850666075860261984182867372954251L} 
 
 # Do doctest if we're not imported
 if __name__ == "__main__":
@@ -418,7 +387,7 @@ if __name__ == "__main__":
     times = []
     #blinding
     #message = 'f'*65
-    message = 'c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2'
+    message = bytes2int('c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2')
     #print 'cleartext ', message
     unblinder = getUnblinder(pub['n'])
     blinder = pow(invMod(unblinder, pub['n']), pub['e'],pub['n'])
@@ -429,7 +398,7 @@ if __name__ == "__main__":
     times.append(time.time() - t)
     t = time.time()
     
-    signedblind = encrypt_int(blinded, priv['d'], priv['p']*priv['q'])
+    signedblind = rsa_operation(blinded, priv['d'], priv['n'])
     times.append(time.time() - t)
     t = time.time()
     
@@ -444,7 +413,7 @@ if __name__ == "__main__":
     if 1:
         #full
         t = time.time()
-        message = 'serial '*5
+        message = bytes2int('serial '*5)
         print 'cleartext ', message
         cypher = encrypt(message,pub)
         print 'cyphertext: ',cypher
@@ -458,7 +427,7 @@ if __name__ == "__main__":
         blinded = blind(message,blinder,pub)
         print 'blinded', blinded
         signedblind = sign(blinded,priv)
-        signedblind = encrypt_int(blinded, priv['d'], priv['p']*priv['q'])
+        signedblind = rsa_operation(blinded, priv['d'], priv['n'])
         print 'signedblind', signedblind
         unblinded = unblind(signedblind,unblinder,pub)
         unblinded = (signedblind * unblinder) % pub['n']

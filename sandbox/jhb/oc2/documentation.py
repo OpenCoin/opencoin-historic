@@ -231,7 +231,7 @@ the latter two usually happening at the same time ('online case').
 ...                      '')
 >>> issuer.getMasterPubKey().verifyContainerSignature(cdd)
 True
-
+>>> cdd.toString(True)
 ###############################################################################
 
 
