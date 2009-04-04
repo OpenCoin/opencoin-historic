@@ -161,55 +161,6 @@ def invMod(a, b):
         return ud % b
     return 0
 
-def powMod(base, power, modulus):
-    nBitScan = 5
-
-    """ Return base**power mod modulus, using multi bit scanning
-    with nBitScan bits at a time."""
-
-    #TREV - Added support for negative exponents
-    negativeResult = False
-    if (power < 0):
-        power *= -1
-        negativeResult = True
-
-    exp2 = 2**nBitScan
-    mask = exp2 - 1
-
-    # Break power into a list of digits of nBitScan bits.
-    # The list is recursive so easy to read in reverse direction.
-    nibbles = None
-    while power:
-        nibbles = int(power & mask), nibbles
-        power = power >> nBitScan
-
-    # Make a table of powers of base up to 2**nBitScan - 1
-    lowPowers = [1]
-    for i in xrange(1, exp2):
-        lowPowers.append((lowPowers[i-1] * base) % modulus)
-
-    # To exponentiate by the first nibble, look it up in the table
-    nib, nibbles = nibbles
-    prod = lowPowers[nib]
-
-    # For the rest, square nBitScan times, then multiply by
-    # base^nibble
-    while nibbles:
-        nib, nibbles = nibbles
-        for i in xrange(nBitScan):
-            prod = (prod * prod) % modulus
-        if nib: prod = (prod * lowPowers[nib]) % modulus
-
-    #TREV - Added support for negative exponents
-    if negativeResult:
-        prodInv = invMod(prod, modulus)
-        #Check to make sure the inverse is correct
-        if (prod * prodInv) % modulus != 1:
-            raise AssertionError()
-        return prodInv
-    return prod
-
-
 def getUnblinder(n):
     while 1:
         r = getRandomNumber(0,n) 
@@ -225,11 +176,12 @@ def generate(bits):  #needed
     t = (p-1)*(q-1)
     n = p * q
     
+    e = 17 
     while 1:
-        e = getRandomNumber(17,t-1)  #getRandomNumber, ungerade < (p-1)*(q-1), coprime(e,(p-1)*(q-1)), e.g. gcd == 1
-        e = e % 2 == 0 and e-1 or e    
         if  gcd(e,t) == 1:
-            break            
+            break
+        e +=2
+   
     d = invMod(e, t)
     keys =  ( {'e': e, 'n': n}, {'d': d, 'n': n} )
     return keys
@@ -287,7 +239,7 @@ def isPrime(n, iterations=5, display=False):
     #Repeat Rabin-Miller x times
     a = 2 #Use 2 as a base for first iteration speedup, per HAC
     for count in range(iterations):
-        v = powMod(a, s, n)
+        v = pow(a, s, n)
         if v==1:
             continue
         i = 0
@@ -295,7 +247,7 @@ def isPrime(n, iterations=5, display=False):
             if i == t-1:
                 return False
             else:
-                v, i = powMod(v, 2, n), i+1
+                v, i = pow(v, 2, n), i+1
         a = getRandomNumber(2, n)
     return True
 
@@ -369,22 +321,17 @@ def numBytes(n):
     return int(math.ceil(bits / 8.0))
 
 
-fast_exponentiation = pow
 
+(dummypub,dummypriv) = ({'e': 17, 'n': 119854184191709851267115469806947480444279686024088476366095898577590388788441098128656550419021335940507973237749080463551087748856480956399611369963199842509280458397835875930007780781743559815353663167178392850613614395643351736086803768428705593212269700447923498009295529617805433375506688910349264456281L}, {'d': 112803938062785742369049853935950569829910292728553860109266728073026248271473974709323812159078904414595739517881487495106906116570805606023163642318305713478430901878058050836432331457217407052608225335053649488684207226225731712680194298917913785665189224809172156144674031166473829983092121536846612402225L, 'n': 119854184191709851267115469806947480444279686024088476366095898577590388788441098128656550419021335940507973237749080463551087748856480956399611369963199842509280458397835875930007780781743559815353663167178392850613614395643351736086803768428705593212269700447923498009295529617805433375506688910349264456281L})
 
-
-dummypub = {'e': 14113314172904951708574681727178419945334488710884393819171664976779680200797597414114771594818675165309793637334221026797603177014256605018822198106314722836374110842070715219892097224490412698863094421694900145536562274616319932131625829121465675029881660966735997768513498069724329875965098488010383588739L, 'n': 145150538976217551367176809671350273750494602624899590324368244897722593745479036259822375443517603452852324994768211967284921909083542545166771234362330874393991730925949129652583929144910470338348353919907753285823861580558682180771896411177636929426768872822501699256786375850666075860261984182867372954251L}
-
-
-dummypriv = {'d': 123696117147104176428005963321746675718965595231084565714315557894285965050935507764060028854105522904648614509261060002795161536846964129662796047291190706239685012795528994459464895585008580460376045227460501329077360873393533273710765442351670778999647836893911520692642555450158992572095458544095097599595L, 'n': 145150538976217551367176809671350273750494602624899590324368244897722593745479036259822375443517603452852324994768211967284921909083542545166771234362330874393991730925949129652583929144910470338348353919907753285823861580558682180771896411177636929426768872822501699256786375850666075860261984182867372954251L} 
 
 # Do doctest if we're not imported
 if __name__ == "__main__":
     import time
-    t = time.time()
     (pub,priv) =  gen_pubpriv_keys(1024)
     print '=' * 40
     times = []
+    t = time.time()
     #blinding
     #message = 'f'*65
     message = bytes2int('c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2')
@@ -410,7 +357,7 @@ if __name__ == "__main__":
     times.append(time.time() - t)
     print sum(times) - times[2]
 
-    if 1:
+    if 0:
         #full
         t = time.time()
         message = bytes2int('serial '*5)

@@ -72,6 +72,9 @@ class GiveMintKeys(Protocol):
         answer.keys = keys
         return answer
 
+
+
+
 class CoinsSpendSender(Protocol):
 
     def __init__(self,coins,target):
