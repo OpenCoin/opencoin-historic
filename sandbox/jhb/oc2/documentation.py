@@ -222,6 +222,7 @@ the latter two usually happening at the same time ('online case').
 
 
 ###############################################################################
+
 >>> port = 9090
 >>> denominations = [0,1,2,5,10,20]
 >>> cdd = issuer.makeCDD('OpenCentA',
@@ -231,7 +232,7 @@ the latter two usually happening at the same time ('online case').
 ...                      '')
 >>> issuer.getMasterPubKey().verifyContainerSignature(cdd)
 True
->>> cdd.toString(True)
+
 ###############################################################################
 
 

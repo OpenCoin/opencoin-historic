@@ -30,5 +30,13 @@ class GiveMintKeys(Message):
         SubitemsField('keys',klass=container.MKC)
     ]
 
+class TransferToken(Message):
+     fields = Message.fields + [
+        Field('transactionId'),
+        Field('target'),
+        Field('blinds'),
+        SubitemsField('coins'),
+        Field('options')
+    ]
 
 
