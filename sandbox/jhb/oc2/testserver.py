@@ -14,6 +14,8 @@ class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
         message = transports.createMessage(data)
         if message.header == 'AskLatestCDD':
             protocol = protocols.GiveLatestCDD(self.issuer)
+        elif message.header == 'FetchMintKeys':
+            protocol = protocols.GiveMintKeys(self.issuer)
         answer = protocol.run(message)
         self.send_response(200)
         self.send_header("Content-type", "text/plain")

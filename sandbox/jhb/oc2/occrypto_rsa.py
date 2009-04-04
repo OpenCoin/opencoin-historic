@@ -23,8 +23,7 @@ class KeyField(Field):
 
 class PubKey(Container):
 
-    fields = [KeyField('key'),
-              Field('signature',signing=False)]
+    fields = [KeyField('key')]
 
     def encrypt(self,data):
         return rsa.encrypt(data,self.key)
@@ -47,15 +46,16 @@ class PubKey(Container):
         blinded = rsa.blind(data,blinder,self.key)
         return secret, blinded
 
+    def blindBlank(self,blank):
+        return self.blind(blank.hash())
+
     def unblind(self,secret,data):
-        #number =  cryptomath.stringToNumber(data)
         number = data
         return (number * secret) % self.key['n']
 
 class PrivKey(Container):
     
-    fields = [KeyField('key'),
-              Field('signature',signing=False)]
+    fields = [KeyField('key')]
 
     def decrypt(self,data):
         return rsa.decrypt(data,self.key)
@@ -64,7 +64,7 @@ class PrivKey(Container):
         return rsa.sign(data,self.key)
 
     def signblind(self,number):
-        return rsa.encrypt_int(number,self.key['d'],self.key['p']*self.key['q'])
+        return rsa.encrypt_int(number,self.key['d'],self.key['n'])
 
     def signContainer(self,container):
         signature =  self.sign(container.hash())
@@ -72,12 +72,16 @@ class PrivKey(Container):
         return container
 
 def hash(data):
-    return hashlib.sha256(data).hexdigest()
+    return rsa.bytes2int(hashlib.sha256(data).hexdigest())
 
 def hashContainer(container,allData=False):
     return hash(container.toString(allData=allData))
 
+def createSerial():
+    return rsa.bytesToNumber(rsa.getRandomBytes(16))
+#!!!
 Container.hash = hashContainer
+
 def KeyFactory(bitlen):
     pub,priv = rsa.gen_pubpriv_keys(bitlen)
     pubkey = PubKey()

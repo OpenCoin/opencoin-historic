@@ -57,6 +57,7 @@ class OneItemField(Field):
         return  value
         
     def setdecoded(self,object,data):
+        #import pdb; pdb.set_trace()
         setattr(object,self.name,self.klass(data))
 
 
@@ -72,13 +73,19 @@ class SubitemsField(Field):
     def getencoded(self,object,allData=False):
         out = []
         for item in getattr(object,self.name):
-            out.append(item.getData(allData=allData))
+            if item == None:
+                out.append('')
+            else:                
+                out.append(item.getData(allData=allData))
         return out       
         
     def setdecoded(self,object,data):
         value = []
         for item in data:
-            value.append(self.klass(item))
+            if item == '':
+                value.append(None)
+            else:
+                value.append(self.klass(item))
         setattr(object,self.name,value)     
 
 
@@ -99,8 +106,13 @@ class Container(object):
         return self.toString()
 
     def fromData(self,data):
+
+        if data == None:
+            return
+
         if type(data) == type(''):
             data = simplejson.loads(data)
+
         if type(data) != type({}):
             data = dict(data)
         for field in self.fields:
@@ -120,4 +132,5 @@ class Container(object):
 
     def toString(self,allData=False):
         return simplejson.dumps(self.getData(allData=allData))
+
 

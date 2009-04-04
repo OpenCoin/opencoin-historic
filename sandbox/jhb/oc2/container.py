@@ -1,6 +1,7 @@
 from containerbase import *
 import occrypto
 
+
 class CDD (Container):
     "Currency Description Document"
 
@@ -18,14 +19,6 @@ class CDD (Container):
         Field('signature',signing=False)
     ]
 
-class PublicKey(Container):
-    "A public key"
-    fields = [
-        BinaryField('a'),
-        BinaryField('b'),
-        BinaryField('c')
-    ]        
-
 
 class MKC(Container):
     "Mint Key Certificate"
@@ -37,25 +30,25 @@ class MKC(Container):
         DateField('notBefore'),
         DateField('keyNotAfter'),
         DateField('coinNotAfter'),
-        OneItemField('publicKey',klass=PublicKey),
+        OneItemField('publicKey',klass=occrypto.PubKey),
         Field('issuer'),
         Field('signature',signing=False)
     ]
 
 
-class Token(Container):
+class Coin(Container):
     fields = [
-        Field('currency'),
-        Field('amount'),
+        Field('standardId'),
+        Field('currencyId'),
+        Field('denomination'),
+        Field('keyId'),
+        Field('serial'),
         Field('signature',signing=False)
     ]
 
-class Message(Container):
-    fields = [
-        Field('subject'),
-        SubitemsField('tokens',klass=Token),
-    ]        
-    
+    def setNewSerial(self):
+        self.serial = occrypto.createSerial()
+
 
 
 

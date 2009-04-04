@@ -18,3 +18,17 @@ class GiveLatestCDD(Message):
     fields = Message.fields + [
         OneItemField('cdd',klass=container.CDD)
     ]
+
+class FetchMintKeys(Message):
+    fields = Message.fields + [
+        Field('denominations'),
+        Field('keyids')
+    ]
+
+class GiveMintKeys(Message):
+    fields = Message.fields + [
+        SubitemsField('keys',klass=container.MKC)
+    ]
+
+
+

@@ -99,15 +99,16 @@ def encrypt_int(message, ekey, n):
     n"""
 
     if type(message) is types.IntType:
-        return encrypt_int(long(message), ekey, n)
-
+        message = long(message)
+    elif type(message) is types.LongType:
+        pass
+    elif type(message) is types.StringType:
+        message = long(bytes2int(message))
+    
     if not type(message) is types.LongType:
-        raise TypeError("You must pass a long or an int")
-
-    #if math.floor(log(message, 2)) > math.floor(log(n, 2)):
-    #    raise OverflowError("The message is too long")
-
-    return fast_exponentiation(message, ekey, n)
+        raise TypeError("You must pass a long or an int, not %s" % type(message))
+    
+    return pow(message, ekey, n)
 
 def decrypt_int(cyphertext, dkey, n):
     """Decrypts a cypher text using the decryption key 'dkey', working
@@ -128,74 +129,37 @@ def verify_int(signed, ekey, n):
 def blinding_int(m,secret,n):
     return (m * secret) % n
 
-def chopstring(message, key, n, funcref):
-    """Splits 'message' into chops that are at most as long as n,
-    converts these into integers, and calls funcref(integer, key, n)
-    for each chop.
-
-    Used by 'encrypt' and 'sign'.
-    """
-
-    msglen = len(message)
-    mbits  = msglen * 8
-    #nbits  = int(math.floor(log(n, 2)))
-    nbits = 1024
-    nbytes = nbits / 8
-    blocks = msglen / nbytes
-
-    if msglen % nbytes > 0:
-        blocks += 1
-
-    cypher = []
-    
-    for bindex in range(blocks):
-        offset = bindex * nbytes
-        block  = message[offset:offset+nbytes]
-        value  = bytes2int(block)
-        cypher.append(funcref(value, key, n))
-
-    return cypher[0]
-
-def gluechops(chops, key, n, funcref):
-    """Glues chops back together into a string.  calls
-    funcref(integer, key, n) for each chop.
-
-    Used by 'decrypt' and 'verify'.
-    """
-    message = ""
-    chops = [chops]
-    
-    for cpart in chops:
-        mpart = funcref(cpart, key, n)
-        message += int2bytes(mpart)
-    
-    return message
 
 def encrypt(message, key):
     """Encrypts a string 'message' with the public key 'key'"""
     
-    return chopstring(message, key['e'], key['n'], encrypt_int)
-
+    #return chopstring(message, key['e'], key['n'], encrypt_int)
+    return encrypt_int(message,key['e'],key['n'])
 def sign(message, key):
     """Signs a string 'message' with the private key 'key'"""
-    
-    return chopstring(message, key['d'], key['p']*key['q'], decrypt_int)
+      
+    #return chopstring(message, key['d'], key['p']*key['q'], decrypt_int)
+    return decrypt_int(message,key['d'],key['n'])
 
 def decrypt(cypher, key):
     """Decrypts a cypher with the private key 'key'"""
 
-    return gluechops(cypher, key['d'], key['p']*key['q'], decrypt_int)
+    #return gluechops(cypher, key['d'], key['p']*key['q'], decrypt_int)
+    return decrypt_int(cypher,key['d'],key['n'])
 
 def verify(cypher, key):
     """Verifies a cypher with the public key 'key'"""
 
-    return gluechops(cypher, key['e'], key['n'], encrypt_int)
+    #return gluechops(cypher, key['e'], key['n'], encrypt_int)
+    return encrypt_int(cypher,key['e'],key['n'])
 
 def blind(message,secret,key):
-    return chopstring(message,secret,key['n'],blinding_int)
+    #return chopstring(message,secret,key['n'],blinding_int)
+    return blinding_int(message,secret,key['n'])
 
 def unblind(message,secret,key):
-    return gluechops(message,secret,key['n'],blinding_int)
+    #return gluechops(message,secret,key['n'],blinding_int)
+    return blinding_int(message,secret,key['n'])
 
 
 #import math
@@ -279,18 +243,19 @@ def getUnblinder(n):
 
 
 def generate(bits):  #needed
+    #return (dummypub,dummypriv)
     p = getRandomPrime(bits/2, False)
     q = getRandomPrime(bits/2, False)
-    t = lcm(p-1, q-1)
+    t = (p-1)*(q-1)
     n = p * q
-    e = 3L  #Needed to be long, for Java
+    
+    while 1:
+        e = getRandomNumber(17,t-1)  #getRandomNumber, ungerade < (p-1)*(q-1), coprime(e,(p-1)*(q-1)), e.g. gcd == 1
+        e = e % 2 == 0 and e-1 or e    
+        if  gcd(e,t) == 1:
+            break            
     d = invMod(e, t)
-    p = p
-    q = q
-    #dP = key.d % (p-1)
-    #dQ = key.d % (q-1)
-    #qInv = invMod(q, p)
-    keys =  ( {'e': e, 'n': n}, {'d': d, 'p': p, 'q': q} )
+    keys =  ( {'e': e, 'n': n}, {'d': d, 'n': n} )
     return keys
 
 gen_pubpriv_keys = generate
@@ -448,8 +413,7 @@ dummypriv = {
 if __name__ == "__main__":
     import time
     t = time.time()
-    #(pub,priv) =  gen_pubpriv_keys(1024)
-    (pub,priv) = (dummypub,dummypriv)          
+    (pub,priv) =  gen_pubpriv_keys(1024)
     print '=' * 40
     times = []
     #blinding
@@ -477,29 +441,29 @@ if __name__ == "__main__":
     times.append(time.time() - t)
     print sum(times) - times[2]
 
-    if 0:
+    if 1:
         #full
         t = time.time()
         message = 'serial '*5
-        #print 'cleartext ', message
+        print 'cleartext ', message
         cypher = encrypt(message,pub)
-        #print 'cyphertext: ',cypher
-        #print 'decrypted', decrypt(cypher,priv)
+        print 'cyphertext: ',cypher
+        print 'decrypted', decrypt(cypher,priv)
         decrypt(cypher,priv)
         signed = sign(message,priv)
-        #print 'signed', signed
-        #print 'verified', message == verify(signed,pub)
+        print 'signed', signed
+        print 'verified', message == verify(signed,pub)
         unblinder = getUnblinder(pub['n'])
         blinder = pow(invMod(unblinder, pub['n']), pub['e'],pub['n'])
         blinded = blind(message,blinder,pub)
-        #print 'blinded', blinded
-        #signedblind = sign(blinded,priv)
+        print 'blinded', blinded
+        signedblind = sign(blinded,priv)
         signedblind = encrypt_int(blinded, priv['d'], priv['p']*priv['q'])
-        #print 'signedblind', signedblind
-        #unblinded = unblind(signedblind,unblinder,pub)
+        print 'signedblind', signedblind
+        unblinded = unblind(signedblind,unblinder,pub)
         unblinded = (signedblind * unblinder) % pub['n']
-        #print 'unblinded', unblinded
-        #print 'verified', message == verify(unblinded,pub)
+        print 'unblinded', unblinded
+        print 'verified', message == verify(unblinded,pub)
         print time.time() - t
         
         

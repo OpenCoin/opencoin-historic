@@ -1,4 +1,10 @@
 """
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
+
+      This is just a todo for jhb, and not the real spec
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
+
 OpenCoin Project                                            N. Toedtmann
 http://opencoin.org/                                         J. H. Baach
 Category: Draft                                                 M. Ryden
@@ -217,9 +223,10 @@ the latter two usually happening at the same time ('online case').
 
 ###############################################################################
 >>> port = 9090
+>>> denominations = [0,1,2,5,10,20]
 >>> cdd = issuer.makeCDD('OpenCentA',
 ...                      'oca',
-...                      [str(d) for d in [0,1,2,5,10,20]],
+...                      [str(d) for d in denominations],
 ...                      'http://localhost:%s/' % port,
 ...                      '')
 >>> issuer.getMasterPubKey().verifyContainerSignature(cdd)
@@ -274,10 +281,10 @@ True
 
 >>> #faked request
 >>> from wallet import Wallet
->>> wallet = Wallet(Item())
+>>> wallet = Wallet({})
 >>> import protocols
 >>> serverside = protocols.GiveLatestCDD(issuer)
->>> clientside = protocols.AskLatestCDD(wallet,serverside.run)
+>>> clientside = protocols.AskLatestCDD(serverside.run)
 >>> cdd == clientside.run()
 True
 
@@ -285,7 +292,7 @@ True
 >>> import transports
 >>> import testserver
 >>> transport = transports.HTTPTransport('http://localhost:%s/' % port)
->>> clientside = protocols.AskLatestCDD(wallet,transport)
+>>> clientside = protocols.AskLatestCDD(transport)
 >>> testserver.run_once(port,issuer)
 >>> cdd2 =  clientside.run()
 >>> cdd2.toString(True) == cdd.toString(True)
@@ -303,6 +310,16 @@ Wallet:
 IS:
     MINTING_KEY_PASS(keycertificate) or MINTING_KEY_FAILURE(reason)
 
+###############################################################################
+
+>>> clientside = protocols.FetchMintKeys(transport,denominations=['1','5'])
+>>> testserver.run_once(port,issuer)
+>>> mkcs =  clientside.run()
+>>> mkcs[0].toString() == issuer.getCurrentMKCs()['1'].toString()
+True
+
+###############################################################################
+
 * Wallet: creates blank according to CDD:
 
   {
@@ -313,6 +330,8 @@ IS:
       serial              = base64(128bit random number)
   }
 
+#XXX: ist key id wirklich vom secret key, oder vom public key?
+
 
 * Wallet: create random r, calculate 
 
@@ -322,6 +341,20 @@ IS:
 
   Keep (r, blank, blind) in mind. 
   
+###############################################################################
+
+>>> mkc = mkcs[1]
+>>> cdd.masterPubKey.verifyContainerSignature(mkc)
+True
+>>> blank = wallet._makeBlank(cdd,mkc)
+>>> blank.denomination == '5'
+True
+>>> key = mkc.publicKey
+>>> secret, blind = key.blindBlank(blank)
+>>> tid = wallet.makeSerial()
+
+###############################################################################
+
 
 3.3.5 "TRANSFER_TOKEN": A generic wallet-issuer request
 

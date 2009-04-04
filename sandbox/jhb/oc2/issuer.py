@@ -71,11 +71,15 @@ class Issuer(Entity):
         return self.getCurrentMKCs()
 
     def addMKC(self,cdd,mkc):
-        mkclist = self.storage.setdefault('mkclist',[])            
+        mkclist = self.storage.setdefault('mkclist',[])
         if len(mkclist) <= cdd.version:
             mkclist.append({})
         mkclist[cdd.version][mkc.denomination]=mkc    
+        keyidlist = self.storage.setdefault('keyidlist',{})
+        keyidlist[mkc.keyId] = mkc
         
     def getCurrentMKCs(self,version=-1):
         return self.storage['mkclist'][version]
 
+    def getMKCById(self,keyid,default=None):
+        return self.storage.setdefault('keyidlist',{}).get(keyid,default)
