@@ -442,16 +442,22 @@ fail, the whole transaction fails.
 
 ###############################################################################
 
+We first need to setup something to sign the requests for authorization
+
 >>> from authorizer import Authorizer
 >>> authorizer = Authorizer({})
 >>> authpub = authorizer.createKeys() 
 >>> mint.addAuthKey(authpub)
+>>> authorizer.setMKCs(mkcs)
+
+
+good, lets start the action
 >>> clientside = protocols.TransferRequest(transport,tid,'foo',[[mkc.keyId,blind]],[])
 >>> testserver.run_once(port,mint=mint,authorizer=authorizer)
 >>> text,value =  clientside.run()
 >>> text
 u'minted'
->>> blindsign = value[0][1]
+>>> blindsign = value[0]
 >>> blank.signature = key.unblind(secret,blindsign)
 >>> coin = blank
 >>> key.verifyContainerSignature(coin)

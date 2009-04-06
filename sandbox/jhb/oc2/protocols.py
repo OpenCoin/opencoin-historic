@@ -82,11 +82,11 @@ class TransferRequest(Protocol):
 
     def run(self,message=None):
         if self.target and self.blinds:
-            type = 'mint'
+            requesttype = 'mint'
         elif self.target and self.coins:
-            type = 'redeem'
+            requesttype = 'redeem'
         elif self.blinds and self.coins:
-            type = 'exchange'
+            requesttype = 'exchange'
         else:
             raise 'Not a valid combination of options'
         
@@ -95,12 +95,12 @@ class TransferRequest(Protocol):
         message.target = self.target
         message.blinds = self.blinds
         message.coins = self.coins
-        message.options = dict(type=type).items()
+        message.options = dict(type=requesttype).items()
 
         response = self.transport(message)
         header = response.header
         if header == 'TransferReject':
-            return ('TRansferReject','')
+            return ('TransferReject','')
         elif header == 'TransferDelay':
             return ('TransferDelay','')
         elif header == 'TransferAccept':
@@ -116,13 +116,18 @@ class TransferHandling(Protocol):
 
     def run(self,message):
         options = dict(message.options)
-        type = options['type']
-        if type == 'mint':
+        requesttype = options['type']
+        if requesttype == 'mint':
             authorizedMessage = self.authorizer.authorize(message)
-            if not authorizedMessage:
-                raise 'not authorized'
-            text,value = self.mint.handleTransferRequest(authorizedMessage)
-            if text == 'minted':
+            if type(authorizedMessage) == messages.Error:
+                return messages.TransferReject()
+                 
+            response  = self.mint.handleTransferRequest(authorizedMessage)
+            if type(response) == messages.Error:
+                return messages.TransferReject()
+
+            text,value = response
+            if value:
                 answer = messages.TransferAccept()
                 answer.text = text
                 answer.signatures = value

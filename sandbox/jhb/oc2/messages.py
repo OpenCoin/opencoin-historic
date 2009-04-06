@@ -51,5 +51,15 @@ class AuthorizedMessage(Message):
         Field('keyId'),
         Field('signature',signing=False)
     ]
+class Error(Message):
+    fields = Message.fields + [
+        Field('text'),
+        Field('data'),
+        Field('keyId'),
+        Field('signature',signing=False)
+    ]
+
+class TransferReject(Message):
+    pass
 
 

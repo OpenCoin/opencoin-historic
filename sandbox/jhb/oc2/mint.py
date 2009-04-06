@@ -36,9 +36,6 @@ class Mint(Entity):
     def getMintKeyById(self,keyid):
         return self.storage['keyids'][keyid]
 
-    def denominationToValue(self,denomination):
-        return int(denomination)
-
 
     def addAuthKey(self,key):
         keyid = key.hash()
@@ -53,47 +50,18 @@ class Mint(Entity):
         return key.verifyContainerSignature(message)
 
     def handleTransferRequest(self,authorizedMessage):
-        
+         
         if not self.validateAuthorization(authorizedMessage):
             return ('nonvalid','')
         else: 
             message = authorizedMessage.message
-        
-        target = message.target
         blinds = message.blinds
-        coins = message.coins
-
-        amount = 0
-        currentversion = len(self.storage['keys']) - 1
-        errors = None
         result = []
-        mintkeys = []
-
         for keyid,blind in blinds:
-            error = None
             priv,pub,denomination,version = self.getMintKeyById(keyid)
-            mintkeys.append(priv)
-            if version != currentversion:
-                error = 'Key not current'
-            
-            if error:
-                errors = True
-                result.append(('error',error))
-            else:
-                result.append(['ok',''])
-    
-            amount += self.denominationToValue(denomination)
-        
-        if errors:
-            return ('errors',result)
-
-        else:
-            i = 0
-            for keyid,blind in blinds:
-                signature = mintkeys[i].sign(blind)
-                result[i][1] = signature
-                i += 1
-                        
+            signature = priv.sign(blind)
+            result.append(signature)
+                    
         return ('minted',result)
 
 
