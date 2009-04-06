@@ -30,7 +30,7 @@ class GiveMintKeys(Message):
         SubitemsField('keys',klass=container.MKC)
     ]
 
-class TransferToken(Message):
+class TransferRequest(Message):
      fields = Message.fields + [
         Field('transactionId'),
         Field('target'),
@@ -39,4 +39,9 @@ class TransferToken(Message):
         Field('options')
     ]
 
+class TransferAccept(Message):
+    fields = Message.fields + [
+        Field('text'),
+        Field('signatures'),
+    ]
 

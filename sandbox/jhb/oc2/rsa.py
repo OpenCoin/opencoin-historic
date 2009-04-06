@@ -22,20 +22,11 @@ import types
 
 # Get os.urandom PRNG
 import os
-try:
-    raise Exception
-    os.urandom(1)
-    def getRandomBytes(howMany):
-        return stringToBytes(os.urandom(howMany))
-    grbname = 'urandom'        
-except:
-
-    def getRandomBytes(howMany):
-        bits = howMany * 8
-        number = random.getrandbits(bits)
-        return numberToBytes(number)
-        pass
-    grbname = 'randint'        
+def getRandomBytes(howMany):
+    bits = howMany * 8
+    number = random.getrandbits(bits)
+    return numberToBytes(number)
+  
 
 def log(x, base = 10):
     return math.log(x) / math.log(base)
@@ -170,7 +161,7 @@ def getUnblinder(n):
 
 
 def generate(bits):  #needed
-    #return (dummypub,dummypriv)
+    return (dummypub,dummypriv)
     p = getRandomPrime(bits/2, False)
     q = getRandomPrime(bits/2, False)
     t = (p-1)*(q-1)

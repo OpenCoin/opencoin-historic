@@ -42,7 +42,7 @@ class PubKey(Container):
 
     def blind(self,data):
         secret = self.createBlindingSecret()
-        blinder =  rsa.powMod(rsa.invMod(secret, self.key['n']), self.key['e'], self.key['n'])
+        blinder =  pow(rsa.invMod(secret, self.key['n']), self.key['e'], self.key['n'])
         blinded = rsa.blind(data,blinder,self.key)
         return secret, blinded
 

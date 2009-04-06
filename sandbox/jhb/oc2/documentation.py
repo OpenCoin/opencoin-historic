@@ -440,6 +440,20 @@ fail, the whole transaction fails.
   some time later and passes "signed blind"="blind token" back to IS 
 
 
+###############################################################################
+
+>>> clientside = protocols.TransferRequest(transport,tid,'foo',[[mkc.keyId,blind]],[])
+>>> testserver.run_once(port,issuer,mint)
+>>> text,value =  clientside.run()
+>>> text
+u'minted'
+>>> blindsign = value[0][1]
+>>> blank.signature = key.unblind(secret,blindsign)
+>>> coin = blank
+>>> key.verifyContainerSignature(coin)
+True
+
+###############################################################################
 3.5 Wallet gets token back
 
 * Wallet asks issuer service

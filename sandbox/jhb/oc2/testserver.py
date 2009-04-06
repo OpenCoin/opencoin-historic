@@ -16,6 +16,8 @@ class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
             protocol = protocols.GiveLatestCDD(self.issuer)
         elif message.header == 'FetchMintKeys':
             protocol = protocols.GiveMintKeys(self.issuer)
+        elif message.header == 'TransferRequest':
+            protocol = protocols.TransferHandle(self.mint)
         answer = protocol.run(message)
         self.send_response(200)
         self.send_header("Content-type", "text/plain")
@@ -23,8 +25,9 @@ class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
         self.wfile.write(answer.toString(True))
 
 
-def run_once(port,issuer=None):
+def run_once(port,issuer=None,mint=None):
     Handler.issuer = issuer
+    Handler.mint = mint
     httpd = BaseHTTPServer.HTTPServer(("", port), Handler)
     import threading
     t = threading.Thread(target=httpd.handle_request)     

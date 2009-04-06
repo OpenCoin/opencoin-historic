@@ -72,8 +72,59 @@ class GiveMintKeys(Protocol):
         answer.keys = keys
         return answer
 
+class TransferRequest(Protocol):
+    def __init__(self,transport,transactionId,target=None,blinds=None,coins=None):
+        self.transport = transport
+        self.transactionId=transactionId
+        self.target = target
+        self.blinds = blinds
+        self.coins = coins
 
+    def run(self,message=None):
+        if self.target and self.blinds:
+            type = 'mint'
+        elif self.target and self.coins:
+            type = 'redeem'
+        elif self.blinds and self.coins:
+            type = 'exchange'
+        else:
+            raise 'Not a valid combination of options'
+        
+        message = messages.TransferRequest()
+        message.transactionId = self.transactionId
+        message.target = self.target
+        message.blinds = self.blinds
+        message.coins = self.coins
+        message.options = dict(type=type).items()
 
+        response = self.transport(message)
+        header = response.header
+        if header == 'TransferReject':
+            return ('TRansferReject','')
+        elif header == 'TransferDelay':
+            return ('TransferDelay','')
+        elif header == 'TransferAccept':
+            return (response.text,response.signatures)
+        else:
+            raise 'unknown thing'
+
+class TransferHandle(Protocol):
+
+    def __init__(self,mint):
+        self.mint = mint
+
+    def run(self,message):
+        options = dict(message.options)
+        type = options['type']
+        if type == 'mint':
+            text,value = self.mint.mintBlinds(message.target,message.blinds)
+            if text == 'minted':
+                answer = messages.TransferAccept()
+                answer.text = text
+                answer.signatures = value
+            else:
+                raise 'something went wrong'
+        return answer    
 
 class CoinsSpendSender(Protocol):
 
@@ -88,30 +139,12 @@ class CoinsSpendSender(Protocol):
         return ''
 
 
+
 class CoinsSpendRecipient(Protocol):
 
     def hearCoins(self,message):
         return ''
 
-    def receiveCoins(self,message):
-        return ''
-
-
-class TransferCoinsSender(Protocol):
-    
-    def __init__(self,target,blinds,coins):
-        self.target = target
-        self.blinds = blinds
-        self.coins = coins
-
-
-
-    def transferCoins(self,message):
-        return ''
-
-
-class TransferCoinRecipient(Protocol):
-    
     def receiveCoins(self,message):
         return ''
 
