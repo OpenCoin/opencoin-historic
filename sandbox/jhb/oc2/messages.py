@@ -36,7 +36,7 @@ class TransferRequest(Message):
         Field('target'),
         Field('blinds'),
         SubitemsField('coins'),
-        Field('options')
+        Field('options'),
     ]
 
 class TransferAccept(Message):
@@ -44,4 +44,12 @@ class TransferAccept(Message):
         Field('text'),
         Field('signatures'),
     ]
+
+class AuthorizedMessage(Message):
+    fields = Message.fields + [
+        OneItemField('message',klass=Message),
+        Field('keyId'),
+        Field('signature',signing=False)
+    ]
+
 

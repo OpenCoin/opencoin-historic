@@ -2,6 +2,7 @@ from entity import *
 
 class Mint(Entity):
 
+
     def setCDD(self,cdd):
         self.storage['cdd'] = cdd
     
@@ -38,10 +39,30 @@ class Mint(Entity):
     def denominationToValue(self,denomination):
         return int(denomination)
 
-    def validateTarget(self,target,amount):
-        return True
 
-    def mintBlinds(self,target,blinds):
+    def addAuthKey(self,key):
+        keyid = key.hash()
+        self.storage.setdefault('authkeys',{})[keyid] = key
+
+    def getAuthKey(self,keyid):
+        return self.storage['authkeys'][keyid]
+
+    def validateAuthorization(self,message):
+        keyid = message.keyId
+        key = self.getAuthKey(keyid)
+        return key.verifyContainerSignature(message)
+
+    def handleTransferRequest(self,authorizedMessage):
+        
+        if not self.validateAuthorization(authorizedMessage):
+            return ('nonvalid','')
+        else: 
+            message = authorizedMessage.message
+        
+        target = message.target
+        blinds = message.blinds
+        coins = message.coins
+
         amount = 0
         currentversion = len(self.storage['keys']) - 1
         errors = None
@@ -66,12 +87,7 @@ class Mint(Entity):
         if errors:
             return ('errors',result)
 
-        valid = self.validateTarget(target,amount)
-
-        if not valid:
-            return ('nonvalid','')
-
-        if valid and not errors:
+        else:
             i = 0
             for keyid,blind in blinds:
                 signature = mintkeys[i].sign(blind)

@@ -442,8 +442,12 @@ fail, the whole transaction fails.
 
 ###############################################################################
 
+>>> from authorizer import Authorizer
+>>> authorizer = Authorizer({})
+>>> authpub = authorizer.createKeys() 
+>>> mint.addAuthKey(authpub)
 >>> clientside = protocols.TransferRequest(transport,tid,'foo',[[mkc.keyId,blind]],[])
->>> testserver.run_once(port,issuer,mint)
+>>> testserver.run_once(port,mint=mint,authorizer=authorizer)
 >>> text,value =  clientside.run()
 >>> text
 u'minted'

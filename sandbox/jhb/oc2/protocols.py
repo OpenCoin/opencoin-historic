@@ -108,16 +108,20 @@ class TransferRequest(Protocol):
         else:
             raise 'unknown thing'
 
-class TransferHandle(Protocol):
+class TransferHandling(Protocol):
 
-    def __init__(self,mint):
+    def __init__(self,mint,authorizer):
         self.mint = mint
+        self.authorizer = authorizer
 
     def run(self,message):
         options = dict(message.options)
         type = options['type']
         if type == 'mint':
-            text,value = self.mint.mintBlinds(message.target,message.blinds)
+            authorizedMessage = self.authorizer.authorize(message)
+            if not authorizedMessage:
+                raise 'not authorized'
+            text,value = self.mint.handleTransferRequest(authorizedMessage)
             if text == 'minted':
                 answer = messages.TransferAccept()
                 answer.text = text
