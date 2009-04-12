@@ -2,7 +2,11 @@ from entity import *
 import datetime
 
 class Issuer(Entity):
- 
+
+    def __init__(self,storage=None):
+        Entity.__init__(self,storage)
+        self.delay = False
+
     def createMasterKeys(self):
         priv,pub = occrypto.KeyFactory(1024)
         self.storage['masterPrivKey'] = priv
@@ -83,3 +87,12 @@ class Issuer(Entity):
 
     def getMKCById(self,keyid,default=None):
         return self.storage.setdefault('keyidlist',{}).get(keyid,default)
+
+    def addToTransactions(self,transactionId,signatures):
+        self.storage.setdefault('transactions',{})[transactionId]=signatures
+
+    def getTransactionResult(self,transactionId):
+        if self.delay:
+            return None
+        else:            
+            return self.storage.setdefault('transactions',{}).get(transactionId,None)

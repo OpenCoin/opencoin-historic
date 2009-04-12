@@ -2,6 +2,9 @@ from entity import *
 
 class Mint(Entity):
 
+    def __init__(self,storage=None):
+        Entity.__init__(self,storage)
+        self.delay = False
 
     def setCDD(self,cdd):
         self.storage['cdd'] = cdd
@@ -61,7 +64,13 @@ class Mint(Entity):
             priv,pub,denomination,version = self.getMintKeyById(keyid)
             signature = priv.sign(blind)
             result.append(signature)
-                    
-        return ('minted',result)
 
+        if self.delay:
+            
+            self.addToTransactions(message.transactionId,result)
+            return('delayed','mint asked to delay')
+        else:            
+            return ('minted',result)
 
+    def addToTransactions(self,transactionId,result):
+        self.storage.setdefault('transactions',{})[transactionId]=result

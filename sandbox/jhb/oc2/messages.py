@@ -41,7 +41,6 @@ class TransferRequest(Message):
 
 class TransferAccept(Message):
     fields = Message.fields + [
-        Field('text'),
         Field('signatures'),
     ]
 
@@ -61,5 +60,16 @@ class Error(Message):
 
 class TransferReject(Message):
     pass
+
+class TransferDelay(Message):
+     fields = Message.fields + [
+        Field('transactionId'),
+        Field('reason'),
+    ]
+
+class TransferResume(Message):
+     fields = Message.fields + [
+        Field('transactionId'),
+    ]
 
 

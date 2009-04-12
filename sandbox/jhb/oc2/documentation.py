@@ -354,6 +354,9 @@ True
 >>> secret, blind = key.blindBlank(blank)
 >>> tid = wallet.makeSerial()
 
+>>> int(mkc.denomination)
+5
+
 ###############################################################################
 
 
@@ -418,20 +421,81 @@ fail, the whole transaction fails.
             list_of_blinds+keyids, (empty list) , list_of_options, )
 
   to issuer service
+  
+  
+###############################################################################
+
+We first need to setup an authorizer, to (surpise) authorize the request. Nils says
+the mint should more or less just mint
+
+>>> from authorizer import Authorizer
+>>> authorizer = Authorizer({})
+>>> authpub = authorizer.createKeys() 
+>>> mint.addAuthKey(authpub)
+>>> authorizer.setMKCs(mkcs)
+>>> clientside = protocols.TransferRequest(transport,tid,'foo',[[mkc.keyId,blind]],[])
+
+###############################################################################
 
 * Issuer: if request will not be minted (e.g., "Bad Key ID" if the key_id
   is not current):
 
         TRANSFER_TOKEN_REJECT( transaction_id, reason,
             list( (blind1.key_id, reason1), ... ), (empty list1)  )
+        
+###############################################################################
+>>> import time
+>>> time.sleep(1)
+>>> authorizer.deny = True
+>>> testserver.run_once(port,mint=mint,authorizer=authorizer)
+>>> text,value =  clientside.run()
+>>> text
+'TransferReject'
+
+
+###############################################################################
 
   ElseIf minting is done just-in-time, IS answers
 
         TRANSFER_TOKEN_ACCEPT( transaction_id, message, list_of_signed_blinds)
 
+###############################################################################
+
+>>> authorizer.deny = False
+>>> testserver.run_once(port,mint=mint,authorizer=authorizer)
+>>> text,value =  clientside.run()
+>>> text
+'TransferAccept'
+>>> blindsign = value[0]
+>>> blank.signature = key.unblind(secret,blindsign)
+>>> coin = blank
+>>> key.verifyContainerSignature(coin)
+True
+
+We don't have a transport between mint and issuer yet. Lets have the mint
+stuff coins directly into the issuer 
+
+>>> mint.addToTransactions = issuer.addToTransactions
+
+
+###############################################################################
+
   Else IS queues blind to the mint and tells wallet to wait
 
         TRANSFER_TOKEN_DELAY( transaction_id, reason )
+
+
+###############################################################################
+
+>>> mint.delay = True
+>>> testserver.run_once(port,mint=mint,authorizer=authorizer)
+>>> text,value =  clientside.run()
+>>> text
+'TransferDelay'
+>>> mint.delay = False
+
+###############################################################################
+
 
   Session is terminated.
 
@@ -440,30 +504,11 @@ fail, the whole transaction fails.
   some time later and passes "signed blind"="blind token" back to IS 
 
 
-###############################################################################
-
-We first need to setup something to sign the requests for authorization
-
->>> from authorizer import Authorizer
->>> authorizer = Authorizer({})
->>> authpub = authorizer.createKeys() 
->>> mint.addAuthKey(authpub)
->>> authorizer.setMKCs(mkcs)
 
 
-good, lets start the action
->>> clientside = protocols.TransferRequest(transport,tid,'foo',[[mkc.keyId,blind]],[])
->>> testserver.run_once(port,mint=mint,authorizer=authorizer)
->>> text,value =  clientside.run()
->>> text
-u'minted'
->>> blindsign = value[0]
->>> blank.signature = key.unblind(secret,blindsign)
->>> coin = blank
->>> key.verifyContainerSignature(coin)
-True
 
-###############################################################################
+
+
 3.5 Wallet gets token back
 
 * Wallet asks issuer service
@@ -479,14 +524,37 @@ True
   or tells to wait longer
 
         TRANSFER_TOKEN_DELAY( transaction_id, reason )
-    
+
+###############################################################################
+
+>>> issuer.delay = True
+>>> clientside = protocols.TransferResume(transport,tid)
+>>> testserver.run_once(port,issuer=issuer)
+>>> text,value =  clientside.run()
+>>> text
+'TransferDelay'
+>>> issuer.delay = False
+
+###############################################################################
+
   (question: what about key expiration while request is in mining queue)
   (oierw thinks: as long as the key is valid for minting when the request is made, we are good)
 
   or passes signed blinds to wallet Bob, must preserve order
 
         TRANSFER_TOKEN_ACCEPT( transaction_id, message, list_of_singed_blinds )
-    
+   
+
+###############################################################################
+
+>>> clientside = protocols.TransferResume(transport,tid)
+>>> testserver.run_once(port,issuer=issuer)
+>>> text,value =  clientside.run()
+>>> text
+'TransferAccept'
+
+###############################################################################
+
   Session terminates
 
 * wallet checks if blind fits request id and if blind was correctly signed. 
@@ -494,6 +562,16 @@ True
   (optional: if yes, inform issuer that he may delete the request)
 
 * Wallet unblinds signed blind and yields token  (or reblinds)
+
+###############################################################################
+
+>>> blindsign = value[0]
+>>> blank.signature = key.unblind(secret,blindsign)
+>>> coin = blank
+>>> key.verifyContainerSignature(coin)
+True
+
+###############################################################################
 
 
 3.6 Wallet to wallet

@@ -18,6 +18,9 @@ class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
             protocol = protocols.GiveMintKeys(self.issuer)
         elif message.header == 'TransferRequest':
             protocol = protocols.TransferHandling(self.mint,self.authorizer)
+        elif message.header == 'TransferResume':
+            protocol = protocols.TransferResumeHandling(self.issuer)
+ 
         answer = protocol.run(message)
         self.send_response(200)
         self.send_header("Content-type", "text/plain")
@@ -25,7 +28,10 @@ class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
         self.wfile.write(answer.toString(True))
 
 
+
 def run_once(port,issuer=None,mint=None,authorizer=None):
+    import time
+    time.sleep(0.001)
     Handler.issuer = issuer
     Handler.mint = mint
     Handler.authorizer = authorizer

@@ -104,7 +104,7 @@ class TransferRequest(Protocol):
         elif header == 'TransferDelay':
             return ('TransferDelay','')
         elif header == 'TransferAccept':
-            return (response.text,response.signatures)
+            return ('TransferAccept',response.signatures)
         else:
             raise 'unknown thing'
 
@@ -127,13 +127,56 @@ class TransferHandling(Protocol):
                 return messages.TransferReject()
 
             text,value = response
-            if value:
+            if text=='minted':
                 answer = messages.TransferAccept()
-                answer.text = text
                 answer.signatures = value
+            elif text =='delayed':
+                answer = messages.TransferDelay()
+                answer.transactionId = message.transactionId
+                answer.reason = value
             else:
                 raise 'something went wrong'
         return answer    
+
+class TransferResume(Protocol):
+
+    def __init__(self,transport,transactionId):
+        self.transport = transport
+        self.transactionId = transactionId
+
+    def run(self,message=None):
+        message = messages.TransferResume()
+        message.transactionId = self.transactionId
+        response = self.transport(message)
+        header = response.header
+        if header == 'TransferReject':
+            return ('TransferReject','')
+        elif header == 'TransferDelay':
+            return ('TransferDelay','')
+        elif header == 'TransferAccept':
+            return ('TransferAccept',response.signatures)
+        else:
+            raise 'unknown thing'
+
+        return response.cdd 
+
+class TransferResumeHandling(Protocol):
+
+    def __init__(self,issuer):
+        self.issuer = issuer
+
+    def run(self,message):
+            
+        signatures = self.issuer.getTransactionResult(message.transactionId)
+        if signatures:
+            answer = messages.TransferAccept()
+            answer.signatures = signatures
+        else:
+            answer = messages.TransferDelay()
+            answer.transactionId = message.transactionId
+            answer.reason = 'issuer has no coins yet'
+        return answer    
+
 
 class CoinsSpendSender(Protocol):
 
