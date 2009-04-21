@@ -96,7 +96,9 @@ class Container(object):
     
     fields = []
 
-    def __init__(self,data={}):
+    def __init__(self,data={},**kwargs):
+        if not data and kwargs:
+            data = kwargs
         self.fromData(data)
 
     def __xrepr__(self):
@@ -115,6 +117,7 @@ class Container(object):
 
         if type(data) != type({}):
             data = dict(data)
+
         for field in self.fields:
             if data.has_key(field.name):
                 field.setdecoded(self,data[field.name])

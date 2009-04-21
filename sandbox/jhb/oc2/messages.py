@@ -50,7 +50,7 @@ class AuthorizedMessage(Message):
         Field('keyId'),
         Field('signature',signing=False)
     ]
-class Error(Message):
+class Error(Message, Exception):
     fields = Message.fields + [
         Field('text'),
         Field('data'),
@@ -71,5 +71,35 @@ class TransferResume(Message):
      fields = Message.fields + [
         Field('transactionId'),
     ]
+
+class TransferResume(Message):
+     fields = Message.fields + [
+        Field('transactionId'),
+    ]
+
+class TransferResume(Message):
+     fields = Message.fields + [
+        Field('transactionId'),
+    ]
+
+class SumAnnounce(Message):
+     fields = Message.fields + [
+        Field('transactionId'),
+        Field('sum'),
+        Field('target'),
+    ]
+
+class SumAccept(Message):
+     fields = Message.fields + [
+        Field('transactionId'),
+    ]
+
+   
+class SumReject(Message):
+     fields = Message.fields + [
+        Field('transactionId'),
+        Field('reason'),
+    ]
+
 
 

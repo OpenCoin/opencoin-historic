@@ -602,6 +602,23 @@ Bob   - receives the token
     B:      SUM_ACCEPT( transaction_id )
         or  SUM_REJECT( transaction_id, "Reason" )
 
+###############################################################################
+
+>>> bobport = 9091
+>>> bobwallet = Wallet({})
+
+>>> aclicetid = wallet.makeSerial()
+>>> bob = protocols.SumAnnounceListen(bobwallet)
+>>> alice = protocols.SumAnnounce(bob.run, wallet, 5, 'foobar') 
+>>> bobwallet.approval = "I don't like odd sums"
+>>> alice.run()
+"I don't like odd sums"
+
+>>> bobwallet.approval = True
+>>> alice.run()
+True
+
+###############################################################################
 
 * Wallet Alice sends tokens to Wallet Bob (this time including their clear 
   serial and signature)

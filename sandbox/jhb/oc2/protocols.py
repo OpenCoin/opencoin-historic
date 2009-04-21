@@ -177,6 +177,42 @@ class TransferResumeHandling(Protocol):
             answer.reason = 'issuer has no coins yet'
         return answer    
 
+class SumAnnounce(Protocol):
+
+    def __init__(self,transport,wallet,sum,target):
+        self.transport = transport
+        self.sum = sum
+        self.target = target
+        self.wallet = wallet
+    
+    def run(self,message=None):
+        tid = self.wallet.makeSerial()
+        message = messages.SumAnnounce()
+        message.transactionId = tid
+        message.sum = self.sum
+        message.target = self.target
+        self.wallet.addOutgoing(message)
+        response = self.transport(message)
+        if response.header == 'SumAccept':
+            return True
+        else:
+            return response.reason
+
+
+class SumAnnounceListen(Protocol):
+    
+    def __init__(self,wallet):
+        self.wallet = wallet
+    
+    def run(self,message=None):
+        approval = self.wallet.getApproval(message)
+        if approval == True:
+            answer = messages.SumAccept()
+        else:
+            answer = messages.SumReject()
+            answer.reason = approval
+        answer.transactionId = message.transactionId            
+        return answer
 
 class CoinsSpendSender(Protocol):
 
