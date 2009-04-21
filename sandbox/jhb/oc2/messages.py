@@ -11,6 +11,11 @@ class Message(Container):
         Container.fromData(self,data)
         self.header = self.__class__.__name__
 
+class MessageException(Message,Exception):
+
+    def __str__(self):
+		return str(self.reason)
+
 class AskLatestCDD(Message):
     pass
 
@@ -35,7 +40,7 @@ class TransferRequest(Message):
         Field('transactionId'),
         Field('target'),
         Field('blinds'),
-        SubitemsField('coins'),
+        SubitemsField('coins',klass=container.Coin),
         Field('options'),
     ]
 
@@ -85,7 +90,7 @@ class TransferResume(Message):
 class SumAnnounce(Message):
      fields = Message.fields + [
         Field('transactionId'),
-        Field('sum'),
+        Field('amount'),
         Field('target'),
     ]
 
@@ -95,9 +100,28 @@ class SumAccept(Message):
     ]
 
    
-class SumReject(Message):
+class SumReject(Message,Exception):
      fields = Message.fields + [
         Field('transactionId'),
+        Field('reason'),
+    ]
+
+class SpendRequest(Message):
+     fields = Message.fields + [
+        Field('transactionId'),
+        SubitemsField('coins',klass=container.Coin),
+    ]
+
+class SpendAccept(Message):
+     fields = Message.fields + [
+        Field('transactionId'),
+    ]
+
+
+class SpendReject(MessageException):
+     fields = Message.fields + [
+        Field('transactionId'),
+        Field('problems'),
         Field('reason'),
     ]
 

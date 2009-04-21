@@ -607,9 +607,9 @@ Bob   - receives the token
 >>> bobport = 9091
 >>> bobwallet = Wallet({})
 
->>> aclicetid = wallet.makeSerial()
+>>> alicetid = wallet.makeSerial()
 >>> bob = protocols.SumAnnounceListen(bobwallet)
->>> alice = protocols.SumAnnounce(bob.run, wallet, 5, 'foobar') 
+>>> alice = protocols.SumAnnounce(bob.run, wallet, alicetid, 5, 'foobar') 
 >>> bobwallet.approval = "I don't like odd sums"
 >>> alice.run()
 "I don't like odd sums"
@@ -646,6 +646,27 @@ True
   In case of acceptance, wallet Alice must delete all instances of the spent
   tokens.
 
+###############################################################################
+
+>>> bob = protocols.SpendListen(bobwallet)
+>>> transport = transports.YieldTransport(bob.run,[])
+>>> alice = protocols.SpendRequest(transport, wallet, 'foobar', [coin]) 
+>>> alice.run()
+Traceback (most recent call last):
+    ....
+SpendReject: unknown transactionId
+
+>>> alice = protocols.SpendRequest(transport, wallet, alicetid, []) 
+>>> alice.run()
+Traceback (most recent call last):
+    ....
+SpendReject: amount of coins does not match announced one
+
+>>> alice = protocols.SpendRequest(transport, wallet, alicetid, [coin]) 
+>>> alice.run()
+True
+
+###############################################################################
 
 3.7 Redeeming tokens 
 

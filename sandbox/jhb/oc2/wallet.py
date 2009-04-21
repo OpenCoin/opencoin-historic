@@ -20,12 +20,18 @@ class Wallet(Entity):
     def addOutgoing(self,message):
         self.storage.setdefault('outgoing',{})[message.transactionId] = message
 
+    def getOutgoing(self,tid):
+        return self.storage.setdefault('outgoing',{})[tid]
+
     def addIncoming(self,message):
         self.storage.setdefault('incoming',{})[message.transactionId] = message
+        
+    def getIncoming(self,tid):
+        return self.storage.setdefault('incoming',{}).get(tid,None)
 
     def getApproval(self,message):
-        sum = message.sum
-        target = message.sum
+        amount = message.amount
+        target = message.target
         approval = getattr(self,'approval',True) #get that from ui
         if approval == True:
             self.addIncoming(message)

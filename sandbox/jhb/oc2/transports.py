@@ -22,4 +22,19 @@ class HTTPTransport(object):
         response = urllib2.urlopen(self.url,message.toString(True))
         return createMessage(response.read())
         
+class YieldTransport(object):
+
+    def __init__(self,targetmethod,args):
+        self.args = args
+        self.targetmethod = targetmethod
+        self.nextarg = None
+
+    def __call__(self,message):
+        gen = self.targetmethod(message)
+        response = None
+        for result in gen:
+            if result != None:
+                response = result
+        return response            
+                    
 

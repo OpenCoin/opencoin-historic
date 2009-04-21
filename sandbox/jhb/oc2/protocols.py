@@ -179,24 +179,24 @@ class TransferResumeHandling(Protocol):
 
 class SumAnnounce(Protocol):
 
-    def __init__(self,transport,wallet,sum,target):
+    def __init__(self,transport,wallet,tid,amount,target):
         self.transport = transport
-        self.sum = sum
+        self.amount = amount
         self.target = target
+        self.tid = tid
         self.wallet = wallet
     
     def run(self,message=None):
-        tid = self.wallet.makeSerial()
         message = messages.SumAnnounce()
-        message.transactionId = tid
-        message.sum = self.sum
+        message.transactionId = self.tid
+        message.amount = self.amount    
         message.target = self.target
         self.wallet.addOutgoing(message)
         response = self.transport(message)
-        if response.header == 'SumAccept':
-            return True
-        else:
+        if response.header == 'SumReject':
             return response.reason
+        else:
+            return True
 
 
 class SumAnnounceListen(Protocol):
@@ -213,6 +213,54 @@ class SumAnnounceListen(Protocol):
             answer.reason = approval
         answer.transactionId = message.transactionId            
         return answer
+
+
+class SpendRequest(Protocol):
+
+    def __init__(self,transport,wallet,tid,coins):
+        self.transport = transport
+        self.wallet = wallet
+        self.tid = tid
+        self.coins = coins
+    
+    def run(self,message=None):
+        message = messages.SpendRequest() 
+        message.transactionId = self.tid
+        message.coins = self.coins
+        response = self.transport(message)
+        if response.header == 'SpendReject':
+            raise response
+        else:
+            return True
+
+class SpendListen(Protocol):
+    
+    def __init__(self,wallet):
+        self.wallet = wallet
+    
+    def run(self,message=None):
+        tid = message.transactionId
+        amount = sum([int(m.denomination) for m in message.coins])
+        #check transactionid
+        orig = self.wallet.getIncoming(tid)
+        if not orig:
+            answer = messages.SpendReject()
+            answer.reason = 'unknown transactionId'
+            yield answer
+            return
+        #check sum
+        if amount != int(orig.amount):
+            answer = messages.SpendReject()
+            answer.reason = 'amount of coins does not match announced one'
+            yield answer
+            return
+        yield 'trying to exchange' 
+        #try to exchange. To yield or not to yield?
+        import pdb; pdb.set_trace()
+        #return answer
+        answer = messages.SpendAccept()
+        answer.transactionId = tid
+        yield answer
 
 class CoinsSpendSender(Protocol):
 
