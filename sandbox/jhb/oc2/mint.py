@@ -1,4 +1,5 @@
 from entity import *
+import messages
 
 class Mint(Entity):
 
@@ -52,12 +53,12 @@ class Mint(Entity):
         key = self.getAuthKey(keyid)
         return key.verifyContainerSignature(message)
 
-    def handleTransferRequest(self,authorizedMessage):
+    def handleMintingRequest(self,authorizedMessage):
          
         if not self.validateAuthorization(authorizedMessage):
-            return ('nonvalid','')
-        else: 
-            message = authorizedMessage.message
+            return messages.TransferReject()
+         
+        message = authorizedMessage.message
         blinds = message.blinds
         result = []
         for keyid,blind in blinds:
@@ -66,11 +67,21 @@ class Mint(Entity):
             result.append(signature)
 
         if self.delay:
-            
             self.addToTransactions(message.transactionId,result)
-            return('delayed','mint asked to delay')
+            answer =  messages.TransferDelay()
+            answer.transactionId = message.transactionId
+            answer.reason = 'mint asked to delay'
         else:            
-            return ('minted',result)
+            answer = messages.TransferAccept()
+            answer.signatures = result
+        
+        return answer
+    
+    def handleExchangeRequest(self,message):
+        coins = message.coins
+        blinds = message.blinds
+
+
 
     def addToTransactions(self,transactionId,result):
         self.storage.setdefault('transactions',{})[transactionId]=result

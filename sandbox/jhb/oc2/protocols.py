@@ -117,26 +117,17 @@ class TransferHandling(Protocol):
     def run(self,message):
         options = dict(message.options)
         requesttype = options['type']
+        
         if requesttype == 'mint':
             authorizedMessage = self.authorizer.authorize(message)
             if type(authorizedMessage) == messages.Error:
                 return messages.TransferReject()
-                 
-            response  = self.mint.handleTransferRequest(authorizedMessage)
-            if type(response) == messages.Error:
-                return messages.TransferReject()
+            return self.mint.handleMintingRequest(authorizedMessage)
+        
+        elif requesttype == 'exchange':
+            return self.mint.handleExchangeRequest(message)
+            
 
-            text,value = response
-            if text=='minted':
-                answer = messages.TransferAccept()
-                answer.signatures = value
-            elif text =='delayed':
-                answer = messages.TransferDelay()
-                answer.transactionId = message.transactionId
-                answer.reason = value
-            else:
-                raise 'something went wrong'
-        return answer    
 
 class TransferResume(Protocol):
 
@@ -233,6 +224,7 @@ class SpendRequest(Protocol):
         else:
             return True
 
+   
 class SpendListen(Protocol):
     
     def __init__(self,wallet):
@@ -246,21 +238,20 @@ class SpendListen(Protocol):
         if not orig:
             answer = messages.SpendReject()
             answer.reason = 'unknown transactionId'
-            yield answer
-            return
+            return answer
         #check sum
         if amount != int(orig.amount):
             answer = messages.SpendReject()
             answer.reason = 'amount of coins does not match announced one'
-            yield answer
-            return
-        yield 'trying to exchange' 
-        #try to exchange. To yield or not to yield?
-        import pdb; pdb.set_trace()
-        #return answer
+            return answer
+        #do exchange
+
+
         answer = messages.SpendAccept()
         answer.transactionId = tid
-        yield answer
+        return answer
+           
+
 
 class CoinsSpendSender(Protocol):
 

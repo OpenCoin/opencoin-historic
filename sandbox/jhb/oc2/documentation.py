@@ -650,19 +650,19 @@ True
 
 >>> bob = protocols.SpendListen(bobwallet)
 >>> transport = transports.YieldTransport(bob.run,[])
->>> alice = protocols.SpendRequest(transport, wallet, 'foobar', [coin]) 
+>>> alice = protocols.SpendRequest(bob.run, wallet, 'foobar', [coin]) 
 >>> alice.run()
 Traceback (most recent call last):
     ....
 SpendReject: unknown transactionId
 
->>> alice = protocols.SpendRequest(transport, wallet, alicetid, []) 
+>>> alice = protocols.SpendRequest(bob.run, wallet, alicetid, []) 
 >>> alice.run()
 Traceback (most recent call last):
     ....
 SpendReject: amount of coins does not match announced one
 
->>> alice = protocols.SpendRequest(transport, wallet, alicetid, [coin]) 
+>>> alice = protocols.SpendRequest(bob.run, wallet, alicetid, [coin]) 
 >>> alice.run()
 True
 
