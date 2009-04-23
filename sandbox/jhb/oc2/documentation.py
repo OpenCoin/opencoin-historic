@@ -606,7 +606,7 @@ Bob   - receives the token
 
 >>> bobport = 9091
 >>> bobwallet = Wallet({})
-
+>>> import test
 >>> alicetid = wallet.makeSerial()
 >>> bob = protocols.SumAnnounceListen(bobwallet)
 >>> alice = protocols.SumAnnounce(bob.run, wallet, alicetid, 5, 'foobar') 
@@ -649,7 +649,7 @@ True
 ###############################################################################
 
 >>> bob = protocols.SpendListen(bobwallet)
->>> transport = transports.YieldTransport(bob.run,[])
+>>> #transport = transports.YieldTransport(bob.run,[])
 >>> alice = protocols.SpendRequest(bob.run, wallet, 'foobar', [coin]) 
 >>> alice.run()
 Traceback (most recent call last):
@@ -665,6 +665,27 @@ SpendReject: amount of coins does not match announced one
 >>> alice = protocols.SpendRequest(bob.run, wallet, alicetid, [coin]) 
 >>> alice.run()
 True
+
+Now, lets first pretend we are on Bobs side. Fix that later, but assume we 
+received the coins, we know what cdd and mkc to use. We need to exchange now
+
+>>> coins = [coin]
+>>> key = mkc.publicKey
+>>> bobblank = bobwallet._makeBlank(cdd,mkc)
+>>> bobsecret, bobblind = key.blindBlank(bobblank)
+>>> blinds = [[mkc.keyId,bobblind]]
+>>> bobtid = wallet.makeSerial()
+
+>>> clientside = protocols.TransferRequest(transport,tid,blinds = blinds, coins = coins)
+>>> testserver.run_once(port,issuer=issuer,mint=mint)
+>>> text,value = clientside.run()
+>>> bobblank.signature = key.unblind(bobsecret,value[0])
+>>> bobcoin = bobblank
+>>> key.verifyContainerSignature(bobcoin)
+True
+
+
+
 
 ###############################################################################
 

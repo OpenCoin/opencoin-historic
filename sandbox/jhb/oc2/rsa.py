@@ -161,7 +161,7 @@ def getUnblinder(n):
 
 
 def generate(bits):  #needed
-    return (dummypub,dummypriv)
+    #return (dummypub,dummypriv)
     p = getRandomPrime(bits/2, False)
     q = getRandomPrime(bits/2, False)
     t = (p-1)*(q-1)

@@ -122,11 +122,14 @@ class TransferHandling(Protocol):
             authorizedMessage = self.authorizer.authorize(message)
             if type(authorizedMessage) == messages.Error:
                 return messages.TransferReject()
-            return self.mint.handleMintingRequest(authorizedMessage)
+            else:
+                return self.mint.handleMintingRequest(authorizedMessage)
         
         elif requesttype == 'exchange':
             return self.mint.handleExchangeRequest(message)
-            
+        
+        else:
+            return messages.TransferReject()
 
 
 class TransferResume(Protocol):
@@ -227,8 +230,9 @@ class SpendRequest(Protocol):
    
 class SpendListen(Protocol):
     
-    def __init__(self,wallet):
+    def __init__(self,wallet,client=None):
         self.wallet = wallet
+        self.client = client
     
     def run(self,message=None):
         tid = message.transactionId

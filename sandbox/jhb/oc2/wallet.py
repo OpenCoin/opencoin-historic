@@ -14,6 +14,9 @@ class Wallet(Entity):
         blank.setNewSerial()
         return blank
 
+    def blanksFromCoins(self,coins):
+        pass
+
     def makeSerial(self):
         return occrypto.createSerial()
     
@@ -37,4 +40,4 @@ class Wallet(Entity):
             self.addIncoming(message)
         return approval
         
-
+        

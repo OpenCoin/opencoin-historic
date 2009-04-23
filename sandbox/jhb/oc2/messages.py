@@ -64,7 +64,10 @@ class Error(Message, Exception):
     ]
 
 class TransferReject(Message):
-    pass
+    fields = Message.fields + [
+        Field('transactionId'),
+        Field('reason'),
+    ]
 
 class TransferDelay(Message):
      fields = Message.fields + [

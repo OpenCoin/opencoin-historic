@@ -60,6 +60,29 @@ class Mint(Entity):
          
         message = authorizedMessage.message
         blinds = message.blinds
+        return self._mintBlinds(message)
+    
+    def handleExchangeRequest(self,message):
+        #import pdb; pdb.set_trace()
+        coins = message.coins
+        blinds = message.blinds
+        payed = sum([int(coin.denomination) for coin in coins])
+        
+        amount = 0
+        for keyid,blind in blinds:
+            priv,pub,denomination,version = self.getMintKeyById(keyid)
+            amount += int(denomination)
+        
+        if payed != amount:
+            reject = messages.TransferReject()
+            reject.reason = 'mismatch'
+            return reject
+
+        return self._mintBlinds(message)
+            
+    def _mintBlinds(self,message):
+        
+        blinds = message.blinds
         result = []
         for keyid,blind in blinds:
             priv,pub,denomination,version = self.getMintKeyById(keyid)
@@ -76,12 +99,6 @@ class Mint(Entity):
             answer.signatures = result
         
         return answer
-    
-    def handleExchangeRequest(self,message):
-        coins = message.coins
-        blinds = message.blinds
-
-
 
     def addToTransactions(self,transactionId,result):
         self.storage.setdefault('transactions',{})[transactionId]=result
