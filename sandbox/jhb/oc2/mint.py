@@ -61,13 +61,49 @@ class Mint(Entity):
         message = authorizedMessage.message
         blinds = message.blinds
         return self._mintBlinds(message)
+
+
+    def validateCoins(self,coins):
+        problems = []
+
+        for coin in coins:
+            if self.inDSDB(coin):
+                problems.append('double spent')
+                continue
+            
+            priv,pub,denomination,version = self.getMintKeyById(coin.keyId)
+            
+            if not pub.verifyContainerSignature(coin):
+                problems.append('no valid signature')
+                continue
+
+            if not denomination == coin.denomination:
+                problems.append('wrong denomination')
+                continue
+
+        if [p for p in problems if p]: #there are problems
+            return problems
+        else:
+            return True
+
+
+
+
     
     def handleExchangeRequest(self,message):
-        #import pdb; pdb.set_trace()
         coins = message.coins
         blinds = message.blinds
+
+        #check coins
+       
+        result = self.validateCoins(coins)
+        if result != True:
+            reject = messages.TransferReject()
+            reject.reason = 'coins'
+            reject.coins = result
+            return reject
+
         payed = sum([int(coin.denomination) for coin in coins])
-        
         amount = 0
         for keyid,blind in blinds:
             priv,pub,denomination,version = self.getMintKeyById(keyid)
@@ -77,6 +113,7 @@ class Mint(Entity):
             reject = messages.TransferReject()
             reject.reason = 'mismatch'
             return reject
+        
 
         return self._mintBlinds(message)
             
@@ -102,3 +139,15 @@ class Mint(Entity):
 
     def addToTransactions(self,transactionId,result):
         self.storage.setdefault('transactions',{})[transactionId]=result
+
+
+    def addToDSDB(self,coin):
+        dsdb = self.storage.setdefault('dsdb',[])
+        if coin.serial in dsdb:
+            return False
+        else:
+            dsdb.append(coin.serial)
+            return True
+
+    def inDSDB(self,coin):
+        return coin.serial in self.storage.setdefault('dsdb',[])

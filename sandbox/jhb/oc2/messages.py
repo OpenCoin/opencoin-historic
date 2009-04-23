@@ -67,6 +67,8 @@ class TransferReject(Message):
     fields = Message.fields + [
         Field('transactionId'),
         Field('reason'),
+        Field('blinds'),
+        Field('coins'),
     ]
 
 class TransferDelay(Message):
