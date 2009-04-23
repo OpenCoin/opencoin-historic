@@ -120,6 +120,9 @@ class TransferHandling(Protocol):
         
         elif requesttype == 'exchange':
             return self.mint.handleExchangeRequest(message)
+                        
+        elif requesttype == 'redeem':
+            return self.mint.handleRedeemRequest(message)
         
         else:
             return messages.TransferReject()

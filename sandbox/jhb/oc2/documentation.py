@@ -681,6 +681,16 @@ received the coins, we know what cdd and mkc to use. We need to exchange now
 >>> key.verifyContainerSignature(bobcoin)
 True
 
+Lets try to double spend
+>>> import messages
+>>> bobblank = bobwallet._makeBlank(cdd,mkc)
+>>> bobsecret, bobblind = key.blindBlank(bobblank)
+>>> blinds = [[mkc.keyId,bobblind]]
+>>> bobtid = wallet.makeSerial()
+>>> clientside = protocols.TransferRequest(transport,tid,blinds = blinds, coins = coins)
+>>> testserver.run_once(port,issuer=issuer,mint=mint)
+>>> clientside.run().header
+'TransferReject'
 
 
 
@@ -719,6 +729,19 @@ True
     IS: TRANSFER_TOKEN_ACCEPT( 
             transaction_id, message, (empty list)
         )
+
+
+###############################################################################
+
+>>> bobtid = wallet.makeSerial()
+>>> clientside = protocols.TransferRequest(transport,tid,target='foo', coins = [bobcoin])
+>>> testserver.run_once(port,issuer=issuer,mint=mint)
+>>> clientside.run().header
+'TransferAccept'
+
+
+###############################################################################
+
 
 
 4. References

@@ -53,16 +53,6 @@ class Mint(Entity):
         key = self.getAuthKey(keyid)
         return key.verifyContainerSignature(message)
 
-    def handleMintingRequest(self,authorizedMessage):
-         
-        if not self.validateAuthorization(authorizedMessage):
-            return messages.TransferReject()
-         
-        message = authorizedMessage.message
-        blinds = message.blinds
-        return self._mintBlinds(message)
-
-
     def validateCoins(self,coins):
         problems = []
 
@@ -87,6 +77,14 @@ class Mint(Entity):
             return True
 
 
+    def handleMintingRequest(self,authorizedMessage):
+         
+        if not self.validateAuthorization(authorizedMessage):
+            return messages.TransferReject()
+         
+        message = authorizedMessage.message
+        blinds = message.blinds
+        return self._mintBlinds(message)
 
 
     
@@ -114,9 +112,30 @@ class Mint(Entity):
             reject.reason = 'mismatch'
             return reject
         
+        for coin in coins:
+            self.addToDSDB(coin)
 
         return self._mintBlinds(message)
-            
+
+
+    def handleRedeemRequest(self,message):
+        target = message.target
+        tid = message.transactionId
+        coins = message.coins
+
+        result = self.validateCoins(coins)
+        if result != True:
+            reject = messages.TransferReject()
+            reject.reason = 'coins'
+            reject.coins = result
+            return reject
+        
+        amount = sum([int(coin.denomination) for coin in coins])
+        for coin in coins:
+            self.addToDSDB(coin)
+        self.addRedeemed(target,tid,amount)
+        return messages.TransferAccept()
+        
     def _mintBlinds(self,message):
         
         blinds = message.blinds
@@ -151,3 +170,6 @@ class Mint(Entity):
 
     def inDSDB(self,coin):
         return coin.serial in self.storage.setdefault('dsdb',[])
+
+    def addRedeemed(self,target,tid,amount):
+        self.storage.setdefault('redeemed',[]).append((target,tid,amount))
