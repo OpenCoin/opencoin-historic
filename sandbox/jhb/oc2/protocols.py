@@ -243,27 +243,3 @@ class SpendListen(Protocol):
            
 
 
-class CoinsSpendSender(Protocol):
-
-    def __init__(self,coins,target):
-        self.coins = coins
-        self.target = target
-
-    def spendCoins(self,message):
-        return ''
-
-    def announceCoins(self,message):
-        return ''
-
-
-
-class CoinsSpendRecipient(Protocol):
-
-    def hearCoins(self,message):
-        return ''
-
-    def receiveCoins(self,message):
-        return ''
-
-
-
