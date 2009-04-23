@@ -98,15 +98,8 @@ class TransferRequest(Protocol):
         message.options = dict(type=requesttype).items()
 
         response = self.transport(message)
-        header = response.header
-        if header == 'TransferReject':
-            return ('TransferReject','')
-        elif header == 'TransferDelay':
-            return ('TransferDelay','')
-        elif header == 'TransferAccept':
-            return ('TransferAccept',response.signatures)
-        else:
-            raise 'unknown thing'
+        return response
+
 
 class TransferHandling(Protocol):
 
@@ -142,17 +135,7 @@ class TransferResume(Protocol):
         message = messages.TransferResume()
         message.transactionId = self.transactionId
         response = self.transport(message)
-        header = response.header
-        if header == 'TransferReject':
-            return ('TransferReject','')
-        elif header == 'TransferDelay':
-            return ('TransferDelay','')
-        elif header == 'TransferAccept':
-            return ('TransferAccept',response.signatures)
-        else:
-            raise 'unknown thing'
-
-        return response.cdd 
+        return response
 
 class TransferResumeHandling(Protocol):
 

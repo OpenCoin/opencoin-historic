@@ -448,8 +448,7 @@ the mint should more or less just mint
 >>> time.sleep(1)
 >>> authorizer.deny = True
 >>> testserver.run_once(port,mint=mint,authorizer=authorizer)
->>> text,value =  clientside.run()
->>> text
+>>> clientside.run().header
 'TransferReject'
 
 
@@ -463,10 +462,10 @@ the mint should more or less just mint
 
 >>> authorizer.deny = False
 >>> testserver.run_once(port,mint=mint,authorizer=authorizer)
->>> text,value =  clientside.run()
->>> text
+>>> response = clientside.run()
+>>> response.header
 'TransferAccept'
->>> blindsign = value[0]
+>>> blindsign = response.signatures[0]
 >>> blank.signature = key.unblind(secret,blindsign)
 >>> coin = blank
 >>> key.verifyContainerSignature(coin)
@@ -489,8 +488,7 @@ stuff coins directly into the issuer
 
 >>> mint.delay = True
 >>> testserver.run_once(port,mint=mint,authorizer=authorizer)
->>> text,value =  clientside.run()
->>> text
+>>> clientside.run().header
 'TransferDelay'
 >>> mint.delay = False
 
@@ -530,8 +528,7 @@ stuff coins directly into the issuer
 >>> issuer.delay = True
 >>> clientside = protocols.TransferResume(transport,tid)
 >>> testserver.run_once(port,issuer=issuer)
->>> text,value =  clientside.run()
->>> text
+>>> clientside.run().header
 'TransferDelay'
 >>> issuer.delay = False
 
@@ -549,8 +546,8 @@ stuff coins directly into the issuer
 
 >>> clientside = protocols.TransferResume(transport,tid)
 >>> testserver.run_once(port,issuer=issuer)
->>> text,value =  clientside.run()
->>> text
+>>> response = clientside.run()
+>>> response.header
 'TransferAccept'
 
 ###############################################################################
@@ -565,7 +562,7 @@ stuff coins directly into the issuer
 
 ###############################################################################
 
->>> blindsign = value[0]
+>>> blindsign = response.signatures[0]
 >>> blank.signature = key.unblind(secret,blindsign)
 >>> coin = blank
 >>> key.verifyContainerSignature(coin)
@@ -678,8 +675,8 @@ received the coins, we know what cdd and mkc to use. We need to exchange now
 
 >>> clientside = protocols.TransferRequest(transport,tid,blinds = blinds, coins = coins)
 >>> testserver.run_once(port,issuer=issuer,mint=mint)
->>> text,value = clientside.run()
->>> bobblank.signature = key.unblind(bobsecret,value[0])
+>>> response = clientside.run()
+>>> bobblank.signature = key.unblind(bobsecret,response.signatures[0])
 >>> bobcoin = bobblank
 >>> key.verifyContainerSignature(bobcoin)
 True
