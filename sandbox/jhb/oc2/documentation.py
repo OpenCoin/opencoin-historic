@@ -1,4 +1,5 @@
 """
+###############################################################################
 Setup an issuer
 
 >>> from issuer import Issuer
@@ -17,6 +18,7 @@ True
 
 
 
+###############################################################################
 mint (regularily) creates keypairs (pP,sP) for all denominations and id(p). 
 Master key holder generates keys certificate
 
@@ -36,28 +38,25 @@ Wallet fetches cdd from issuer
 >>> from wallet import Wallet
 >>> wallet = Wallet({})
 >>> import protocols
->>> serverside = protocols.GiveLatestCDD(issuer)
->>> clientside = protocols.AskLatestCDD(serverside.run)
->>> cdd == clientside.run()
+>>> cdd == wallet.askLatestCDD(issuer.giveLatestCDD)
 True
 
 >>> #using http
 >>> import transports
 >>> import testserver
 >>> transport = transports.HTTPTransport('http://localhost:%s/' % port)
->>> clientside = protocols.AskLatestCDD(transport)
 >>> testserver.run_once(port,issuer)
->>> cdd2 =  clientside.run()
+>>> cdd2 = wallet.askLatestCDD(transport)
 >>> cdd2.toString(True) == cdd.toString(True)
 True
 
 
 
+###############################################################################
 Wallet: fetches current public minting keys for denomination
 
->>> clientside = protocols.FetchMintKeys(transport,denominations=['1','5'])
 >>> testserver.run_once(port,issuer)
->>> mkcs =  clientside.run()
+>>> mkcs = wallet.fetchMintKeys(transport,denominations=['1','5'])
 >>> mkcs[0].toString() == issuer.getCurrentMKCs()['1'].toString()
 True
 
@@ -79,6 +78,7 @@ True
 
 
 
+###############################################################################
 Lets try to get a coin minted
 
 We first need to setup an authorizer, to (surpise) authorize the request. Nils says
@@ -89,20 +89,19 @@ the mint should more or less just mint
 >>> authpub = authorizer.createKeys() 
 >>> mint.addAuthKey(authpub)
 >>> authorizer.setMKCs(mkcs)
->>> clientside = protocols.TransferRequest(transport,tid,'foo',[[mkc.keyId,blind]],[])
 
 Lets have the authorizer denying the request
 
 >>> authorizer.deny = True
->>> testserver.run_once(port,mint=mint,authorizer=authorizer)
->>> clientside.run().header
+>>> testserver.run_once(port,issuer=issuer,mint=mint,authorizer=authorizer)
+>>> wallet.requestTransfer(transport,tid,'foo',[[mkc.keyId,blind]],[]).header
 'TransferReject'
 
 Now have a well working one
 
 >>> authorizer.deny = False
->>> testserver.run_once(port,mint=mint,authorizer=authorizer)
->>> response = clientside.run()
+>>> testserver.run_once(port,issuer=issuer,mint=mint,authorizer=authorizer)
+>>> response = wallet.requestTransfer(transport,tid,'foo',[[mkc.keyId,blind]],[])
 >>> response.header
 'TransferAccept'
 
@@ -122,8 +121,8 @@ stuff coins directly into the issuer
 The mint can also be a bit slow
 
 >>> mint.delay = True
->>> testserver.run_once(port,mint=mint,authorizer=authorizer)
->>> clientside.run().header
+>>> testserver.run_once(port,issuer=issuer,mint=mint,authorizer=authorizer)
+>>> wallet.requestTransfer(transport,tid,'foo',[[mkc.keyId,blind]],[]).header
 'TransferDelay'
 
 >>> mint.delay = False
@@ -131,18 +130,15 @@ The mint can also be a bit slow
 Or the issuer is slow
 
 >>> issuer.delay = True
->>> clientside = protocols.TransferResume(transport,tid)
 >>> testserver.run_once(port,issuer=issuer)
->>> clientside.run().header
+>>> wallet.resumeTransfer(transport,tid).header
 'TransferDelay'
 >>> issuer.delay = False
 
 So we need to resume
 
->>> clientside = protocols.TransferResume(transport,tid)
 >>> testserver.run_once(port,issuer=issuer)
->>> response = clientside.run()
->>> response.header
+>>> wallet.resumeTransfer(transport,tid).header
 'TransferAccept'
 
 And we have a valid coin
@@ -155,21 +151,21 @@ True
 
 
 
+###############################################################################
 Now, wallet to wallet. We setup an alice and a bob side. Alice announces
 a sum, and bob dedices if he wants to accept it
 
+>>> alice = wallet
 >>> bobport = 9091
->>> bobwallet = Wallet({})
+>>> bob = Wallet({})
 >>> import test
->>> alicetid = wallet.makeSerial()
->>> bob = protocols.SumAnnounceListen(bobwallet)
->>> alice = protocols.SumAnnounce(bob.run, wallet, alicetid, 5, 'foobar') 
->>> bobwallet.approval = "I don't like odd sums"
->>> alice.run()
+>>> bob.approval = "I don't like odd sums"
+>>> alicetid = alice.makeSerial()
+>>> alice.announceSum(bob.listenSum, alicetid, 5, 'foobar') 
 "I don't like odd sums"
 
->>> bobwallet.approval = True
->>> alice.run()
+>>> bob.approval = True
+>>> wallet.announceSum(bob.listenSum, alicetid, 5, 'foobar') 
 True
 
 
@@ -178,40 +174,37 @@ Wallet Alice sends tokens to Wallet Bob (this time including their clear
 serial and signature)
 
 Lets have first a wrong transactionId
-
->>> bob = protocols.SpendListen(bobwallet)
 >>> #transport = transports.YieldTransport(bob.run,[])
->>> alice = protocols.SpendRequest(bob.run, wallet, 'foobar', [coin]) 
->>> alice.run()
+>>> alice.requestSpend(bob.listenSpend,'foobar',[coin])
 Traceback (most recent call last):
     ....
 SpendReject: unknown transactionId
 
 Or lets try to send a wrong amount
 
->>> alice = protocols.SpendRequest(bob.run, wallet, alicetid, []) 
->>> alice.run()
+>>> alice.requestSpend(bob.listenSpend,alicetid,[])
 Traceback (most recent call last):
     ....
 SpendReject: amount of coins does not match announced one
 
->>> alice = protocols.SpendRequest(bob.run, wallet, alicetid, [coin]) 
->>> alice.run()
+>>> alice.requestSpend(bob.listenSpend, alicetid, [coin]) 
 True
 
+
+
+###############################################################################
 Now, lets first pretend we are on Bobs side. Fix that later, but assume we 
 received the coins, we know what cdd and mkc to use. We need to exchange now
 
 >>> coins = [coin]
 >>> key = mkc.publicKey
->>> bobblank = bobwallet._makeBlank(cdd,mkc)
+>>> bobblank = bob._makeBlank(cdd,mkc)
 >>> bobsecret, bobblind = key.blindBlank(bobblank)
 >>> blinds = [[mkc.keyId,bobblind]]
 >>> bobtid = wallet.makeSerial()
 
->>> clientside = protocols.TransferRequest(transport,tid,blinds = blinds, coins = coins)
 >>> testserver.run_once(port,issuer=issuer,mint=mint)
->>> response = clientside.run()
+>>> response = bob.requestTransfer(transport,tid,blinds = blinds, coins = coins)
 >>> bobblank.signature = key.unblind(bobsecret,response.signatures[0])
 >>> bobcoin = bobblank
 >>> key.verifyContainerSignature(bobcoin)
@@ -220,23 +213,22 @@ True
 Lets try to double spend
 
 >>> import messages
->>> bobblank = bobwallet._makeBlank(cdd,mkc)
+>>> bobblank = bob._makeBlank(cdd,mkc)
 >>> bobsecret, bobblind = key.blindBlank(bobblank)
 >>> blinds = [[mkc.keyId,bobblind]]
 >>> bobtid = wallet.makeSerial()
->>> clientside = protocols.TransferRequest(transport,tid,blinds = blinds, coins = coins)
 >>> testserver.run_once(port,issuer=issuer,mint=mint)
->>> clientside.run().header
+>>> wallet.requestTransfer(transport,tid,blinds = blinds, coins = coins).header
 'TransferReject'
 
 
 
+###############################################################################
 Last step - bob wants to redeem the coins
 
 >>> bobtid = wallet.makeSerial()
->>> clientside = protocols.TransferRequest(transport,tid,target='foo', coins = [bobcoin])
 >>> testserver.run_once(port,issuer=issuer,mint=mint)
->>> clientside.run().header
+>>> bob.requestTransfer(transport,tid,target='foo', coins = [bobcoin]).header
 'TransferAccept'
 
 """

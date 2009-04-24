@@ -1,5 +1,6 @@
 from entity import *
 import datetime
+import messages
 
 class Issuer(Entity):
 
@@ -96,3 +97,55 @@ class Issuer(Entity):
             return None
         else:            
             return self.storage.setdefault('transactions',{}).get(transactionId,None)
+
+    def giveLatestCDD(self,message):
+        answer = messages.GiveLatestCDD()
+        answer.cdd = self.getCDD()
+        return answer
+
+
+    def giveMintKeys(self,message):
+        keys = []
+        if message.denominations:
+            keyslist = self.getCurrentMKCs()
+            for d in message.denominations:
+                keys.append(keyslist.get(d))
+        elif message.keyids:
+            for id in message.keyids:
+                keys.append(self.getKeyById(id))
+        
+        answer = messages.GiveMintKeys()
+        answer.keys = keys
+        return answer
+
+    def handleTransferRequest(self,mint,authorizer,message):
+        options = dict(message.options)
+        requesttype = options['type']
+        
+        if requesttype == 'mint':
+            authorizedMessage = authorizer.authorize(message)
+            if type(authorizedMessage) == messages.Error:
+                return messages.TransferReject()
+            else:
+                return mint.handleMintingRequest(authorizedMessage)
+        
+        elif requesttype == 'exchange':
+            return mint.handleExchangeRequest(message)
+                        
+        elif requesttype == 'redeem':
+            return mint.handleRedeemRequest(message)
+        
+        else:
+            return messages.TransferReject()
+
+    def resumeTransfer(self,message):
+        signatures = self.getTransactionResult(message.transactionId)
+        if signatures:
+            answer = messages.TransferAccept()
+            answer.signatures = signatures
+        else:
+            answer = messages.TransferDelay()
+            answer.transactionId = message.transactionId
+            answer.reason = 'issuer has no coins yet'
+        return answer 
+

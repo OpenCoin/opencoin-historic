@@ -96,16 +96,8 @@ class Container(object):
     
     fields = []
 
-    def __init__(self,data={},**kwargs):
-        if not data and kwargs:
-            data = kwargs
+    def __init__(self,data={}):
         self.fromData(data)
-
-    def __xrepr__(self):
-        return "<%s(%s)>" % (self.__class__.__name__,self.getData(True))
-
-    def __xstr__(self):
-        return self.toString()
 
     def fromData(self,data):
 

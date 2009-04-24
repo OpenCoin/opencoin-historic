@@ -13,15 +13,14 @@ class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
         data = urllib.unquote(data)
         message = transports.createMessage(data)
         if message.header == 'AskLatestCDD':
-            protocol = protocols.GiveLatestCDD(self.issuer)
+            answer = self.issuer.giveLatestCDD(message)
         elif message.header == 'FetchMintKeys':
-            protocol = protocols.GiveMintKeys(self.issuer)
+            answer = self.issuer.giveMintKeys(message)
         elif message.header == 'TransferRequest':
-            protocol = protocols.TransferHandling(self.mint,self.authorizer)
+            answer = self.issuer.handleTransferRequest(self.mint,self.authorizer,message)
         elif message.header == 'TransferResume':
-            protocol = protocols.TransferResumeHandling(self.issuer)
+            answer = self.issuer.resumeTransfer(message)
  
-        answer = protocol.run(message)
         self.send_response(200)
         self.send_header("Content-type", "text/plain")
         self.wfile.write('\r\n')
