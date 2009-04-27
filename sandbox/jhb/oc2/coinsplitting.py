@@ -12,11 +12,11 @@ def tokenizer(denominations,amount):
             #print 'append %s' % d
             tokens.append(1)
             i +=1
-        elif d <= rest-d + denominations[i-1]:
+        elif d <= rest-d + denominations[i-1]+1:
             #print 'append %s' % d
             tokens.append(d)
             i +=1
-        elif d > rest -d + denominations[i-1]:
+        elif d > rest -d + denominations[i-1]+1:
             i -= 1
     return tokens            
 
@@ -30,12 +30,13 @@ def testspend(tokens,amount):
             picked.append(token)
     return picked            
 
-dl = [[1,2,5,10],[1,3,9,27],[1,3,5,7,11,13,17,19,23],[1,17,33]]   
+dl = [[1,2,5,10,20,50,100],[1,3,9,27],[1,3,5,7,11,13,17,19,23],[1,17,33]]
+dl = dl[0:1]
 problems = 0
 for denominations in dl:
     print 'DENOMINATIONS %s' % denominations
     print
-    for i in range(1,max(denominations)*10):
+    for i in range(1,max(denominations)*2):
         print 'Tokenize %i, ' % i,
         tokens = tokenizer(denominations,i)
         print 'tokens %s (%s)' % (tokens,sum(tokens))
