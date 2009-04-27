@@ -205,7 +205,6 @@ class Wallet(Entity):
         
         secrets = []
         data = []
-        print tokenized
         for denomination in tokenized:
             mkc = mkcs[str(denomination)]
             blank = self._makeBlank(cdd,mkc)
@@ -226,4 +225,4 @@ class Wallet(Entity):
                 raise 'Invalid signature' 
             currency['coins'].append(coin)
             i += 1
-            self.storage.save()
+        self.storage.save()
