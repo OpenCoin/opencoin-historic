@@ -3,6 +3,7 @@ from protocols import *
 from container import *
 import occrypto
 import messages
+import coinsplitting
 
 class Wallet(Entity):
 
@@ -165,19 +166,9 @@ class Wallet(Entity):
 
     def deleteCurrency(self,id):
         del(self.storage[id])
-
-
+    
     def tokenizeForBuying(self,amount,denominations):
-        denominations = [int(d) for d in denominations]
-        denominations.sort()
-        denominations.reverse()
-
-        out = []
-        for d in denominations:
-            while amount and amount >= d:
-                out.append(d)
-                amount -= d
-        return out                
+        return coinsplitting.tokenizer([int(d) for d in denominations],amount)                   
 
         
 
