@@ -1,5 +1,4 @@
 import occrypto,container
-from storage import Item
 
 class Entity(object):
     

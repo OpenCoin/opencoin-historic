@@ -29,6 +29,18 @@ import socket
 simulated_access_points = { 10: "life :) Internet", 15: "Vodafone Internet", 25: "WLAN" }
 default_access_point = None
 
+class AccessPoint(object):
+    def __init__(self,apid=None):
+        self.apid = apid
+
+    def start(self):
+        pass
+    def stop(self):
+        pass
+
+    def ip(self):
+        return 'fake ip'
+
 def select_access_point():
    """
    This opens popup selection where access points are listed and can be selected. Returns selected
@@ -44,7 +56,7 @@ def access_point(apid):
    """
    This creates access point object by given apid. Returns access point object.
    """
-   return repr(apid)
+   return AccessPoint(apid)
    
 def set_default_access_point(apo):
    """
