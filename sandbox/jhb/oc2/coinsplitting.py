@@ -30,13 +30,12 @@ def testspend(tokens,amount):
             picked.append(token)
     return picked            
 
-dl = [[1,2,5,10],[1,3,9,27],[1,3,5,7,11,13,17,19,23],[1,17,33]]
-dl = dl[0:1]
+dl = [[1,2,5,10],[1,3,9,27],[1,3,5,7,11,13,17,19,23],[1,17,33]]   
 problems = 0
 for denominations in dl:
     print 'DENOMINATIONS %s' % denominations
     print
-    for i in range(1,max(denominations)*2):
+    for i in range(1,max(denominations)*10):
         print 'Tokenize %i, ' % i,
         tokens = tokenizer(denominations,i)
         print 'tokens %s (%s)' % (tokens,sum(tokens))
