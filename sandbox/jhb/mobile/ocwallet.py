@@ -14,9 +14,9 @@ class WalletClient:
         self.actions=[(u'Send',u'Send coins to someone',self.getDetails),
                       (u'Receive',u'Receive coins',self.getReceiveDetails),
                       (u'Freshen up',u'Freshen up the coins',self.getFreshenUpDetails),
-                      (u'Buy',u'Buy new coins',self.buyCoins),
-                      (u'Sell',u'Sell coins',self.getDetails),
-                      (u'Details',u'See what coins you hold',self.inspect),]
+                      (u'Buy',u'Buy new coins',self.mintCoins),
+                      (u'Sell',u'Sell coins',self.redeemCoins),
+                      (u'Details',u'See what coins you hold',self.inspectCurrency),]
 
         self.methods=[(u'Internet',u'Use the internet'),
                       (u'Bluetooth',u'Mobile to mobile')]
@@ -109,11 +109,34 @@ class WalletClient:
         self.todo['method'] = method
         return method
                               
-    def inspect(self):
+    def inspectCurrency(self):
         #print 'inspect'
-        pass
-
-
+        cdd,amount = self.getCurrentCurrency()
+        id = cdd.currencyId
+        coins = self.wallet.getAllCoins(id)
+        coinlist = []
+        for coin in coins:
+            coinlist.append(u'coin: %s' % coin.denomination)
+        self.currency_menu = appuifw.Listbox(coinlist,self.inspectCoin)
+        self.currency_menu.bind(EKeyRightArrow,self.inspectCoin)
+        self.currency_menu.bind(EKeyLeftArrow,self.displayActionMenu)
+        appuifw.app.body = self.currency_menu
+        appuifw.app.title = u'opencoin - currency\nCoins in wallet'
+ 
+    def inspectCoin(self):
+        cdd,amount = self.getCurrentCurrency()
+        id = cdd.currencyId
+        coins = self.wallet.getAllCoins(id)
+        coin = coins[self.currency_menu.current()]
+        details = []
+        details.append((unicode(coin.standardId),u'Standard Id'))
+        details.append((unicode(coin.currencyId),u'Currency Id'))
+        details.append((unicode(coin.denomination),u'Denomination'))
+        self.coin_menu = appuifw.Listbox(details,self.inspectCurrency)
+        self.coin_menu.bind(EKeyLeftArrow,self.inspectCurrency)
+        appuifw.app.body = self.coin_menu
+        appuifw.app.title = u'opencoin - coin\nDetails of coin'
+ 
     def addCurrency(self):
         url = appuifw.query(u'url','text',u'http://192.168.2.101:9090')
         self.todo['url'] = url
@@ -135,7 +158,7 @@ class WalletClient:
         self.makeWalletMenu()
         self.displayWalletMenu()
 
-    def buyCoins(self):
+    def mintCoins(self):
         amount = self.getAmount()
         if not amount:
             return
@@ -148,9 +171,28 @@ class WalletClient:
         url = cdd.issuerServiceLocation
 
         transport = transports.HTTPTransport(url)
-        self.wallet.buyCoins(transport,amount,target)
+        self.wallet.mintCoins(transport,amount,target)
         self.makeWalletMenu()
         self.displayWalletMenu()
+
+
+    def redeemCoins(self):
+        amount = self.getAmount()
+        if not amount:
+            return
+        
+        target = self.getTarget()
+        if not target:
+            return
+
+        cdd,alreadythere = self.getCurrentCurrency()
+        url = cdd.issuerServiceLocation
+
+        transport = transports.HTTPTransport(url)
+        self.wallet.redeemCoins(transport,amount,target)
+        self.makeWalletMenu()
+        self.displayWalletMenu()
+
 
     def execute(self):
         #print 'execute'
@@ -168,12 +210,12 @@ class WalletClient:
             try:
                 #sys.modules['socket'] = __import__('btsocket')
                 import btsocket as socket
-                apid = socket.select_access_point()
-                apo = socket.access_point(apid)
-                socket.set_default_access_point(apo)
-                apo.start()
-                self.apo = apo
-                self.ip = apo.ip()
+                #apid = socket.select_access_point()
+                #apo = socket.access_point(apid)
+                #socket.set_default_access_point(apo)
+                #apo.start()
+                #self.apo = apo
+                #self.ip = apo.ip()
 
             except ImportError:
                 import socket
