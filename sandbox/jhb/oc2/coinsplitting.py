@@ -27,7 +27,8 @@ def testspend(tokens,amount):
         rest = amount - sum(picked)
         if rest > 0 and token <= rest:
             picked.append(token)
-    return picked            
+    return picked         
+
 if __name__ == '__main__':
     dl = [[1,2,5,10,20,50,100],[1,3,9,27],[1,3,5,7,11,13,17,19,23],[1,17,33]]
     problems = 0

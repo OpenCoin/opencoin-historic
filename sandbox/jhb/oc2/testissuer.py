@@ -22,7 +22,7 @@ if not issuerstorage.has_key('masterPrivKey'):
     issuer.createMasterKeys()
 
     print 'issuer: setup currency discription'
-    denominations=[0,1,2,5,10,20]
+    denominations=[1,2,5,10,20]
     cdd = issuer.makeCDD('TestCent','tc',[str(d) for d in denominations],'http://192.168.2.101:%s/' % port,'')
     mint.setCDD(cdd)
     
@@ -46,9 +46,15 @@ if not issuerstorage.has_key('masterPrivKey'):
     mintstorage.save()
     authorizerstorage.save()
 
+
+def address_string(self):
+    host, port = self.client_address[:2]
+    return host
+
 print 'Starting up server'
 Handler.issuer = issuer
 Handler.mint = mint
 Handler.authorizer = authorizer
 httpd = BaseHTTPServer.HTTPServer(("", port), Handler)
+httpd.address_string = address_string
 httpd.serve_forever()

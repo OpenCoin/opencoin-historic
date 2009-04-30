@@ -169,7 +169,21 @@ class Wallet(Entity):
     def tokenizeForBuying(self,amount,denominations):
         return coinsplitting.tokenizer([int(d) for d in denominations],amount)                   
 
-        
+    def pickForSpending(self,amount,coins):
+        tmp = [(c.denomination,c) for c in coins]
+        tmp.sort()
+        tmp.reverse()
+        coins = [t[1] for t in tmp]
+        picked = []
+        for coin in coins:
+            sumpicked = sum([int(c.denomination) for c in picked])
+            if sumpicked < amount:
+                if int(coin.denomination) <= (amount - sumpicked):
+                    picked.append(coin)
+            else:
+                break
+        return picked                
+
 
 #################################higher level#############################
 
@@ -180,7 +194,7 @@ class Wallet(Entity):
         if cdd.version not in [cdd.version for cdd in currency['cdds']]:
             currency['cdds'].append(cdd)
 
-    def buyCoins(self,transport,amount,target):
+    def mintCoins(self,transport,amount,target):
         cdd = self.askLatestCDD(transport)
         currency = self.getCurrency(cdd.currencyId)
         tokenized =  self.tokenizeForBuying(amount,cdd.denominations) #what coins do we need
@@ -216,3 +230,21 @@ class Wallet(Entity):
             currency['coins'].append(coin)
             i += 1
         self.storage.save()
+
+    def getAllCoins(self,currencyId):
+        currency = self.getCurrency(currencyId)
+        return currency['coins']
+
+
+
+    def redeemCoins(self,transport,amount,target):
+        cdd = self.askLatestCDD(transport)
+        currency = self.getCurrency(cdd.currencyId)
+        coins = currency['coins']
+        picked = self.pickForSpending(amount,coins)
+        tid = self.makeSerial()
+        response = self.requestTransfer(transport,tid,target,[],picked)
+        newcoins = [c for c in coins if c not in picked]
+        currency['coins'] = newcoins
+
+
