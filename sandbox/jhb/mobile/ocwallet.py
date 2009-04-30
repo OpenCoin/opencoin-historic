@@ -1,7 +1,7 @@
 import appuifw,e32,socket,httplib, urllib
 from graphics import *
 from key_codes import EKeyLeftArrow, EKeyRightArrow
-
+import encodings
 from oc2 import storage,wallet, transports
 
 class WalletClient:
@@ -34,8 +34,12 @@ class WalletClient:
             title = u'%s %ss' % (amount,cdd.currencyId)
             description = unicode(cdd.issuerServiceLocation)
             self.wallet_list.append((title,description))
-        self.wallet_menu =  appuifw.Listbox(self.wallet_list,self.displayActionMenu)
-        self.wallet_menu.bind(EKeyRightArrow,self.displayActionMenu)
+        if not self.wallet_list:
+            self.wallet_list.append(u'no currencies yet')
+            self.wallet_menu =  appuifw.Listbox(self.wallet_list,self.displayActionMenu)
+        else:
+            self.wallet_menu =  appuifw.Listbox(self.wallet_list,self.displayActionMenu)
+            self.wallet_menu.bind(EKeyRightArrow,self.displayActionMenu)
 
     def displayWalletMenu(self):
         appuifw.app.body =  self.wallet_menu
@@ -111,7 +115,7 @@ class WalletClient:
 
 
     def addCurrency(self):
-        url = appuifw.query(u'url','text',u'http://localhost:9090')
+        url = appuifw.query(u'url','text',u'http://192.168.2.101:9090')
         self.todo['url'] = url
         transport = self.getHTTPTransport(url) 
         self.wallet.addCurrency(transport)
@@ -162,8 +166,8 @@ class WalletClient:
         if not self.apo:
             import sys
             try:
-                sys.modules['socket'] = __import__('btsocket')
-                import socket
+                #sys.modules['socket'] = __import__('btsocket')
+                import btsocket as socket
                 apid = socket.select_access_point()
                 apo = socket.access_point(apid)
                 socket.set_default_access_point(apo)
@@ -187,7 +191,7 @@ class WalletClient:
 #appuifw.app.screen='full'
 app_lock = e32.Ao_lock()
 storage = storage.Storage()
-storage.setFilename('data/wallet.bin')
+storage.setFilename('wallet.bin')
 storage.restore()
 
 w = WalletClient(storage)

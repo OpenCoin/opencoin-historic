@@ -1,5 +1,5 @@
 import BaseHTTPServer, threading
-import protocols, issuer, mint, transports, urllib
+import issuer, mint, transports, urllib
 
 
 class Handler(BaseHTTPServer.BaseHTTPRequestHandler):

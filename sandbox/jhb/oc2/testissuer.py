@@ -1,5 +1,5 @@
 import BaseHTTPServer
-import protocols, issuer, mint,authorizer,storage
+import issuer, mint,authorizer,storage
 from testserver import Handler
 
 
