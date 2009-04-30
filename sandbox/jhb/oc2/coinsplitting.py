@@ -34,7 +34,7 @@ if __name__ == '__main__':
     for denominations in dl:
         print 'DENOMINATIONS %s' % denominations
         print
-        for i in range(1,max(denominations)*10):
+        for i in range(1,max(denominations)*3):
             print 'Tokenize %i, ' % i,
             tokens = tokenizer(denominations,i)
             print 'tokens %s (%s)' % (tokens,sum(tokens))

@@ -23,7 +23,7 @@ if not issuerstorage.has_key('masterPrivKey'):
 
     print 'issuer: setup currency discription'
     denominations=[0,1,2,5,10,20]
-    cdd = issuer.makeCDD('TestCent','tc',[str(d) for d in denominations],'http://localhost:%s/' % port,'')
+    cdd = issuer.makeCDD('TestCent','tc',[str(d) for d in denominations],'http://192.168.2.101:%s/' % port,'')
     mint.setCDD(cdd)
     
     print 'mint: setting up mintkeys'
