@@ -171,6 +171,7 @@ class AppFrame(wx.Frame):
         self.body.Show(True)
 
         self.Layout()
+        self.body.SetFocus()
 
     def SetSubMenu(self,content):
         pass
