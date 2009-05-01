@@ -198,8 +198,15 @@ class Wallet(Entity):
         cdd = self.askLatestCDD(transport)
         currency = self.getCurrency(cdd.currencyId)
         tokenized =  self.tokenizeForBuying(amount,cdd.denominations) #what coins do we need
-        wanted = list(set(tokenized)) #what mkcs do we want
-        
+        tid = self.makeSerial()
+        secrets,data = self.prepareBlanks(transport,cdd,tokenized)
+        response = self.requestTransfer(transport,tid,target,data,[])                         
+        signatures = response.signatures
+        currency['coins'].extend(self.unblindWithSignatures(secrets,signatures))
+        self.storage.save()
+
+    def prepareBlanks(self,transport,cdd,values):        
+        wanted = list(set(values)) #what mkcs do we want
         keys = self.fetchMintKeys(transport,denominations=wanted)
         mkcs = {}
         for mkc in keys:
@@ -209,17 +216,19 @@ class Wallet(Entity):
         
         secrets = []
         data = []
-        for denomination in tokenized:
+        for denomination in values:
             mkc = mkcs[str(denomination)]
             blank = self._makeBlank(cdd,mkc)
             secret,blind = mkc.publicKey.blindBlank(blank)
             secrets.append((blank,blind,mkc,secret))
             data.append((mkc.keyId,blind))
+        return secrets,data
 
-        tid = self.makeSerial() 
-        response = self.requestTransfer(transport,tid,target,data,[])                 
+
+       
+    def unblindWithSignatures(self,secrets,signatures):        
         i = 0
-        signatures = response.signatures
+        coins = []
         for signature in signatures:
             blank,blind,mkc,secret = secrets[i]
             key = mkc.publicKey
@@ -227,9 +236,9 @@ class Wallet(Entity):
             coin = blank
             if not key.verifyContainerSignature(coin):
                 raise 'Invalid signature' 
-            currency['coins'].append(coin)
+            coins.append(coin)
             i += 1
-        self.storage.save()
+        return coins            
 
     def getAllCoins(self,currencyId):
         currency = self.getCurrency(currencyId)
@@ -246,5 +255,36 @@ class Wallet(Entity):
         response = self.requestTransfer(transport,tid,target,[],picked)
         newcoins = [c for c in coins if c not in picked]
         currency['coins'] = newcoins
+        self.storage.save()
 
 
+
+    def freshenUp(self,transport,cdd):        
+        currency = self.getCurrency(cdd.currencyId)
+        paycoins,secrets,data = self.prepare4exchange(transport,cdd,currency['coins'],[])
+        tid = self.makeSerial()
+        response = self.requestTransfer(transport,tid,None,data,paycoins)
+        coins = currency['coins']
+        for coin in paycoins:
+            coins.pop(coins.index(coin))
+        coins.extend(self.unblindWithSignatures(secrets,response.signatures)) 
+        self.storage.save()
+
+    def prepare4exchange(self,transport,cdd,oldcoins,newcoins):
+        oldcoins = [c for c in oldcoins]
+        newcoins = [c for c in newcoins]
+        
+        oldvalues = [int(c.denomination) for c in oldcoins]
+        newvalues = [int(c.denomination) for c in newcoins]
+        denominations = [int(d) for d in cdd.denominations]
+        keep,pay,blank = coinsplitting.prepare_for_exchange(denominations,oldvalues,newvalues)
+        
+        paycoins = []
+        for value in pay:
+            for coin in oldcoins:
+                if int(coin.denomination) == value:
+                    paycoins.append(oldcoins.pop(oldcoins.index(coin)))
+                    break
+        
+        secrets,data = self.prepareBlanks(transport,cdd,blank)
+        return paycoins,secrets,data

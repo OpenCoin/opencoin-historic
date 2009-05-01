@@ -13,7 +13,7 @@ class WalletClient:
         self.displayWalletMenu()        
         self.actions=[(u'Send',u'Send coins to someone',self.getDetails),
                       (u'Receive',u'Receive coins',self.getReceiveDetails),
-                      (u'Freshen up',u'Freshen up the coins',self.getFreshenUpDetails),
+                      (u'Freshen up',u'Freshen up the coins',self.freshenUp),
                       (u'Buy',u'Buy new coins',self.mintCoins),
                       (u'Sell',u'Sell coins',self.redeemCoins),
                       (u'Details',u'See what coins you hold',self.inspectCurrency),]
@@ -99,9 +99,7 @@ class WalletClient:
             appuifw.note(u'we are reachable at:','conf')
         self.execute()
 
-    def getFreshenUpDetails(self):
-        self.getMethod()
-        self.execute()
+
 
     def getMethod(self):
         methodlist = [u'mobile to mobile',u'internet']
@@ -190,6 +188,14 @@ class WalletClient:
 
         transport = transports.HTTPTransport(url)
         self.wallet.redeemCoins(transport,amount,target)
+        self.makeWalletMenu()
+        self.displayWalletMenu()
+
+
+    def freshenUp(self):
+        cdd,alreadythere = self.getCurrentCurrency()
+        transport = transports.HTTPTransport(cdd.issuerServiceLocation)
+        self.wallet.freshenUp(transport,cdd)
         self.makeWalletMenu()
         self.displayWalletMenu()
 
