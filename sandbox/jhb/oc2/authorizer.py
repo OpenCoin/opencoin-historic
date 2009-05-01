@@ -37,7 +37,7 @@ class Authorizer(Entity):
         for keyid,blind in blinds:
             mkc = self.getMKCById(keyid)
             amount += self.denominationToValue(mkc.denomination)
-        if amount > 10000:
+        if amount > 10000000:
             error = messages.Error()
             error.text = 'way too much'
             return error

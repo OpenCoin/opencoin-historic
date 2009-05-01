@@ -19,6 +19,36 @@ def tokenizer(denominations,amount):
             i -= 1
     return tokens            
 
+def prepare_for_exchange(denominations,oldcoins,newcoins):
+    """returns ([value to keep,..],[value for paying,...],[value for blank,...]),
+     assumes that all newcoins are exchanged anyhow"""
+
+    oldcoins = list(oldcoins)
+    oldcoins.sort()
+    oldcoins.reverse()
+
+    newcoins = list(newcoins)
+    newcoins.sort()
+    newcoins.reverse()
+
+    amountold = sum([int(o) for o in oldcoins])
+    amountnew = sum([int(n) for n in newcoins])
+    amount = amountold + amountnew
+
+    targettokens = tokenizer(denominations,amount)
+    targettokens.sort()
+    targettokens.reverse()
+    keepold = []
+    makenew = []
+    for tt in targettokens:
+        try:
+            keepold.append(oldcoins.pop(oldcoins.index(tt)))
+        except ValueError:
+            makenew.append(tt)
+                
+    return (keepold,oldcoins,makenew)            
+
+
 def testspend(tokens,amount):
     picked = []
     tokens.sort()
@@ -29,8 +59,8 @@ def testspend(tokens,amount):
             picked.append(token)
     return picked         
 
-if __name__ == '__main__':
-    dl = [[1,2,5,10,20,50,100],[1,3,9,27],[1,3,5,7,11,13,17,19,23],[1,17,33]]
+
+def test_tokenizer():
     problems = 0
     for denominations in dl:
         print 'DENOMINATIONS %s' % denominations
@@ -53,3 +83,29 @@ if __name__ == '__main__':
                     
     amount = 137
     print tokenizer(dl[0],amount)
+
+def test_prepare_for_exchange():
+    denominations = dl[0]
+    startvalue = max(denominations)
+    for i in range(1,startvalue * 2 +1):
+        print '#'*20,' i: %s ' % i, '#' * 20
+        start = tokenizer(denominations,i)
+        for j in range(1,i*3 +1):
+            print 'j: %s - ' % j,
+            newcoins = tokenizer(denominations,j)
+            keepold,paywith,makenew = prepare_for_exchange(denominations,start,newcoins)
+            sumkeep = sum(keepold)
+            sumnew = sum(makenew)
+            total = sumkeep + sumnew
+            print "keep: %s, tomake: %s, paywith: %s, %s, sum: %s" % (keepold,makenew,paywith,newcoins,total)
+
+if __name__ == '__main__':
+    
+    dl = [[1,2,5,10,20,50,100],[1,3,9,27],[1,3,5,7,11,13,17,19,23],[1,17,33]]
+    #test_tokenizer()
+    #test_prepare_for_exchange() 
+    print "keep: %s, paywith: %s, makenew: %s" %prepare_for_exchange(dl[0],[10],[5,2])
+
+
+
+
