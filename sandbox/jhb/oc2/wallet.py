@@ -254,21 +254,22 @@ class Wallet(Entity):
         tid = self.makeSerial()
         response = self.requestTransfer(transport,tid,target,[],picked)
         newcoins = [c for c in coins if c not in picked]
-        currency['coins'] = newcoins
+        currency['coins'] = newcoins        
         self.storage.save()
-
+        self.freshenUp(transport,cdd)
 
 
     def freshenUp(self,transport,cdd):        
         currency = self.getCurrency(cdd.currencyId)
         paycoins,secrets,data = self.prepare4exchange(transport,cdd,currency['coins'],[])
-        tid = self.makeSerial()
-        response = self.requestTransfer(transport,tid,None,data,paycoins)
-        coins = currency['coins']
-        for coin in paycoins:
-            coins.pop(coins.index(coin))
-        coins.extend(self.unblindWithSignatures(secrets,response.signatures)) 
-        self.storage.save()
+        if secrets:
+            tid = self.makeSerial()
+            response = self.requestTransfer(transport,tid,None,data,paycoins)
+            coins = currency['coins']
+            for coin in paycoins:
+                coins.pop(coins.index(coin))
+            coins.extend(self.unblindWithSignatures(secrets,response.signatures)) 
+            self.storage.save()
 
     def prepare4exchange(self,transport,cdd,oldcoins,newcoins):
         oldcoins = [c for c in oldcoins]
@@ -279,12 +280,15 @@ class Wallet(Entity):
         denominations = [int(d) for d in cdd.denominations]
         keep,pay,blank = coinsplitting.prepare_for_exchange(denominations,oldvalues,newvalues)
         
-        paycoins = []
-        for value in pay:
-            for coin in oldcoins:
-                if int(coin.denomination) == value:
-                    paycoins.append(oldcoins.pop(oldcoins.index(coin)))
-                    break
+        if blank:
+            paycoins = []
+            for value in pay:
+                for coin in oldcoins:
+                    if int(coin.denomination) == value:
+                        paycoins.append(oldcoins.pop(oldcoins.index(coin)))
+                        break
         
-        secrets,data = self.prepareBlanks(transport,cdd,blank)
-        return paycoins,secrets,data
+            secrets,data = self.prepareBlanks(transport,cdd,blank)
+            return paycoins,secrets,data
+        else:
+            return [],[],[]
