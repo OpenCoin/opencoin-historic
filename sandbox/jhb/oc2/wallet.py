@@ -37,8 +37,6 @@ class Wallet(Entity):
         amount = message.amount
         target = message.target
         approval = getattr(self,'approval',True) #get that from ui
-        if approval == True:
-            self.addIncoming(message)
         return approval
         
 
@@ -106,6 +104,7 @@ class Wallet(Entity):
         approval = self.getApproval(message)
         if approval == True:
             answer = messages.SumAccept()
+            self.addIncoming(message)
         else:
             answer = messages.SumReject()
             answer.reason = approval
@@ -122,7 +121,8 @@ class Wallet(Entity):
         else:
             return True
 
-    def listenSpend(self,message):
+
+    def listenSpend(self,message,transport=None):
         tid = message.transactionId
         amount = sum([int(m.denomination) for m in message.coins])
         #check transactionid
@@ -137,7 +137,11 @@ class Wallet(Entity):
             answer.reason = 'amount of coins does not match announced one'
             return answer
         #do exchange
-
+        if transport:
+            cdd = self.askLatestCDD(transport)
+            currency = self.getCurrency(cdd.currencyId)
+            newcoins = message.coins 
+            self.freshenUp(transport,cdd,newcoins)
 
         answer = messages.SpendAccept()
         answer.transactionId = tid
@@ -158,9 +162,12 @@ class Wallet(Entity):
     def listCurrencies(self):
         out = []
         for key,currency in self.storage.items():
-            cdd = currency['cdds'][-1]
-            amount = sum([int(coin.denomination) for coin in currency['coins']])
-            out.append((cdd,amount))
+            try:
+                cdd = currency['cdds'][-1]
+                amount = sum([int(coin.denomination) for coin in currency['coins']])
+                out.append((cdd,amount))
+            except:
+                del(self.storage[key])
         return out            
 
     def deleteCurrency(self,id):
@@ -259,12 +266,12 @@ class Wallet(Entity):
         self.freshenUp(transport,cdd)
 
 
-    def freshenUp(self,transport,cdd):        
+    def freshenUp(self,transport,cdd,newcoins=[]):        
         currency = self.getCurrency(cdd.currencyId)
-        paycoins,secrets,data = self.prepare4exchange(transport,cdd,currency['coins'],[])
+        paycoins,secrets,data = self.prepare4exchange(transport,cdd,currency['coins'],newcoins)
         if secrets:
             tid = self.makeSerial()
-            response = self.requestTransfer(transport,tid,None,data,paycoins)
+            response = self.requestTransfer(transport,tid,None,data,paycoins+newcoins)
             coins = currency['coins']
             for coin in paycoins:
                 coins.pop(coins.index(coin))
@@ -292,3 +299,20 @@ class Wallet(Entity):
             return paycoins,secrets,data
         else:
             return [],[],[]
+
+
+    def spendCoins(self,transport,currencyId,amount,target):
+        currency = self.getCurrency(currencyId)
+        coins = currency['coins']
+        picked = self.pickForSpending(amount,coins)
+        tid = self.makeSerial()
+        
+        self.announceSum(transport,tid,amount,target)
+
+        response = self.requestSpend(transport,tid,picked)
+        if response == True: 
+            newcoins = [c for c in coins if c not in picked]
+            currency['coins'] = newcoins        
+            self.storage.save()
+
+

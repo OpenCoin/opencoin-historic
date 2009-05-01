@@ -11,15 +11,13 @@ class WalletClient:
         self.wallet = wallet.Wallet(storage)
         self.makeWalletMenu()
         self.displayWalletMenu()        
-        self.actions=[(u'Send',u'Send coins to someone',self.getDetails),
-                      (u'Receive',u'Receive coins',self.getReceiveDetails),
+        self.actions=[(u'Send',u'Send coins to someone',self.spendCoins),
+                      (u'Receive',u'Receive coins',self.receiveCoins),
                       (u'Freshen up',u'Freshen up the coins',self.freshenUp),
-                      (u'Buy',u'Buy new coins',self.mintCoins),
-                      (u'Sell',u'Sell coins',self.redeemCoins),
+                      (u'Mint',u'new coins from issuer',self.mintCoins),
+                      (u'Redeem',u'redeem from issuer',self.redeemCoins),
                       (u'Details',u'See what coins you hold',self.inspectCurrency),]
 
-        self.methods=[(u'Internet',u'Use the internet'),
-                      (u'Bluetooth',u'Mobile to mobile')]
         
         self.todo = {}
         self.apo = None
@@ -93,20 +91,7 @@ class WalletClient:
 
         self.execute()
 
-    def getReceiveDetails(self):
-        method = self.getMethod()
-        if method ==1:
-            appuifw.note(u'we are reachable at:','conf')
-        self.execute()
 
-
-
-    def getMethod(self):
-        methodlist = [u'mobile to mobile',u'internet']
-        method = appuifw.popup_menu(methodlist)
-        self.todo['method'] = method
-        return method
-                              
     def inspectCurrency(self):
         #print 'inspect'
         cdd,amount = self.getCurrentCurrency()
@@ -114,7 +99,7 @@ class WalletClient:
         coins = self.wallet.getAllCoins(id)
         coinlist = []
         for coin in coins:
-            coinlist.append(u'coin: %s' % coin.denomination)
+            coinlist.append(u'%s %s' % (coin.denomination,cdd.currencyId))
         self.currency_menu = appuifw.Listbox(coinlist,self.inspectCoin)
         self.currency_menu.bind(EKeyRightArrow,self.inspectCoin)
         self.currency_menu.bind(EKeyLeftArrow,self.displayActionMenu)
@@ -127,9 +112,9 @@ class WalletClient:
         coins = self.wallet.getAllCoins(id)
         coin = coins[self.currency_menu.current()]
         details = []
-        details.append((unicode(coin.standardId),u'Standard Id'))
-        details.append((unicode(coin.currencyId),u'Currency Id'))
-        details.append((unicode(coin.denomination),u'Denomination'))
+        details.append((u'Standard Id',unicode(coin.standardId)))
+        details.append((u'Currency Id',unicode(coin.currencyId)))
+        details.append((u'Denomination',unicode(coin.denomination)))
         self.coin_menu = appuifw.Listbox(details,self.inspectCurrency)
         self.coin_menu.bind(EKeyLeftArrow,self.inspectCurrency)
         appuifw.app.body = self.coin_menu
@@ -209,6 +194,88 @@ class WalletClient:
         self.startInternet()
         transport = transports.HTTPTransport(url)
         return transport
+    
+    def receiveCoins(self):
+        methodlist = [u'internet',u'bluetooth']
+        method = appuifw.popup_menu(methodlist)
+        if method ==1:
+            appuifw.note(u'bt not implemented yet','conf')
+        else:
+            cdd,alreadythere = self.getCurrentCurrency()
+            transport = transports.HTTPTransport(cdd.issuerServiceLocation)
+            self.receiveCoinsHTTP(transport)
+        
+        self.makeWalletMenu()
+        self.displayWalletMenu()
+
+
+
+    def receiveCoinsHTTP(self,transport):
+        import BaseHTTPServer, urllib
+        
+        class OCHandler(BaseHTTPServer.BaseHTTPRequestHandler):
+
+            def do_POST(self):
+                #print self.server
+                if self.path == '/stop':
+                    raise 'foobar'
+                length = self.headers.get('Content-Length')
+                data = self.rfile.read(int(length))
+                data = urllib.unquote(data)
+                message = transports.createMessage(data)
+                if message.header == 'SumAnnounce':
+                    answer = self.wallet.listenSum(message)
+                if message.header == 'SpendRequest':
+                    answer = self.wallet.listenSpend(message,transport)
+                self.send_response(200)
+                self.send_header("Content-type", "text/plain")
+                self.wfile.write('\r\n')
+                self.wfile.write(answer.toString(True))
+                
+        port = int(appuifw.query(u'port','number','9091'))
+        OCHandler.wallet = self.wallet
+        OCHandler.wallet.getApproval = self.getApproval
+        self.startInternet()
+        
+        #hack to open internet
+        #r = urllib.urlopen('http://google.com')
+        
+        httpd = BaseHTTPServer.HTTPServer(("",port),OCHandler)
+        appuifw.note(u'waiting at %s:%s' % ('localhost',port),'conf')
+        httpd.handle_request()
+        httpd.handle_request()
+        self.stopInternet()
+
+    def spendCoins(self):
+
+        amount = self.getAmount()
+        if not amount:
+            return
+        
+        target = self.getTarget()
+        if not target:
+            return
+        cdd,alreadythere = self.getCurrentCurrency()
+        url = appuifw.query(u'url','text',u'http://192.168.2.105:9091')
+        transport = transports.HTTPTransport(url)
+
+        self.wallet.spendCoins(transport,cdd.currencyId,amount,target)
+        self.makeWalletMenu()
+        self.displayWalletMenu()
+
+
+
+
+    def getApproval(self,message):
+        amount = message.amount
+        target = message.target
+        return appuifw.query(u'Accept %s (ref "%s")?' % (amount,target),'query') 
+
+
+    
+
+
+
 
     def startInternet(self):
         if not self.apo:
@@ -216,15 +283,16 @@ class WalletClient:
             try:
                 #sys.modules['socket'] = __import__('btsocket')
                 import btsocket as socket
-                #apid = socket.select_access_point()
-                #apo = socket.access_point(apid)
-                #socket.set_default_access_point(apo)
-                #apo.start()
-                #self.apo = apo
-                #self.ip = apo.ip()
+                apid = socket.select_access_point()
+                apo = socket.access_point(apid)
+                socket.set_default_access_point(apo)
+                apo.start()
+                self.apo = apo
+                self.ip = apo.ip()
 
             except ImportError:
                 import socket
+                self.ip = '127.0.0.2'
             
 
     def stopInternet(self):

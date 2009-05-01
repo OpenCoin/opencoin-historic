@@ -38,7 +38,6 @@ Wallet fetches cdd from issuer
 >>> #faked request
 >>> from wallet import Wallet
 >>> wallet = Wallet({})
->>> import protocols
 >>> cdd == wallet.askLatestCDD(issuer.giveLatestCDD)
 True
 
