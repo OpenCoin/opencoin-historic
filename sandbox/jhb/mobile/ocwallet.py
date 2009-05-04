@@ -3,6 +3,7 @@ from graphics import *
 from key_codes import EKeyLeftArrow, EKeyRightArrow
 import encodings
 from oc2 import storage,wallet, transports
+import sys
 
 class WalletClient:
 
@@ -208,6 +209,31 @@ class WalletClient:
         self.makeWalletMenu()
         self.displayWalletMenu()
 
+    def receiveCoinsBT(self,transport):
+        import btsocket
+        server_socket = btsocket.socket(btsocket.AF_BT, btsocket.SOCK_STREAM)
+        port = btsocket.bt_rfcomm_get_available_server_channel(server_socket)
+        server_socket.bind(("", port))
+        server_socket.listen(1)
+        btsocket.bt_advertise_service( u"opencoin", server_socket, True, btsocket.RFCOMM)
+        btsocket.set_security(server_socket, btsocket.AUTH)
+        (sock,peer_addr) = server_socket.accept()
+        def receive(sock):
+            received = ''
+            try:
+                while True:
+                    data = sock.recv(1024)
+                    if len(data) == 0: break
+                    received += data    
+            except IOError:
+                pass
+            return transports.createMessage(received)
+
+        self.wallet.getApproval = self.getApproval 
+        reply(self.wallet.listenSum(receive(sock))
+        reply(self.wallet.listenSum(receive(sock))
+        
+
 
 
     def receiveCoinsHTTP(self,transport):
@@ -281,11 +307,12 @@ class WalletClient:
         if not self.apo:
             import sys
             try:
-                #sys.modules['socket'] = __import__('btsocket')
-                import btsocket as socket
+                sys.modules['socket'] = __import__('btsocket')
+                import socket
+                #import btsocket as socket
                 apid = socket.select_access_point()
                 apo = socket.access_point(apid)
-                socket.set_default_access_point(apo)
+                #socket.set_default_access_point(apo)
                 apo.start()
                 self.apo = apo
                 self.ip = apo.ip()
