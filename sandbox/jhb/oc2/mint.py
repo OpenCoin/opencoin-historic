@@ -113,8 +113,10 @@ class Mint(Entity):
             return reject
         
         for coin in coins:
-            self.addToDSDB(coin)
-
+            success = self.addToDSDB(coin)
+            if not success:
+                reject = messages.TransferReject()
+                return reject
         return self._mintBlinds(message)
 
 
