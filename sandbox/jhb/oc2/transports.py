@@ -18,10 +18,37 @@ class HTTPTransport(object):
         self.url = url
      
     def __call__(self,message):
-        import urllib2, urllib
-        response = urllib2.urlopen(self.url,message.toString(True))
+        import  urllib
+        response = urllib.urlopen(self.url,message.toString(True))
         return createMessage(response.read())
+
+import sys
+
+class BTTransport(object):
+
+    def __init__(self,socket):
+        self.stop = '\r\r+++STOP+++\r\r'
+        self.lenstop = len(self.stop)
+        self.socket = socket
         
+    def __call__(self,message):
+        self.send(message)
+        return self.receive()
+   
+    def send(self,message):
+        self.socket.send(message.toString(True)+self.stop)
+
+    def receive(self):
+        line=''
+        while not line.endswith(self.stop):
+            ch=self.socket.recv(1)
+            line += ch
+
+        received = line[:-self.lenstop]
+        return createMessage(received)
+
+    
+
 class YieldTransport(object):
 
     def __init__(self,targetmethod,args):

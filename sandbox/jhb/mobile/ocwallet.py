@@ -199,42 +199,52 @@ class WalletClient:
     def receiveCoins(self):
         methodlist = [u'internet',u'bluetooth']
         method = appuifw.popup_menu(methodlist)
+
+        cdd,alreadythere = self.getCurrentCurrency()
+        transport = transports.HTTPTransport(cdd.issuerServiceLocation)
+
         if method ==1:
-            appuifw.note(u'bt not implemented yet','conf')
+            self.receiveCoinsBT(transport)
         else:
-            cdd,alreadythere = self.getCurrentCurrency()
-            transport = transports.HTTPTransport(cdd.issuerServiceLocation)
             self.receiveCoinsHTTP(transport)
         
         self.makeWalletMenu()
         self.displayWalletMenu()
+    
 
+    
+    
     def receiveCoinsBT(self,transport):
-        import btsocket
-        server_socket = btsocket.socket(btsocket.AF_BT, btsocket.SOCK_STREAM)
-        port = btsocket.bt_rfcomm_get_available_server_channel(server_socket)
-        server_socket.bind(("", port))
-        server_socket.listen(1)
-        btsocket.bt_advertise_service( u"opencoin", server_socket, True, btsocket.RFCOMM)
-        btsocket.set_security(server_socket, btsocket.AUTH)
-        (sock,peer_addr) = server_socket.accept()
-        def receive(sock):
-            received = ''
-            try:
-                while True:
-                    data = sock.recv(1024)
-                    if len(data) == 0: break
-                    received += data    
-            except IOError:
-                pass
-            return transports.createMessage(received)
+        if sys.platform == 'symbian_s60':
+            import btsocket
+            server_socket = btsocket.socket(btsocket.AF_BT, btsocket.SOCK_STREAM)
+            port = btsocket.bt_rfcomm_get_available_server_channel(server_socket)
+            server_socket.bind(("", port))
+            server_socket.listen(1)
+            btsocket.bt_advertise_service( u"opencoin", server_socket, True, btsocket.RFCOMM)
+            btsocket.set_security(server_socket, btsocket.AUTH)
+            appuifw.note(u'waiting for connection')
+            (sock,peer_addr) = server_socket.accept()
 
-        self.wallet.getApproval = self.getApproval 
-        reply(self.wallet.listenSum(receive(sock))
-        reply(self.wallet.listenSum(receive(sock))
+        else:
+            import bluetooth as bt
+            server_sock=bt.BluetoothSocket(bt.RFCOMM)
+            server_sock.bind(("",bt.PORT_ANY))
+            server_sock.listen(1)
+            port = server_sock.getsockname()[1]
+
+            uuid = "9e72d9d8-e06d-41cb-bbd4-89cd052cccb8"
+            
+            bt.advertise_service( server_sock, u"opencoin",)
+                               
+            sock, client_info = server_sock.accept()
+
         
-
-
+        bt = transports.BTTransport(sock)
+        self.wallet.getApproval = self.getApproval 
+        bt.send(self.wallet.listenSum(bt.receive()))
+        bt.send(self.wallet.listenSpend(bt.receive(),transport))
+        
 
     def receiveCoinsHTTP(self,transport):
         import BaseHTTPServer, urllib
@@ -272,6 +282,23 @@ class WalletClient:
         httpd.handle_request()
         self.stopInternet()
 
+
+    def getBTTransport(self):
+        
+        import btsocket
+        sock=btsocket.socket(btsocket.AF_BT,btsocket.SOCK_STREAM)
+        addr,services=btsocket.bt_discover()
+        if len(services)>0:
+            choices=services.keys()
+            choices.sort()
+            choice=appuifw.popup_menu([unicode(services[x])+": "+x for x in choices],u'Choose port:')
+            port=services[choices[choice]]
+        else:
+            port=services[services.keys()[0]]
+        address=(addr,port)
+        sock.connect(address)
+        return transports.BTTransport(sock)
+
     def spendCoins(self):
 
         amount = self.getAmount()
@@ -281,9 +308,17 @@ class WalletClient:
         target = self.getTarget()
         if not target:
             return
+            
+        methodlist = [u'internet',u'bluetooth']
+        method = appuifw.popup_menu(methodlist)
+
+
         cdd,alreadythere = self.getCurrentCurrency()
-        url = appuifw.query(u'url','text',u'http://192.168.2.105:9091')
-        transport = transports.HTTPTransport(url)
+        if method == 0:
+            url = appuifw.query(u'url','text',u'http://192.168.2.105:9091')
+            transport = self.getHTTPTransport(url)
+        else:
+            transport = self.getBTTransport() 
 
         self.wallet.spendCoins(transport,cdd.currencyId,amount,target)
         self.makeWalletMenu()
