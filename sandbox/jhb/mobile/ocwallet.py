@@ -10,6 +10,8 @@ class WalletClient:
     def __init__(self,storage):
         self.storage = storage
         self.wallet = wallet.Wallet(storage)
+        self.wallet.getApproval = self.getApproval
+        self.wallet.feedback = self.feedback
         self.makeWalletMenu()
         self.displayWalletMenu()        
         self.actions=[(u'Send',u'Send coins to someone',self.spendCoins),
@@ -39,6 +41,10 @@ class WalletClient:
         else:
             self.wallet_menu =  appuifw.Listbox(self.wallet_list,self.displayActionMenu)
             self.wallet_menu.bind(EKeyRightArrow,self.displayActionMenu)
+
+    def feedback(self,message):
+        appuifw.note(unicode(message))
+
 
     def displayWalletMenu(self):
         appuifw.app.body =  self.wallet_menu
@@ -122,7 +128,7 @@ class WalletClient:
         appuifw.app.title = u'opencoin - coin\nDetails of coin'
  
     def addCurrency(self):
-        url = appuifw.query(u'url','text',u'http://192.168.2.101:9090')
+        url = appuifw.query(u'url','text',u'http://baach.de:9090')
         self.todo['url'] = url
         transport = self.getHTTPTransport(url) 
         self.wallet.addCurrency(transport)
@@ -236,7 +242,6 @@ class WalletClient:
                 
         port = int(appuifw.query(u'port','number','9091'))
         OCHandler.wallet = self.wallet
-        OCHandler.wallet.getApproval = self.getApproval
         self.startInternet()
         
         #hack to open internet

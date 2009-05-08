@@ -33,14 +33,10 @@ class Wallet(Entity):
     def getIncoming(self,tid):
         return self.storage.setdefault('incoming',{}).get(tid,None)
 
-    def getApproval(self,message):
-        amount = message.amount
-        target = message.target
-        approval = getattr(self,'approval',True) #get that from ui
-        return approval
         
 
     def askLatestCDD(self,transport):
+        self.feedback('fetching latest CDD')
         response = transport(messages.AskLatestCDD())
         return response.cdd
 
@@ -53,7 +49,7 @@ class Wallet(Entity):
         message = messages.FetchMintKeys()
         message.denominations = [str(d) for d in denominations]
         message.keyids = keyids
-        
+        self.feedback('fetching mintkeys')
         response = transport(message)
         if response.header == 'MINTING_KEY_FAILURE':
             raise message
@@ -77,7 +73,7 @@ class Wallet(Entity):
         message.blinds = blinds
         message.coins = coins
         message.options = dict(type=requesttype).items()
-
+        self.feedback('request %s' % requesttype)
         response = transport(message)
         return response
 
@@ -191,6 +187,14 @@ class Wallet(Entity):
                 break
         return picked                
 
+    def getApproval(self,message):
+        amount = message.amount
+        target = message.target
+        approval = getattr(self,'approval',True) #get that from ui
+        return approval
+
+    def feedback(self,message):
+        print message
 
 #################################higher level#############################
 
