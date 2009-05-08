@@ -1,4 +1,4 @@
-import appuifw,e32,socket,httplib, urllib
+import appuifw,e32,httplib, urllib
 from graphics import *
 from key_codes import EKeyLeftArrow, EKeyRightArrow
 import encodings
@@ -21,7 +21,7 @@ class WalletClient:
 
         
         self.todo = {}
-        self.apo = None
+        self.ip = None
 
     def makeWalletMenu(self):
         self.wallet_list = []
@@ -154,7 +154,7 @@ class WalletClient:
         cdd,alreadythere = self.getCurrentCurrency()
         url = cdd.issuerServiceLocation
 
-        transport = transports.HTTPTransport(url)
+        transport = self.getHTTPTransport(url)
         self.wallet.mintCoins(transport,amount,target)
         self.makeWalletMenu()
         self.displayWalletMenu()
@@ -172,7 +172,7 @@ class WalletClient:
         cdd,alreadythere = self.getCurrentCurrency()
         url = cdd.issuerServiceLocation
 
-        transport = transports.HTTPTransport(url)
+        transport = self.getHTTPTransport(url)
         self.wallet.redeemCoins(transport,amount,target)
         self.makeWalletMenu()
         self.displayWalletMenu()
@@ -180,7 +180,7 @@ class WalletClient:
 
     def freshenUp(self):
         cdd,alreadythere = self.getCurrentCurrency()
-        transport = transports.HTTPTransport(cdd.issuerServiceLocation)
+        transport = self.getHTTPTransport(cdd.issuerServiceLocation)
         self.wallet.freshenUp(transport,cdd)
         self.makeWalletMenu()
         self.displayWalletMenu()
@@ -190,18 +190,12 @@ class WalletClient:
         #print 'execute'
         print self.todo
 
-
-    def getHTTPTransport(self,url):
-        self.startInternet()
-        transport = transports.HTTPTransport(url)
-        return transport
-    
     def receiveCoins(self):
         methodlist = [u'internet',u'bluetooth']
         method = appuifw.popup_menu(methodlist)
 
         cdd,alreadythere = self.getCurrentCurrency()
-        transport = transports.HTTPTransport(cdd.issuerServiceLocation)
+        transport = self.getHTTPTransport(cdd.issuerServiceLocation)
 
         if method ==1:
             self.receiveCoinsBT(transport)
@@ -212,40 +206,12 @@ class WalletClient:
         self.displayWalletMenu()
     
 
+
+    def getHTTPTransport(self,url):
+        self.startInternet()
+        transport = transports.HTTPTransport(url)
+        return transport
     
-    
-    def receiveCoinsBT(self,transport):
-        if sys.platform == 'symbian_s60':
-            import btsocket
-            server_socket = btsocket.socket(btsocket.AF_BT, btsocket.SOCK_STREAM)
-            port = btsocket.bt_rfcomm_get_available_server_channel(server_socket)
-            server_socket.bind(("", port))
-            server_socket.listen(1)
-            btsocket.bt_advertise_service( u"opencoin", server_socket, True, btsocket.RFCOMM)
-            btsocket.set_security(server_socket, btsocket.AUTH)
-            appuifw.note(u'waiting for connection')
-            (sock,peer_addr) = server_socket.accept()
-
-        else:
-            import bluetooth as bt
-            server_sock=bt.BluetoothSocket(bt.RFCOMM)
-            server_sock.bind(("",bt.PORT_ANY))
-            server_sock.listen(1)
-            port = server_sock.getsockname()[1]
-
-            uuid = "9e72d9d8-e06d-41cb-bbd4-89cd052cccb8"
-            
-            bt.advertise_service( server_sock, u"opencoin",)
-                               
-            sock, client_info = server_sock.accept()
-
-        
-        bt = transports.BTTransport(sock)
-        self.wallet.getApproval = self.getApproval 
-        bt.send(self.wallet.listenSum(bt.receive()))
-        bt.send(self.wallet.listenSpend(bt.receive(),transport))
-        
-
     def receiveCoinsHTTP(self,transport):
         import BaseHTTPServer, urllib
         
@@ -282,7 +248,6 @@ class WalletClient:
         httpd.handle_request()
         self.stopInternet()
 
-
     def getBTTransport(self):
         
         import btsocket
@@ -298,6 +263,42 @@ class WalletClient:
         address=(addr,port)
         sock.connect(address)
         return transports.BTTransport(sock)
+
+  
+    
+    def receiveCoinsBT(self,transport):
+        if sys.platform == 'symbian_s60':
+            import btsocket
+            server_socket = btsocket.socket(btsocket.AF_BT, btsocket.SOCK_STREAM)
+            port = btsocket.bt_rfcomm_get_available_server_channel(server_socket)
+            server_socket.bind(("", port))
+            server_socket.listen(1)
+            btsocket.bt_advertise_service( u"opencoin", server_socket, True, btsocket.RFCOMM)
+            btsocket.set_security(server_socket, btsocket.AUTH)
+            appuifw.note(u'waiting for bt connection')
+            (sock,peer_addr) = server_socket.accept()
+
+        else:
+            import bluetooth as bt
+            server_sock=bt.BluetoothSocket(bt.RFCOMM)
+            server_sock.bind(("",bt.PORT_ANY))
+            server_sock.listen(1)
+            port = server_sock.getsockname()[1]
+
+            uuid = "9e72d9d8-e06d-41cb-bbd4-89cd052cccb8"
+            
+            bt.advertise_service( server_sock, u"opencoin",)
+                               
+            sock, client_info = server_sock.accept()
+
+        
+        bt = transports.BTTransport(sock)
+        self.wallet.getApproval = self.getApproval 
+        bt.send(self.wallet.listenSum(bt.receive()))
+        bt.send(self.wallet.listenSpend(bt.receive(),transport))
+        import e32
+        e32.ao_sleep(1)    
+
 
     def spendCoins(self):
 
@@ -339,29 +340,24 @@ class WalletClient:
 
 
     def startInternet(self):
-        if not self.apo:
+        if not self.ip:
             import sys
-            try:
-                sys.modules['socket'] = __import__('btsocket')
+            if sys.platform == 'symbian_s60':
                 import socket
-                #import btsocket as socket
-                apid = socket.select_access_point()
-                apo = socket.access_point(apid)
-                #socket.set_default_access_point(apo)
-                apo.start()
-                self.apo = apo
-                self.ip = apo.ip()
+                appuifw.note(u'Preparing access points')
+                aps = [ap['name'] for ap in socket.access_points()]
+                aps.sort()
+                apid = appuifw.popup_menu(aps,u'select access point')
+                socket.set_default_access_point(aps[apid])
+                self.ip = 'some ip, s60'
 
-            except ImportError:
+            else:
                 import socket
-                self.ip = '127.0.0.2'
+                self.ip = 'some ip'
             
 
     def stopInternet(self):
-        if self.apo:
-            self.apo.stop()
-            self.apo = None
-
+        pass
 
 
     
