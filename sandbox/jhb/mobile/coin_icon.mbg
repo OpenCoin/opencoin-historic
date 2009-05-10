@@ -1,0 +1,8 @@
+ 
+/* This file has been generated, DO NOT MODIFY. */
+enum TMifCoin_icon
+	{
+	EMbmCoin_iconCoin_icon = 16384,
+	EMbmCoin_iconCoin_icon_mask = 16385,
+	EMbmCoin_iconLastElement
+	};

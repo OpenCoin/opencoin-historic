@@ -4,6 +4,11 @@ from key_codes import EKeyLeftArrow, EKeyRightArrow
 import encodings
 from oc2 import storage,wallet, transports
 import sys
+import audio
+
+icon = appuifw.Icon(u'e:\\python\\coin_icon.mif',16384,16385)
+coinsound = audio.Sound.open('e:\\python\\coinsound.wav')
+
 
 class WalletClient:
 
@@ -34,7 +39,7 @@ class WalletClient:
         for cdd,amount in self.currencies:
             title = u'%s %ss' % (amount,cdd.currencyId)
             description = unicode(cdd.issuerServiceLocation)
-            self.wallet_list.append((title,description))
+            self.wallet_list.append((title,description,icon))
         if not self.wallet_list:
             self.wallet_list.append(u'no currencies yet')
             self.wallet_menu =  appuifw.Listbox(self.wallet_list,self.displayActionMenu)
@@ -122,6 +127,8 @@ class WalletClient:
         details.append((u'Standard Id',unicode(coin.standardId)))
         details.append((u'Currency Id',unicode(coin.currencyId)))
         details.append((u'Denomination',unicode(coin.denomination)))
+        details.append((u'Serial',unicode(coin.serial)))
+        details.append((u'Signature',unicode(coin.signature)))
         self.coin_menu = appuifw.Listbox(details,self.inspectCurrency)
         self.coin_menu.bind(EKeyLeftArrow,self.inspectCurrency)
         appuifw.app.body = self.coin_menu
@@ -162,6 +169,7 @@ class WalletClient:
 
         transport = self.getHTTPTransport(url)
         self.wallet.mintCoins(transport,amount,target)
+        coinsound.play() 
         self.makeWalletMenu()
         self.displayWalletMenu()
 
@@ -188,6 +196,7 @@ class WalletClient:
         cdd,alreadythere = self.getCurrentCurrency()
         transport = self.getHTTPTransport(cdd.issuerServiceLocation)
         self.wallet.freshenUp(transport,cdd)
+        coinsound.play() 
         self.makeWalletMenu()
         self.displayWalletMenu()
 
@@ -207,7 +216,8 @@ class WalletClient:
             self.receiveCoinsBT(transport)
         else:
             self.receiveCoinsHTTP(transport)
-        
+
+        coinsound.play() 
         self.makeWalletMenu()
         self.displayWalletMenu()
     
@@ -259,10 +269,11 @@ class WalletClient:
         sock=btsocket.socket(btsocket.AF_BT,btsocket.SOCK_STREAM)
         addr,services=btsocket.bt_discover()
         if len(services)>0:
-            choices=services.keys()
-            choices.sort()
-            choice=appuifw.popup_menu([unicode(services[x])+": "+x for x in choices],u'Choose port:')
-            port=services[choices[choice]]
+            #choices=services.keys()
+            #choices.sort()
+            #choice=appuifw.popup_menu([unicode(services[x])+": "+x for x in choices],u'Choose port:')
+            #port=services[choices[choice]]
+            port = services[u'opencoin']
         else:
             port=services[services.keys()[0]]
         address=(addr,port)
@@ -280,7 +291,7 @@ class WalletClient:
             server_socket.listen(1)
             btsocket.bt_advertise_service( u"opencoin", server_socket, True, btsocket.RFCOMM)
             btsocket.set_security(server_socket, btsocket.AUTH)
-            appuifw.note(u'waiting for bt connection')
+            self.feedback(u'waiting for bt connection')
             (sock,peer_addr) = server_socket.accept()
 
         else:
@@ -296,7 +307,6 @@ class WalletClient:
                                
             sock, client_info = server_sock.accept()
 
-        
         bt = transports.BTTransport(sock)
         self.wallet.getApproval = self.getApproval 
         bt.send(self.wallet.listenSum(bt.receive()))

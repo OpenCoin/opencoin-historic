@@ -311,8 +311,9 @@ class Wallet(Entity):
         picked = self.pickForSpending(amount,coins)
         tid = self.makeSerial()
         
+        self.feedback(u'Announcing transfer')
         self.announceSum(transport,tid,amount,target)
-
+        self.feedback(u'Transferring coins. Wating for other side...')
         response = self.requestSpend(transport,tid,picked)
         if response == True: 
             newcoins = [c for c in coins if c not in picked]
