@@ -1,14 +1,4 @@
-import appuifw,e32,httplib, urllib
-from graphics import *
-from key_codes import EKeyLeftArrow, EKeyRightArrow
-import encodings
-from oc2 import storage,wallet, transports
-import sys
-import audio
-
-icon = appuifw.Icon(u'e:\\python\\coin_icon.mif',16384,16385)
-coinsound = audio.Sound.open('e:\\python\\coinsound.wav')
-
+import appuifw,e32
 
 class WalletClient:
 
@@ -17,7 +7,6 @@ class WalletClient:
         self.wallet = wallet.Wallet(storage)
         self.wallet.getApproval = self.getApproval
         self.wallet.feedback = self.feedback
-        self.makeWalletMenu()
         self.displayWalletMenu()        
         self.actions=[(u'Send',u'Send coins to someone',self.spendCoins),
                       (u'Receive',u'Receive coins',self.receiveCoins),
@@ -47,13 +36,18 @@ class WalletClient:
             self.wallet_menu =  appuifw.Listbox(self.wallet_list,self.displayActionMenu)
             self.wallet_menu.bind(EKeyRightArrow,self.displayActionMenu)
 
-    def feedback(self,message):
-        appuifw.note(unicode(message))
-
+    def feedback(self,text):
+        #appuifw.note(unicode(message))
+        status(unicode(text))
+        #i = i=appuifw.InfoPopup()
+        #i.show(unicode(message), (0, 0), timeout*1000, 0, appuifw.EHCenterVCenter)
+        
+     
 
     def displayWalletMenu(self):
+        self.makeWalletMenu()
         appuifw.app.body =  self.wallet_menu
-        appuifw.app.title = u'opencoin - main\nchoose your currency'
+        appuifw.app.title = u'opencoin wallet\nall currencies'
         appuifw.app.menu = [(u'add Currency',self.addCurrency),
                             (u'delete Currency',self.delCurrency)]
 
@@ -64,7 +58,8 @@ class WalletClient:
         self.action_menu.bind(EKeyRightArrow,self.selectAction)
         self.action_menu.bind(EKeyLeftArrow,self.displayWalletMenu)
         appuifw.app.body = self.action_menu
-        appuifw.app.title = u'opencoin - currency\nSelect the action'
+        cdd,amount = self.getCurrentCurrency()
+        appuifw.app.title = u'%ss\nactions' % cdd.currencyId
         #print 'displayActionMenu'
 
     def selectAction(self):
@@ -116,7 +111,7 @@ class WalletClient:
         self.currency_menu.bind(EKeyRightArrow,self.inspectCoin)
         self.currency_menu.bind(EKeyLeftArrow,self.displayActionMenu)
         appuifw.app.body = self.currency_menu
-        appuifw.app.title = u'opencoin - currency\nCoins in wallet'
+        appuifw.app.title = u'%ss\ncoin list' % id
  
     def inspectCoin(self):
         cdd,amount = self.getCurrentCurrency()
@@ -132,14 +127,13 @@ class WalletClient:
         self.coin_menu = appuifw.Listbox(details,self.inspectCurrency)
         self.coin_menu.bind(EKeyLeftArrow,self.inspectCurrency)
         appuifw.app.body = self.coin_menu
-        appuifw.app.title = u'opencoin - coin\nDetails of coin'
+        appuifw.app.title = u'%ss\ncoin details' % id
  
     def addCurrency(self):
         url = appuifw.query(u'url','text',u'http://baach.de:9090')
         self.todo['url'] = url
         transport = self.getHTTPTransport(url) 
         self.wallet.addCurrency(transport)
-        self.makeWalletMenu()
         self.displayWalletMenu()
 
 
@@ -152,7 +146,6 @@ class WalletClient:
         result = appuifw.query(u'Delete %s %ss?' % (amount,id),'query')
         if result:
             self.wallet.deleteCurrency(id)
-        self.makeWalletMenu()
         self.displayWalletMenu()
 
     def mintCoins(self):
@@ -170,7 +163,6 @@ class WalletClient:
         transport = self.getHTTPTransport(url)
         self.wallet.mintCoins(transport,amount,target)
         coinsound.play() 
-        self.makeWalletMenu()
         self.displayWalletMenu()
 
 
@@ -188,7 +180,6 @@ class WalletClient:
 
         transport = self.getHTTPTransport(url)
         self.wallet.redeemCoins(transport,amount,target)
-        self.makeWalletMenu()
         self.displayWalletMenu()
 
 
@@ -197,7 +188,6 @@ class WalletClient:
         transport = self.getHTTPTransport(cdd.issuerServiceLocation)
         self.wallet.freshenUp(transport,cdd)
         coinsound.play() 
-        self.makeWalletMenu()
         self.displayWalletMenu()
 
 
@@ -206,19 +196,18 @@ class WalletClient:
         print self.todo
 
     def receiveCoins(self):
-        methodlist = [u'internet',u'bluetooth']
-        method = appuifw.popup_menu(methodlist)
+        methodlist = [u'bluetooth',u'internet']
+        method = appuifw.popup_menu(methodlist,u'how to connect?')
 
         cdd,alreadythere = self.getCurrentCurrency()
         transport = self.getHTTPTransport(cdd.issuerServiceLocation)
 
-        if method ==1:
+        if method ==0:
             self.receiveCoinsBT(transport)
         else:
             self.receiveCoinsHTTP(transport)
 
         coinsound.play() 
-        self.makeWalletMenu()
         self.displayWalletMenu()
     
 
@@ -258,7 +247,7 @@ class WalletClient:
         #r = urllib.urlopen('http://google.com')
         
         httpd = BaseHTTPServer.HTTPServer(("",port),OCHandler)
-        appuifw.note(u'waiting at %s:%s' % ('localhost',port),'conf')
+        self.feedback(u'waiting at %s:%s' % ('localhost',port),'conf')
         httpd.handle_request()
         httpd.handle_request()
         self.stopInternet()
@@ -291,7 +280,7 @@ class WalletClient:
             server_socket.listen(1)
             btsocket.bt_advertise_service( u"opencoin", server_socket, True, btsocket.RFCOMM)
             btsocket.set_security(server_socket, btsocket.AUTH)
-            self.feedback(u'waiting for bt connection')
+            self.feedback(u'Receive coins: ready to receive...')
             (sock,peer_addr) = server_socket.accept()
 
         else:
@@ -325,19 +314,21 @@ class WalletClient:
         if not target:
             return
             
-        methodlist = [u'internet',u'bluetooth']
-        method = appuifw.popup_menu(methodlist)
+        methodlist = [u'bluetooth',u'internet']
+        method = appuifw.popup_menu(methodlist,u'how to connect?')
 
 
         cdd,alreadythere = self.getCurrentCurrency()
-        if method == 0:
+        if method == 1:
             url = appuifw.query(u'url','text',u'http://192.168.2.105:9091')
             transport = self.getHTTPTransport(url)
+            self.wallet.spendCoins(transport,cdd.currencyId,amount,target)
         else:
-            transport = self.getBTTransport() 
+            ready =self.query('Is the other side ready to receive?')
+            if ready:
+                transport = self.getBTTransport() 
+                self.wallet.spendCoins(transport,cdd.currencyId,amount,target)
 
-        self.wallet.spendCoins(transport,cdd.currencyId,amount,target)
-        self.makeWalletMenu()
         self.displayWalletMenu()
 
 
@@ -346,9 +337,10 @@ class WalletClient:
     def getApproval(self,message):
         amount = message.amount
         target = message.target
-        return appuifw.query(u'Accept %s (ref "%s")?' % (amount,target),'query') 
+        return self.query(u'"%s": accept %s coins?' % (target,amount)) 
 
-
+    def query(self,text):
+        return appuifw.query(unicode(text),'query')
     
 
 
@@ -358,11 +350,15 @@ class WalletClient:
         if not self.ip:
             import sys
             if sys.platform == 'symbian_s60':
+                self.feedback(u'Preparing internet access:searching access points')
+                e32.ao_sleep(1)
                 import socket
-                appuifw.note(u'Preparing access points')
                 aps = [ap['name'] for ap in socket.access_points()]
                 aps.sort()
                 apid = appuifw.popup_menu(aps,u'select access point')
+                self.feedback(u'Preparing internet access:setting access point')
+                e32.ao_sleep(1)
+
                 socket.set_default_access_point(aps[apid])
                 self.ip = 'some ip, s60'
 
@@ -374,19 +370,52 @@ class WalletClient:
     def stopInternet(self):
         pass
 
+def status(text):
+    if ':' in text:
+        appuifw.app.body = appuifw.Listbox([tuple([unicode(p.strip()) for p in text.split(':')]),], lambda:None)
+    else:        
+        appuifw.app.body = appuifw.Listbox([unicode(text)], lambda: None)
 
-    
+def startup(text):
+    status('Welcome to opencoin!:loading... '+text)
+############################### main code ############################        
+app_lock = e32.Ao_lock()
+appuifw.app.screen='normal'
+appuifw.app.exit_key_handler = app_lock.signal
+
+startup('network')
+import httplib, urllib
+startup('graphics')
+from graphics import *
+startup('ui')
+import audio
+import sys
+import encodings
+from key_codes import EKeyLeftArrow, EKeyRightArrow
+
+startup('storage')
+from oc2 import storage
+startup('oc wallet')
+from oc2 import wallet
+startup('transports')
+from oc2 import transports
+
+
+startup('media')
+icon = appuifw.Icon(u'e:\\python\\coin_icon.mif',16384,16385)
+coinsound = audio.Sound.open('e:\\python\\coinsound.wav')
+
 
 #appuifw.app.screen='full'
-app_lock = e32.Ao_lock()
+startup('coins')
 storage = storage.Storage()
 storage.setFilename('wallet.bin')
 storage.restore()
-
+startup('done')
 w = WalletClient(storage)
-appuifw.app.screen='normal'
-appuifw.app.exit_key_handler = app_lock.signal
 import time
 app_lock.wait()
+status('Shut down:saving data...')
 storage.save()
-print 'fini'
+status('Shut down:exit')
+time.sleep(1)

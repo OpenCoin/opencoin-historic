@@ -36,7 +36,7 @@ class Wallet(Entity):
         
 
     def askLatestCDD(self,transport):
-        self.feedback('fetching latest CDD')
+        self.feedback('Talking to issuer: fetching latest CDD')
         response = transport(messages.AskLatestCDD())
         return response.cdd
 
@@ -49,7 +49,7 @@ class Wallet(Entity):
         message = messages.FetchMintKeys()
         message.denominations = [str(d) for d in denominations]
         message.keyids = keyids
-        self.feedback('fetching mintkeys')
+        self.feedback('Talking to issuer: fetching mintkeys')
         response = transport(message)
         if response.header == 'MINTING_KEY_FAILURE':
             raise message
@@ -73,7 +73,7 @@ class Wallet(Entity):
         message.blinds = blinds
         message.coins = coins
         message.options = dict(type=requesttype).items()
-        self.feedback('request %s' % requesttype)
+        self.feedback('Talking to issuer: request %s' % requesttype)
         response = transport(message)
         return response
 
@@ -311,9 +311,9 @@ class Wallet(Entity):
         picked = self.pickForSpending(amount,coins)
         tid = self.makeSerial()
         
-        self.feedback(u'Announcing transfer')
+        self.feedback(u'Spending coins: wating for confirmation')
         self.announceSum(transport,tid,amount,target)
-        self.feedback(u'Transferring coins. Wating for other side...')
+        self.feedback(u'Spending coins: wating for other side')
         response = self.requestSpend(transport,tid,picked)
         if response == True: 
             newcoins = [c for c in coins if c not in picked]
