@@ -18,6 +18,7 @@ class WalletClient:
         
         self.todo = {}
         self.ip = None
+        self.imagecounter = 0
 
     def makeWalletMenu(self):
         self.wallet_list = []
@@ -48,8 +49,8 @@ class WalletClient:
         self.makeWalletMenu()
         appuifw.app.body =  self.wallet_menu
         appuifw.app.title = u'opencoin wallet\nall currencies'
-        appuifw.app.menu = [(u'add Currency',self.addCurrency),
-                            (u'delete Currency',self.delCurrency)]
+        appuifw.app.menu = [(u'add currency',self.addCurrency),
+                            (u'delete currency',self.delCurrency)]
 
     def displayActionMenu(self):
 
@@ -299,6 +300,7 @@ class WalletClient:
         bt = transports.BTTransport(sock)
         self.wallet.getApproval = self.getApproval 
         bt.send(self.wallet.listenSum(bt.receive()))
+        self.feedback(u'Receive coins: receiving...')
         bt.send(self.wallet.listenSpend(bt.receive(),transport))
         import e32
         e32.ao_sleep(1)    
@@ -351,13 +353,11 @@ class WalletClient:
             import sys
             if sys.platform == 'symbian_s60':
                 self.feedback(u'Preparing internet access:searching access points')
-                e32.ao_sleep(1)
                 import socket
                 aps = [ap['name'] for ap in socket.access_points()]
                 aps.sort()
                 apid = appuifw.popup_menu(aps,u'select access point')
                 self.feedback(u'Preparing internet access:setting access point')
-                e32.ao_sleep(1)
 
                 socket.set_default_access_point(aps[apid])
                 self.ip = 'some ip, s60'
@@ -370,11 +370,20 @@ class WalletClient:
     def stopInternet(self):
         pass
 
+def filmIt(foo=None):
+    import os
+    image = screenshot()
+    counter = len(os.listdir('e:\\screenshots'))
+    filename = 'e:\\screenshots\\ocwallet%s.jpg' % counter
+    image.save(filename,filmIt)
+
+
 def status(text):
     if ':' in text:
         appuifw.app.body = appuifw.Listbox([tuple([unicode(p.strip()) for p in text.split(':')]),], lambda:None)
     else:        
         appuifw.app.body = appuifw.Listbox([unicode(text)], lambda: None)
+    e32.ao_sleep(0.3)
 
 def startup(text):
     status('Welcome to opencoin!:loading... '+text)
@@ -383,10 +392,12 @@ app_lock = e32.Ao_lock()
 appuifw.app.screen='normal'
 appuifw.app.exit_key_handler = app_lock.signal
 
+#startup('graphics')
+#from graphics import *
+#filmIt()
+
 startup('network')
 import httplib, urllib
-startup('graphics')
-from graphics import *
 startup('ui')
 import audio
 import sys
