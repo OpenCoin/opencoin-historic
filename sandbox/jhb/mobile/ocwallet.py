@@ -8,12 +8,12 @@ class WalletClient:
         self.wallet.getApproval = self.getApproval
         self.wallet.feedback = self.feedback
         self.displayWalletMenu()        
-        self.actions=[(u'Send',u'Send coins to someone',self.spendCoins),
-                      (u'Receive',u'Receive coins',self.receiveCoins),
-                      (u'Freshen up',u'Freshen up the coins',self.freshenUp),
-                      (u'Mint',u'new coins from issuer',self.mintCoins),
-                      (u'Redeem',u'redeem from issuer',self.redeemCoins),
-                      (u'Details',u'See what coins you hold',self.inspectCurrency),]
+        self.actions=[(u'Send',u'Send coins to someone',icons['right'],self.spendCoins),
+                      (u'Receive',u'Receive coins',icons['left'],self.receiveCoins),
+                      (u'Freshen up',u'Freshen up the coins',icons['refresh'],self.freshenUp),
+                      (u'Mint',u'new coins from issuer',icons['down'],self.mintCoins),
+                      (u'Redeem',u'redeem from issuer',icons['up'],self.redeemCoins),
+                      (u'Details',u'See what coins you hold',icons['coins'],self.inspectCurrency),]
 
         
         self.todo = {}
@@ -29,7 +29,7 @@ class WalletClient:
         for cdd,amount in self.currencies:
             title = u'%s %ss' % (amount,cdd.currencyId)
             description = unicode(cdd.issuerServiceLocation)
-            self.wallet_list.append((title,description,icon))
+            self.wallet_list.append((title,description,icons['opencoin']))
         if not self.wallet_list:
             self.wallet_list.append(u'no currencies yet')
             self.wallet_menu =  appuifw.Listbox(self.wallet_list,self.displayActionMenu)
@@ -54,7 +54,7 @@ class WalletClient:
 
     def displayActionMenu(self):
 
-        action_list = [(action[0],action[1]) for action in self.actions]
+        action_list = [(action[0],action[1],action[2]) for action in self.actions]
         self.action_menu = appuifw.Listbox(action_list,self.selectAction)
         self.action_menu.bind(EKeyRightArrow,self.selectAction)
         self.action_menu.bind(EKeyLeftArrow,self.displayWalletMenu)
@@ -66,7 +66,7 @@ class WalletClient:
     def selectAction(self):
         current = self.action_menu.current()
         self.todo['action'] = self.actions[current][0]
-        self.actions[current][2]()
+        self.actions[current][3]()
 
 
     def getAmount(self):
@@ -107,7 +107,7 @@ class WalletClient:
         coins = self.wallet.getAllCoins(id)
         coinlist = []
         for coin in coins:
-            coinlist.append(u'%s %s' % (coin.denomination,cdd.currencyId))
+            coinlist.append((unicode(cdd.currencyId),unicode(coin.denomination),icons['coin']))
         self.currency_menu = appuifw.Listbox(coinlist,self.inspectCoin)
         self.currency_menu.bind(EKeyRightArrow,self.inspectCoin)
         self.currency_menu.bind(EKeyLeftArrow,self.displayActionMenu)
@@ -378,24 +378,31 @@ def filmIt(foo=None):
     image.save(filename,filmIt)
 
 
-def status(text):
+def status(text,icon=None):
     if ':' in text:
-        appuifw.app.body = appuifw.Listbox([tuple([unicode(p.strip()) for p in text.split(':')]),], lambda:None)
+        items = [unicode(p.strip()) for p in text.split(':',1)]
     else:        
-        appuifw.app.body = appuifw.Listbox([unicode(text)], lambda: None)
+        items = [unicode(text)]
+    if icon:
+        items.append(icon)
+    appuifw.app.body = appuifw.Listbox([tuple(items)], lambda: None)
+            
     e32.ao_sleep(0.3)
 
 def startup(text):
-    status('Welcome to opencoin!:loading... '+text)
+    status('opencoin: loading '+text,icons['restore'])
 ############################### main code ############################        
 app_lock = e32.Ao_lock()
 appuifw.app.screen='normal'
 appuifw.app.exit_key_handler = app_lock.signal
 
-#startup('graphics')
+#only for documenting it
 #from graphics import *
 #filmIt()
 
+names = dict(coin=0,opencoin=1,coins=2,detail=3,down=4,left=5,refresh=6,
+             restore=7,right=8,save=9,up=10,zoom=11)
+icons = dict([(k,appuifw.Icon(u'e:\\python\\ocicons.mbm',v*2,v*2+1)) for k,v in names.items()])
 startup('network')
 import httplib, urllib
 startup('ui')
@@ -411,9 +418,10 @@ from oc2 import wallet
 startup('transports')
 from oc2 import transports
 
-
 startup('media')
-icon = appuifw.Icon(u'e:\\python\\coin_icon.mif',16384,16385)
+
+
+
 coinsound = audio.Sound.open('e:\\python\\coinsound.wav')
 
 
@@ -426,7 +434,7 @@ startup('done')
 w = WalletClient(storage)
 import time
 app_lock.wait()
-status('Shut down:saving data...')
+status('Shut down:saving data...',icons['save'])
 storage.save()
-status('Shut down:exit')
+status('Shut down:exit',icons['save'])
 time.sleep(1)
