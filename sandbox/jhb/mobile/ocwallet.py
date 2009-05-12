@@ -1,4 +1,4 @@
-import appuifw,e32
+import appuifw,e32,os,sys
 
 class WalletClient:
 
@@ -395,19 +395,31 @@ def startup(text):
 app_lock = e32.Ao_lock()
 appuifw.app.screen='normal'
 appuifw.app.exit_key_handler = app_lock.signal
-
+import oc2
+import sys
+oc2path = oc2.__file__
+if sys.platform == 'symbian_s60':
+    basedrive = oc2path[:2]
+    if oc2path[3:].startswith('python'):
+        #no standalone app
+        mediapath = u'%s\\python\\' % basedrive
+    else:
+        #standalone app
+        mediapath = u'%s\\private\\%s\\' % (basedrive,appuifw.app.uid())
+else:
+    mediapath = u''
+        
 #only for documenting it
 #from graphics import *
 #filmIt()
 
 names = dict(coin=0,opencoin=1,coins=2,detail=3,down=4,left=5,refresh=6,
              restore=7,right=8,save=9,up=10,zoom=11)
-icons = dict([(k,appuifw.Icon(u'e:\\python\\ocicons.mbm',v*2,v*2+1)) for k,v in names.items()])
+icons = dict([(k,appuifw.Icon(mediapath+u'ocicons.mbm',v*2,v*2+1)) for k,v in names.items()])
 startup('network')
 import httplib, urllib
 startup('ui')
 import audio
-import sys
 import encodings
 from key_codes import EKeyLeftArrow, EKeyRightArrow
 
@@ -417,12 +429,11 @@ startup('oc wallet')
 from oc2 import wallet
 startup('transports')
 from oc2 import transports
-
 startup('media')
 
 
 
-coinsound = audio.Sound.open('e:\\python\\coinsound.wav')
+coinsound = audio.Sound.open(mediapath+u'coinsound.wav')
 
 
 #appuifw.app.screen='full'

@@ -2,4 +2,4 @@ Most of the files in here are emulator files, taken from http://pys60-compat.svn
 
 ocwallet.py is the real file. Use this one. 
 
-
+(c) 2009 Joerg Baach, License: GPL V3
