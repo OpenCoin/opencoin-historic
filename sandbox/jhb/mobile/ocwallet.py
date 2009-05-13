@@ -18,6 +18,7 @@ class WalletClient:
         
         self.todo = {}
         self.ip = None
+        self.external_ip = None
         self.imagecounter = 0
 
     def makeWalletMenu(self):
@@ -201,12 +202,13 @@ class WalletClient:
         method = appuifw.popup_menu(methodlist,u'how to connect?')
 
         cdd,alreadythere = self.getCurrentCurrency()
-        transport = self.getHTTPTransport(cdd.issuerServiceLocation)
-
         if method ==0:
+            transport = self.getHTTPTransport(cdd.issuerServiceLocation)
             self.receiveCoinsBT(transport)
         else:
-            self.receiveCoinsHTTP(transport)
+            port = int(appuifw.query(u'port','number',9091))
+            transport = self.getHTTPTransport(cdd.issuerServiceLocation)
+            self.receiveCoinsHTTP(transport,port)
 
         coinsound.play() 
         self.displayWalletMenu()
@@ -218,7 +220,7 @@ class WalletClient:
         transport = transports.HTTPTransport(url)
         return transport
     
-    def receiveCoinsHTTP(self,transport):
+    def receiveCoinsHTTP(self,transport,port):
         import BaseHTTPServer, urllib
         
         class OCHandler(BaseHTTPServer.BaseHTTPRequestHandler):
@@ -240,15 +242,14 @@ class WalletClient:
                 self.wfile.write('\r\n')
                 self.wfile.write(answer.toString(True))
                 
-        port = int(appuifw.query(u'port','number','9091'))
         OCHandler.wallet = self.wallet
         self.startInternet()
         
         #hack to open internet
         #r = urllib.urlopen('http://google.com')
-        
+        #ip = urllib.urlopen('http://opencoin.org/myownip').read()
         httpd = BaseHTTPServer.HTTPServer(("",port),OCHandler)
-        self.feedback(u'waiting at %s:%s' % ('localhost',port),'conf')
+        self.feedback(u'Receiving coins: waiting at %s:%s' % (self.ip,port))
         httpd.handle_request()
         httpd.handle_request()
         self.stopInternet()
@@ -360,7 +361,11 @@ class WalletClient:
                 self.feedback(u'Preparing internet access:setting access point')
 
                 socket.set_default_access_point(aps[apid])
-                self.ip = 'some ip, s60'
+                #one time socket, for just finding out our ip
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                #anonymity issue here
+                s.connect(('www.google.com',80))
+                self.ip = s.getsockname()[0]
 
             else:
                 import socket
