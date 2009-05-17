@@ -108,17 +108,8 @@
     True
 """
 
-def divide(x,y,N):
-    """ if y and N are coprime: return  x/y % N   
-        else: ??? (ToDo: return 0 in this case)"""
-    if y%N==0: return (0,1,N)
-    a=y; b=N; q=[]
-    while a%b != 0:
-        q.append(-1*(a//b))
-        (a,b)=(b,a%b)
-    (a,b,gcd)=(1,q.pop(),b)
-    while q:(a,b)=(b,b*q.pop()+a)
-    return (x*a) % N
+
+from eea import divide
 
 
 def _test():
