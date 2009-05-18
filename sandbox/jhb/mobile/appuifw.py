@@ -676,4 +676,7 @@ def popup_menu(data, label=""):
     else:
         return None
 
+class Icon:
+    def __init__(self,*args,**kwargs):
+        pass
 app = Application(redirect=False)

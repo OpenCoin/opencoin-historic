@@ -255,20 +255,40 @@ class WalletClient:
         self.stopInternet()
 
     def getBTTransport(self):
-        
-        import btsocket
-        sock=btsocket.socket(btsocket.AF_BT,btsocket.SOCK_STREAM)
-        addr,services=btsocket.bt_discover()
-        if len(services)>0:
-            #choices=services.keys()
-            #choices.sort()
-            #choice=appuifw.popup_menu([unicode(services[x])+": "+x for x in choices],u'Choose port:')
-            #port=services[choices[choice]]
-            port = services[u'opencoin']
+        if sys.platform == 'symbian_s60': 
+            import btsocket
+            sock=btsocket.socket(btsocket.AF_BT,btsocket.SOCK_STREAM)
+            addr,services=btsocket.bt_discover()
+            if len(services)>0:
+                #choices=services.keys()
+                #choices.sort()
+                #choice=appuifw.popup_menu([unicode(services[x])+": "+x for x in choices],u'Choose port:')
+                #port=services[choices[choice]]
+                port = services[u'opencoin']
+            else:
+                port=services[services.keys()[0]]
+            address=(addr,port)
+            sock.connect(address)
         else:
-            port=services[services.keys()[0]]
-        address=(addr,port)
-        sock.connect(address)
+            import bluetooth as bt
+            #evil hack
+            appuifw.note(u'Searching for devices','info')
+            results = [r for r in bt.find_service() if r['name']==None]
+            targets = []
+            for result in results:
+                targets.append(u'%s:%s' % (bt.lookup_name(result['host']),result['port']))
+            selected = appuifw.popup_menu(targets,u'Connect to...?')
+            
+            host = results[selected]['host']
+            port = results[selected]['port']
+            print 'host: %s, port: %s' % (host,port)
+            sock=bt.BluetoothSocket( bt.RFCOMM )
+            sock.connect((host, port))
+
+            
+
+
+
         return transports.BTTransport(sock)
 
   
@@ -293,9 +313,14 @@ class WalletClient:
             port = server_sock.getsockname()[1]
 
             uuid = "9e72d9d8-e06d-41cb-bbd4-89cd052cccb8"
-            
-            bt.advertise_service( server_sock, u"opencoin",)
+            bt.advertise_service( server_sock, u"opencoin",
+                   service_id = uuid,
+                   service_classes = [ uuid, bt.SERIAL_PORT_CLASS ],
+                   profiles = [ bt.SERIAL_PORT_PROFILE ] )
+ 
+            #bt.advertise_service( server_sock, u"opencoin",)
                                
+            self.feedback(u'Receive coins: ready to receive...')
             sock, client_info = server_sock.accept()
 
         bt = transports.BTTransport(sock)
