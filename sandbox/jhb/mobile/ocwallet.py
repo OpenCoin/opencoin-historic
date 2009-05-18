@@ -276,11 +276,12 @@ class WalletClient:
             results = [r for r in bt.find_service() if r['name']==None]
             targets = []
             for result in results:
-                targets.append(u'%s:%s' % (bt.lookup_name(result['host']),result['port']))
+                targets.append(u'%s' % (bt.lookup_name(result['host'])))
             selected = appuifw.popup_menu(targets,u'Connect to...?')
             
             host = results[selected]['host']
-            port = results[selected]['port']
+            #port = results[selected]['port']
+            port = 3
             print 'host: %s, port: %s' % (host,port)
             sock=bt.BluetoothSocket( bt.RFCOMM )
             sock.connect((host, port))
@@ -297,8 +298,9 @@ class WalletClient:
         if sys.platform == 'symbian_s60':
             import btsocket
             server_socket = btsocket.socket(btsocket.AF_BT, btsocket.SOCK_STREAM)
-            port = btsocket.bt_rfcomm_get_available_server_channel(server_socket)
-            server_socket.bind(("", port))
+            #port = btsocket.bt_rfcomm_get_available_server_channel(server_socket)
+            #server_socket.bind(("", port))
+            server_socket.bind(("", 3))
             server_socket.listen(1)
             btsocket.bt_advertise_service( u"opencoin", server_socket, True, btsocket.RFCOMM)
             btsocket.set_security(server_socket, btsocket.AUTH)
@@ -308,7 +310,8 @@ class WalletClient:
         else:
             import bluetooth as bt
             server_sock=bt.BluetoothSocket(bt.RFCOMM)
-            server_sock.bind(("",bt.PORT_ANY))
+            #server_sock.bind(("",bt.PORT_ANY))
+            server_sock.bind(("",3))
             server_sock.listen(1)
             port = server_sock.getsockname()[1]
 
