@@ -258,7 +258,9 @@ class WalletClient:
                 self.send_header("Content-type", "text/plain")
                 self.wfile.write('\r\n')
                 self.wfile.write(answer.toString(True))
-                
+
+            def log_message(self,*args,**kwargs):
+                pass
         OCHandler.wallet = self.wallet
         self.startInternet()
         
