@@ -39,12 +39,8 @@ class WalletClient:
             self.wallet_menu.bind(EKeyRightArrow,self.displayActionMenu)
 
     def feedback(self,text):
-        #appuifw.note(unicode(message))
         status(unicode(text))
-        #i = i=appuifw.InfoPopup()
-        #i.show(unicode(message), (0, 0), timeout*1000, 0, appuifw.EHCenterVCenter)
         
-     
 
     def displayWalletMenu(self):
         self.makeWalletMenu()
@@ -70,9 +66,25 @@ class WalletClient:
         self.actions[current][3]()
 
 
-    def getAmount(self):
-        amount = appuifw.query(u'Amount','number')
-        amount = int(amount)
+    def getAmount(self,min=1,max=-1):
+        ok = False  
+        text = ['Amount']
+        text.append('min %s' % min)
+        if max != -1:
+            text.append('max %s' % max)
+        text = u', '.join([unicode(t) for t in text])                
+        while not ok:
+            amount = appuifw.query(text,'number')
+            if amount:
+                amount = int(amount)
+                if amount < min:
+                    appuifw.note(u'amount to small','error')
+                    continue
+                if max != -1 and amount > max:
+                    appuifw.note(u'amount to large','error')
+                    continue
+            ok = True                    
+
         self.todo['amount'] = amount
         return amount
 
@@ -82,23 +94,6 @@ class WalletClient:
             target = appuifw.query(u'Reference','text')
         self.todo['target'] = target
         return target            
-
-    def getDetails(self):
-        
-        amount = self.getAmount()
-        if not amount:
-            return
-
-        target = self.getTarget()
-        if not target:
-            return
-
-        method = self.getMethod()
-        if method ==1:
-            url = appuifw.query(u'url','text',u'http://')
-            self.todo['url'] = url
-
-        self.execute()
 
 
     def inspectCurrency(self):
@@ -169,7 +164,8 @@ class WalletClient:
 
 
     def redeemCoins(self):
-        amount = self.getAmount()
+        cdd,alreadythere = self.getCurrentCurrency()
+        amount = self.getAmount(max=alreadythere)
         if not amount:
             return
         
@@ -177,7 +173,6 @@ class WalletClient:
         if not target:
             return
 
-        cdd,alreadythere = self.getCurrentCurrency()
         url = cdd.issuerServiceLocation
 
         transport = self.getHTTPTransport(url)
@@ -193,10 +188,6 @@ class WalletClient:
         self.displayWalletMenu()
 
 
-    def execute(self):
-        #print 'execute'
-        print self.todo
-
     def receiveCoins(self):
         methodlist = [u'bluetooth',u'internet']
         method = appuifw.popup_menu(methodlist,u'how to connect?')
@@ -206,9 +197,8 @@ class WalletClient:
             transport = self.getHTTPTransport(cdd.issuerServiceLocation)
             self.receiveCoinsBT(transport)
         else:
-            port = int(appuifw.query(u'port','number',9091))
             transport = self.getHTTPTransport(cdd.issuerServiceLocation)
-            self.receiveCoinsHTTP(transport,port)
+            self.receiveCoinsHTTP(transport,walletport)
 
         coinsound.play() 
         self.displayWalletMenu()
@@ -249,7 +239,7 @@ class WalletClient:
         #r = urllib.urlopen('http://google.com')
         #ip = urllib.urlopen('http://opencoin.org/myownip').read()
         httpd = BaseHTTPServer.HTTPServer(("",port),OCHandler)
-        self.feedback(u'Receiving coins: waiting at %s:%s' % (self.ip,port))
+        self.feedback(u'Receiving coins: waiting at %s' % (self.ip))
         httpd.handle_request()
         httpd.handle_request()
         self.stopInternet()
@@ -337,7 +327,9 @@ class WalletClient:
 
     def spendCoins(self):
 
-        amount = self.getAmount()
+        cdd,alreadythere = self.getCurrentCurrency()
+        
+        amount = self.getAmount(max=alreadythere)
         if not amount:
             return
         
@@ -349,9 +341,12 @@ class WalletClient:
         method = appuifw.popup_menu(methodlist,u'how to connect?')
 
 
-        cdd,alreadythere = self.getCurrentCurrency()
         if method == 1:
-            url = appuifw.query(u'url','text',u'http://192.168.2.105:9091')
+            url = appuifw.query(u'address','text',u'192.168.2.105')
+            if not url:
+                return                
+            else:     
+                url = 'http://%s:%s' % (url,walletport)
             transport = self.getHTTPTransport(url)
             self.wallet.spendCoins(transport,cdd.currencyId,amount,target)
         else:
@@ -380,25 +375,26 @@ class WalletClient:
     def startInternet(self):
         if not self.ip:
             import sys
+            import socket
             if sys.platform == 'symbian_s60':
                 self.feedback(u'Preparing internet access:searching access points')
-                import socket
                 aps = [ap['name'] for ap in socket.access_points()]
                 aps.sort()
                 apid = appuifw.popup_menu(aps,u'select access point')
                 self.feedback(u'Preparing internet access:setting access point')
 
                 socket.set_default_access_point(aps[apid])
-                #one time socket, for just finding out our ip
-                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                #anonymity issue here
-                s.connect(('www.google.com',80))
-                self.ip = s.getsockname()[0]
-
+           
             else:
                 import socket
                 self.ip = 'some ip'
             
+            #one time socket, for just finding out our ip
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            #anonymity issue here
+            s.connect(('www.google.com',80))
+            self.ip = s.getsockname()[0]
+
 
     def stopInternet(self):
         pass
@@ -423,8 +419,13 @@ def status(text,icon=None):
     e32.ao_sleep(0.3)
 
 def startup(text):
-    status('opencoin: loading '+text,icons['restore'])
+    if sys.platform == 'symbian_s60':
+        status('opencoin: loading '+text,icons['restore'])
+
+
+
 ############################### main code ############################        
+walletport = 9091
 app_lock = e32.Ao_lock()
 appuifw.app.screen='normal'
 appuifw.app.exit_key_handler = app_lock.signal
