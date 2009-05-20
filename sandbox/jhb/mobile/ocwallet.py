@@ -38,8 +38,8 @@ class WalletClient:
             self.wallet_menu =  appuifw.Listbox(self.wallet_list,self.displayActionMenu)
             self.wallet_menu.bind(EKeyRightArrow,self.displayActionMenu)
 
-    def feedback(self,text):
-        status(unicode(text))
+    def feedback(self,text,cb=None):
+        status(unicode(text),callback=cb)
         
 
     def displayWalletMenu(self):
@@ -211,8 +211,35 @@ class WalletClient:
         return transport
     
     def receiveCoinsHTTP(self,transport,port):
-        import BaseHTTPServer, urllib
-        
+        import BaseHTTPServer, urllib,socket
+       
+        class StoppableHTTPServer(BaseHTTPServer.HTTPServer):
+
+            def server_bind(self):
+                BaseHTTPServer.HTTPServer.server_bind(self)
+                self.socket.settimeout(0.5)
+                self.run = True
+
+            def get_request(self):
+                while self.run:
+                    try:
+                        e32.ao_yield()
+                        sock, addr = self.socket.accept()
+                        sock.settimeout(None)
+                        return (sock, addr)
+                    except socket.timeout:
+                        if not self.run:
+                            self.socket.close()
+                            raise socket.error
+
+            def stop(self):
+                self.run = False
+
+            def serve(self):
+                while self.run:
+                    self.handle_request()
+
+
         class OCHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
             def do_POST(self):
@@ -238,11 +265,18 @@ class WalletClient:
         #hack to open internet
         #r = urllib.urlopen('http://google.com')
         #ip = urllib.urlopen('http://opencoin.org/myownip').read()
-        httpd = BaseHTTPServer.HTTPServer(("",port),OCHandler)
-        self.feedback(u'Receiving coins: waiting at %s' % (self.ip))
-        httpd.handle_request()
-        httpd.handle_request()
+        self.httpd = StoppableHTTPServer(("",port),OCHandler)
+        self.feedback(u'Receiving coins: waiting at %s' % (self.ip),self.stopReceiveCoinsHTTP)
+        if self.httpd.run:
+            self.httpd.handle_request()
+        if self.httpd.run:
+            self.httpd.handle_request()
+        self.httpd.socket.close()          
         self.stopInternet()
+
+    def stopReceiveCoinsHTTP(self):
+        self.httpd.stop()
+
 
     def getBTTransport(self):
         if sys.platform == 'symbian_s60': 
@@ -407,15 +441,18 @@ def filmIt(foo=None):
     image.save(filename,filmIt)
 
 
-def status(text,icon=None):
+def status(text,icon=None,callback=None):
     if ':' in text:
         items = [unicode(p.strip()) for p in text.split(':',1)]
     else:        
         items = [unicode(text)]
     if icon:
         items.append(icon)
-    appuifw.app.body = appuifw.Listbox([tuple(items)], lambda: None)
             
+    body = appuifw.Listbox([tuple(items)], lambda: None)
+    if callback:
+            body.bind(EKeyLeftArrow,callback)
+    appuifw.app.body=body
     e32.ao_sleep(0.3)
 
 def startup(text):
