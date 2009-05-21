@@ -130,7 +130,7 @@ class Wallet(Entity):
         #check sum
         if amount != int(orig.amount):
             answer = messages.SpendReject()
-            answer.reason = 'amount of coins does not match announced one'
+            answer.reason = 'amount of coins does not match announced one. Announced: %s, got %s' % (orig.amount, amount)
             return answer
         #do exchange
         if transport:

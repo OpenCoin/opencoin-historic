@@ -261,12 +261,10 @@ class WalletClient:
 
             def log_message(self,*args,**kwargs):
                 pass
+
         OCHandler.wallet = self.wallet
         self.startInternet()
         
-        #hack to open internet
-        #r = urllib.urlopen('http://google.com')
-        #ip = urllib.urlopen('http://opencoin.org/myownip').read()
         self.httpd = StoppableHTTPServer(("",port),OCHandler)
         self.feedback(u'Receiving coins: waiting at %s' % (self.ip),self.stopReceiveCoinsHTTP)
         if self.httpd.run:
@@ -286,10 +284,6 @@ class WalletClient:
             sock=btsocket.socket(btsocket.AF_BT,btsocket.SOCK_STREAM)
             addr,services=btsocket.bt_discover()
             if len(services)>0:
-                #choices=services.keys()
-                #choices.sort()
-                #choice=appuifw.popup_menu([unicode(services[x])+": "+x for x in choices],u'Choose port:')
-                #port=services[choices[choice]]
                 port = services[u'opencoin']
             else:
                 port=services[services.keys()[0]]
@@ -489,15 +483,33 @@ else:
 names = dict(coin=0,opencoin=1,coins=2,detail=3,down=4,left=5,refresh=6,
              restore=7,right=8,save=9,up=10,zoom=11)
 icons = dict([(k,appuifw.Icon(mediapath+u'ocicons.mbm',v*2,v*2+1)) for k,v in names.items()])
-startup('network')
+
+startup('storage')
+from oc2 import storage as oc2storage
+password = ''
+while 1:
+    password = appuifw.query(u'password','text')
+
+    if password == None:
+        sys.exit()   
+    startup('encrypted data')
+    storage = oc2storage.CryptedStorage()
+    storage.setPassword(password)
+    storage.setFilename('wallet.bin')
+    try:
+        storage.restore()
+        break
+    except:
+        pass
+
+
+startup('netlib')
 import httplib, urllib
 startup('ui')
 import audio
 import encodings
 from key_codes import EKeyLeftArrow, EKeyRightArrow
 
-startup('storage')
-from oc2 import storage
 startup('oc wallet')
 from oc2 import wallet
 startup('transports')
@@ -511,9 +523,6 @@ coinsound = audio.Sound.open(mediapath+u'coinsound.wav')
 
 #appuifw.app.screen='full'
 startup('coins')
-storage = storage.Storage()
-storage.setFilename('wallet.bin')
-storage.restore()
 startup('done')
 w = WalletClient(storage)
 import time
