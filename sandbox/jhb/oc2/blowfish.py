@@ -572,9 +572,10 @@ if __name__ == '__main__':
     print "Testing CTR encrypt:"
     cipher.initCTR()
     text = "The quick brown fox jumps over the lazy dog"
-    print "\tText:\t\t", text
+    text = 'h' * 100000
+    #print "\tText:\t\t", text
     crypted = cipher.encryptCTR(text)
-    print "\tEncrypted:\t", crypted
+    #print "\tEncrypted:\t", crypted
     cipher.initCTR()
     decrypted = cipher.decryptCTR(crypted)
-    print "\tDecrypted:\t", decrypted
+    #print "\tDecrypted:\t", decrypted

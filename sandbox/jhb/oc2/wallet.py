@@ -194,7 +194,8 @@ class Wallet(Entity):
         return approval
 
     def feedback(self,message):
-        print message
+        #print message
+        pass
 
 #################################higher level#############################
 
@@ -211,7 +212,7 @@ class Wallet(Entity):
         tokenized =  self.tokenizeForBuying(amount,cdd.denominations) #what coins do we need
         tid = self.makeSerial()
         secrets,data = self.prepareBlanks(transport,cdd,tokenized)
-        response = self.requestTransfer(transport,tid,target,data,[])                         
+        response = self.requestTransfer(transport,tid,target,data,[])
         signatures = response.signatures
         currency['coins'].extend(self.unblindWithSignatures(secrets,signatures))
         self.storage.save()

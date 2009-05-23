@@ -185,7 +185,7 @@ Or lets try to send a wrong amount
 >>> alice.requestSpend(bob.listenSpend,alicetid,[])
 Traceback (most recent call last):
     ....
-SpendReject: amount of coins does not match announced one
+SpendReject: amount of coins does not match announced one. Announced: 5, got 0
 
 >>> alice.requestSpend(bob.listenSpend, alicetid, [coin]) 
 True

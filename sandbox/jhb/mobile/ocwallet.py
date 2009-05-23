@@ -47,7 +47,8 @@ class WalletClient:
         appuifw.app.body =  self.wallet_menu
         appuifw.app.title = u'opencoin wallet\nall currencies'
         appuifw.app.menu = [(u'add currency',self.addCurrency),
-                            (u'delete currency',self.delCurrency)]
+                            (u'delete currency',self.delCurrency),
+                            (u'new password',self.newPassword),]
 
     def displayActionMenu(self):
 
@@ -425,9 +426,21 @@ class WalletClient:
             s.connect(('www.google.com',80))
             self.ip = s.getsockname()[0]
 
+    
 
     def stopInternet(self):
         pass
+
+
+    def newPassword(self):
+        password = appuifw.query(u'new password','text')
+        if password != None:
+            self.storage.setPassword(password)
+            appuifw.note(u'new password set','conf')
+
+
+
+
 
 def filmIt(foo=None):
     import os
@@ -458,12 +471,21 @@ def startup(text):
 
 
 ############################### main code ############################        
+
+#what port do we listen on?
 walletport = 9091
+
+#setting up the environment
 app_lock = e32.Ao_lock()
 appuifw.app.screen='normal'
+
+#this will return normal control to the main code once the exit key is pressed
 appuifw.app.exit_key_handler = app_lock.signal
+
 import oc2
 import sys
+
+#finding out where we are, in order to get the icons
 oc2path = oc2.__file__
 if sys.platform == 'symbian_s60':
     basedrive = oc2path[:2]
@@ -473,36 +495,42 @@ if sys.platform == 'symbian_s60':
     else:
         #standalone app
         mediapath = u'%s\\private\\%s\\' % (basedrive,appuifw.app.uid())
+    storagepath=u'e:\\'
 else:
     mediapath = u''
+    storagepath=u''
         
 #only for documenting it
 #from graphics import *
 #filmIt()
 
+#set up the icons
 names = dict(coin=0,opencoin=1,coins=2,detail=3,down=4,left=5,refresh=6,
              restore=7,right=8,save=9,up=10,zoom=11)
 icons = dict([(k,appuifw.Icon(mediapath+u'ocicons.mbm',v*2,v*2+1)) for k,v in names.items()])
 
 startup('storage')
 from oc2 import storage as oc2storage
+
+#Try to use a password on the data file. Repeat till its sucessfully loaded
 password = ''
 while 1:
     password = appuifw.query(u'password','text')
 
     if password == None:
         sys.exit()   
-    startup('encrypted data')
+    startup('data...')
     storage = oc2storage.CryptedStorage()
     storage.setPassword(password)
-    storage.setFilename('wallet.bin')
+    storage.setFilename(storagepath+'wallet.bin')
     try:
         storage.restore()
         break
     except:
+        appuifw.note(u'wrong password','error')
         pass
 
-
+#Load the rest of the libs
 startup('netlib')
 import httplib, urllib
 startup('ui')
@@ -515,19 +543,20 @@ from oc2 import wallet
 startup('transports')
 from oc2 import transports
 startup('media')
-
-
-
 coinsound = audio.Sound.open(mediapath+u'coinsound.wav')
-
-
-#appuifw.app.screen='full'
-startup('coins')
 startup('done')
+
+#Ok, fire up the real wallet
 w = WalletClient(storage)
-import time
+
+#this makes the app running till a signal (by the exit key) is given
 app_lock.wait()
+
+#Saving the data (encrypting it on the fly)
 status('Shut down:saving data...',icons['save'])
 storage.save()
 status('Shut down:exit',icons['save'])
+
+#give a bit of time to read the last message
+import time
 time.sleep(1)

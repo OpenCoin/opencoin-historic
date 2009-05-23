@@ -64,4 +64,23 @@ class YieldTransport(object):
                 response = result
         return response            
                     
+class TestTransport(object):
+
+    def __init__(self, *args):
+        self.results = list(args)
+
+    def __call__(self,message):
+        result = self.results.pop(0)
+        
+        if type(result) == type([]) or type(result) == type(()):
+            method = result[0]
+            args = list(result[1:])
+            args.append(message)
+            return method(*args)
+        
+        elif callable(result):
+            return result(message)        
+        
+        else:
+            return result
 
