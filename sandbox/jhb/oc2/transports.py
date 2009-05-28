@@ -68,8 +68,10 @@ class TestTransport(object):
 
     def __init__(self, *args):
         self.results = list(args)
-
+        self.debug = 0
     def __call__(self,message):
+        if self.debug:
+            import pdb; pdb.set_trace()
         result = self.results.pop(0)
         
         if type(result) == type([]) or type(result) == type(()):
@@ -78,7 +80,7 @@ class TestTransport(object):
             args.append(message)
             return method(*args)
         
-        elif callable(result):
+        elif not isinstance(result,messages.Message) and callable(result):
             return result(message)        
         
         else:

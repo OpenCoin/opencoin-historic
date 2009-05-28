@@ -1,5 +1,14 @@
 import appuifw,e32,os,sys
 
+def error_catched(f):
+    def error_handled(*args,**kwargs):
+        try:
+            f(*args,**kwargs)
+        except:
+            appuifw.note(u'cought error','error') 
+    return error_handled        
+
+
 class WalletClient:
 
     def __init__(self,storage):
@@ -130,7 +139,10 @@ class WalletClient:
     def addCurrency(self):
         url = appuifw.query(u'url','text',u'http://baach.de:9090')
         self.todo['url'] = url
-        transport = self.getHTTPTransport(url) 
+        transport = self.getHTTPTransport(url)
+        if not transport:
+            self.displayActionMenu()
+            return
         self.wallet.addCurrency(transport)
         self.displayWalletMenu()
 
@@ -159,6 +171,10 @@ class WalletClient:
         url = cdd.issuerServiceLocation
 
         transport = self.getHTTPTransport(url)
+        if not transport:
+            self.displayActionMenu()
+            return
+ 
         self.wallet.mintCoins(transport,amount,target)
         coinsound.play() 
         self.displayWalletMenu()
@@ -177,6 +193,10 @@ class WalletClient:
         url = cdd.issuerServiceLocation
 
         transport = self.getHTTPTransport(url)
+        if not transport:
+            self.displayActionMenu()
+            return
+ 
         self.wallet.redeemCoins(transport,amount,target)
         self.displayWalletMenu()
 
@@ -184,8 +204,12 @@ class WalletClient:
     def freshenUp(self):
         cdd,alreadythere = self.getCurrentCurrency()
         transport = self.getHTTPTransport(cdd.issuerServiceLocation)
+        if not transport:
+            self.displayActionMenu()
+            return
+ 
         self.wallet.freshenUp(transport,cdd)
-        coinsound.play() 
+        #coinsound.play() 
         self.displayWalletMenu()
 
 
@@ -196,9 +220,18 @@ class WalletClient:
         cdd,alreadythere = self.getCurrentCurrency()
         if method ==0:
             transport = self.getHTTPTransport(cdd.issuerServiceLocation)
+            if not transport:
+                self.displayActionMenu()
+                return
+ 
             self.receiveCoinsBT(transport)
+ 
         else:
             transport = self.getHTTPTransport(cdd.issuerServiceLocation)
+            if not transport:
+                self.displayActionMenu()
+                return
+ 
             self.receiveCoinsHTTP(transport,walletport)
 
         coinsound.play() 
@@ -207,7 +240,8 @@ class WalletClient:
 
 
     def getHTTPTransport(self,url):
-        self.startInternet()
+        if not self.startInternet():
+            return 
         transport = transports.HTTPTransport(url)
         return transport
     
@@ -254,7 +288,7 @@ class WalletClient:
                 if message.header == 'SumAnnounce':
                     answer = self.wallet.listenSum(message)
                 if message.header == 'SpendRequest':
-                    answer = self.wallet.listenSpend(message,transport)
+                    answer = self.wallet.listenSpend(transport,message)
                 self.send_response(200)
                 self.send_header("Content-type", "text/plain")
                 self.wfile.write('\r\n')
@@ -264,7 +298,8 @@ class WalletClient:
                 pass
 
         OCHandler.wallet = self.wallet
-        self.startInternet()
+        if not self.startInternet():
+            return
         
         self.httpd = StoppableHTTPServer(("",port),OCHandler)
         self.feedback(u'Receiving coins: waiting at %s' % (self.ip),self.stopReceiveCoinsHTTP)
@@ -379,6 +414,9 @@ class WalletClient:
             else:     
                 url = 'http://%s:%s' % (url,walletport)
             transport = self.getHTTPTransport(url)
+            if not transport:
+                self.displayActionMenu()
+                return
             self.wallet.spendCoins(transport,cdd.currencyId,amount,target)
         else:
             ready =self.query('Is the other side ready to receive?')
@@ -412,6 +450,8 @@ class WalletClient:
                 aps = [ap['name'] for ap in socket.access_points()]
                 aps.sort()
                 apid = appuifw.popup_menu(aps,u'select access point')
+                if apid == None:
+                    return None
                 self.feedback(u'Preparing internet access:setting access point')
 
                 socket.set_default_access_point(aps[apid])
@@ -425,7 +465,7 @@ class WalletClient:
             #anonymity issue here
             s.connect(('www.google.com',80))
             self.ip = s.getsockname()[0]
-
+        return True
     
 
     def stopInternet(self):
@@ -514,7 +554,7 @@ from oc2 import storage as oc2storage
 
 #Try to use a password on the data file. Repeat till its sucessfully loaded
 password = ''
-while 1:
+while 0: #don't use the password protected storage, too slow atm.
     password = appuifw.query(u'password','text')
 
     if password == None:
@@ -529,6 +569,19 @@ while 1:
     except:
         appuifw.note(u'wrong password','error')
         pass
+storage = oc2storage.Storage()
+storage.setFilename(storagepath+'wallet.bin')
+tmp = open(storagepath+'wallet.bin')
+tmpcontent = tmp.read()
+tmp.close()
+if tmpcontent.startswith('salt'):
+    os.remove(storagepath+'wallet.bin')
+storage.restore()    
+
+
+
+
+
 
 #Load the rest of the libs
 startup('netlib')

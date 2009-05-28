@@ -51,7 +51,7 @@ def address_string(self):
     host, port = self.client_address[:2]
     return host
 
-print 'Starting up server'
+print 'Starting up server on port %s ' % port
 Handler.issuer = issuer
 Handler.mint = mint
 Handler.authorizer = authorizer

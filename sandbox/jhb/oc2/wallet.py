@@ -38,23 +38,39 @@ class Wallet(Entity):
     def askLatestCDD(self,transport):
         self.feedback('Talking to issuer: fetching latest CDD')
         response = transport(messages.AskLatestCDD())
+        if not isinstance(response,messages.GiveLatestCDD):
+            raise Exception, 'Not a valid message'
+        if not response.cdd.masterPubKey.verifyContainerSignature(response.cdd):
+            raise Exception, 'Could not verify cdd'
         return response.cdd
 
 
-    def fetchMintKeys(self,transport,denominations=None,keyids=None):
+    def fetchMintKeys(self,transport,cdd,denominations=None,keyids=None):
         if denominations and keyids:
-            raise "you can't ask for denominations and keyids at the same time"
+            raise Exception, "you can't ask for denominations and keyids at the same time"
         if not (denominations or keyids):
-            raise "you need to ask at least for one"
+            raise Exception, "you need to ask at least for one"
         message = messages.FetchMintKeys()
-        message.denominations = [str(d) for d in denominations]
+        denominations = [str(d) for d in denominations]
+        message.denominations = denominations
         message.keyids = keyids
         self.feedback('Talking to issuer: fetching mintkeys')
         response = transport(message)
+        
         if response.header == 'MINTING_KEY_FAILURE':
             raise message
-        else:
-            return  response.keys
+        
+        if not isinstance(response,messages.GiveMintKeys):
+            raise Exception, 'Not a valid message'
+        
+        if set(denominations).difference(set([key.denomination for key in response.keys])):
+            raise Exception, 'Not all denominations met'
+
+        for key in response.keys:
+            if not cdd.masterPubKey.verifyContainerSignature(key):
+                raise Exception, 'Could not verify key'
+        return  response.keys
+            
        
 
     def requestTransfer(self,transport,transactionId,target=None,blinds=None,coins=None):
@@ -118,7 +134,7 @@ class Wallet(Entity):
             return True
 
 
-    def listenSpend(self,message,transport=None):
+    def listenSpend(self,transport,message):
         tid = message.transactionId
         amount = sum([int(m.denomination) for m in message.coins])
         #check transactionid
@@ -173,12 +189,12 @@ class Wallet(Entity):
         return coinsplitting.tokenizer([int(d) for d in denominations],amount)                   
 
     def pickForSpending(self,amount,coins):
-        tmp = [(c.denomination,c) for c in coins]
+        tmp = [(int(c.denomination),c) for c in coins]
         tmp.sort()
         tmp.reverse()
-        coins = [t[1] for t in tmp]
+        mycoins = [t[1] for t in tmp]
         picked = []
-        for coin in coins:
+        for coin in mycoins:
             sumpicked = sum([int(c.denomination) for c in picked])
             if sumpicked < amount:
                 if int(coin.denomination) <= (amount - sumpicked):
@@ -219,11 +235,11 @@ class Wallet(Entity):
 
     def prepareBlanks(self,transport,cdd,values):        
         wanted = list(set(values)) #what mkcs do we want
-        keys = self.fetchMintKeys(transport,denominations=wanted)
+        keys = self.fetchMintKeys(transport,cdd,denominations=wanted)
         mkcs = {}
         for mkc in keys:
             if not cdd.masterPubKey.verifyContainerSignature(mkc):
-                raise 'Invalid signature on mkc'
+                raise Exception, 'Could not verify mkc'
             mkcs[mkc.denomination] = mkc
         
         secrets = []
