@@ -386,7 +386,7 @@ class WalletClient:
         self.wallet.getApproval = self.getApproval 
         bt.send(self.wallet.listenSum(bt.receive()))
         self.feedback(u'Receive coins: receiving...')
-        bt.send(self.wallet.listenSpend(bt.receive(),transport))
+        bt.send(self.wallet.listenSpend(transport,bt.receive()))
         import e32
         e32.ao_sleep(1)    
 
@@ -554,6 +554,8 @@ from oc2 import storage as oc2storage
 
 #Try to use a password on the data file. Repeat till its sucessfully loaded
 password = ''
+wbpath = storagepath+'wallet.bin'
+
 while 0: #don't use the password protected storage, too slow atm.
     password = appuifw.query(u'password','text')
 
@@ -562,7 +564,7 @@ while 0: #don't use the password protected storage, too slow atm.
     startup('data...')
     storage = oc2storage.CryptedStorage()
     storage.setPassword(password)
-    storage.setFilename(storagepath+'wallet.bin')
+    storage.setFilename(wbpath)
     try:
         storage.restore()
         break
@@ -570,12 +572,13 @@ while 0: #don't use the password protected storage, too slow atm.
         appuifw.note(u'wrong password','error')
         pass
 storage = oc2storage.Storage()
-storage.setFilename(storagepath+'wallet.bin')
-tmp = open(storagepath+'wallet.bin')
-tmpcontent = tmp.read()
-tmp.close()
-if tmpcontent.startswith('salt'):
-    os.remove(storagepath+'wallet.bin')
+storage.setFilename(wbpath)
+if os.path.exists(wbpath):
+    tmp = open(wbpath)
+    tmpcontent = tmp.read()
+    tmp.close()
+    if tmpcontent.startswith('salt'):
+        os.remove(wbpath)
 storage.restore()    
 
 
