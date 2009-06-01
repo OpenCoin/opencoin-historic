@@ -1,16 +1,11 @@
 """RSA module
 
-!!! This is just a playground, for understanding some bits and pieces,
-this is not at all serious crypto production code!!!
+This is a module based on the works by Sybren Stuvel, Marloes de Boer and Ivo Tamboer,
+tlslite, helped by Nils Toedtmann, done wrong by Joerg Baach ;-)
 
+This file still needs serious audit before you can trust it for anything productive
 
-
-Module for calculating large primes, and RSA encryption, decryption,
-signing and verification. Includes generating public and private keys.
 """
-
-__author__ = "Sybren Stuvel, Marloes de Boer and Ivo Tamboer"
-__date__ = "2004-11-17"
 
 # NOTE: Python's modulo can return negative numbers. We compensate for
 # this behaviour using the abs() function
@@ -19,13 +14,26 @@ import math
 import sys
 import random    # For picking semi-random numbers
 import types
+from hashlib import sha256
 
 # Get os.urandom PRNG
 import os
 def getRandomBytes(howMany):
-    bits = howMany * 8
+    factor = 8 * 8 #bytesize time security factor
+    bits = howMany * factor
+    if bits % factor:
+        bits = bits+(16-(bits % factor))
     number = random.getrandbits(bits)
-    return numberToBytes(number)
+    bytes =  numberToBytes(number)
+    out = ''
+
+    #Assuming we haven't used a good source of randomness, but the
+    #Mersenne twister, we hash a bit to make it secure
+    while bytes:        
+        out += sha256(bytes[:factor]).digest()
+        bytes = bytes[factor:]
+    return stringToBytes(out[:howMany])
+        
   
 
 def log(x, base = 10):

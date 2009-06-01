@@ -244,6 +244,7 @@ class Wallet(Entity):
         
         secrets = []
         data = []
+        self.feedback('Talking to issuer: preparing blanks')
         for denomination in values:
             mkc = mkcs[str(denomination)]
             blank = self._makeBlank(cdd,mkc)
@@ -270,7 +271,9 @@ class Wallet(Entity):
 
     def getAllCoins(self,currencyId):
         currency = self.getCurrency(currencyId)
-        return currency['coins']
+        tmp = [(int(c.denomination),c) for c in currency['coins']]
+        tmp.sort()
+        return [t[1] for t in tmp]
 
 
 

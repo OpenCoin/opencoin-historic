@@ -17,11 +17,11 @@ class WalletClient:
         self.wallet.getApproval = self.getApproval
         self.wallet.feedback = self.feedback
         self.displayWalletMenu()        
-        self.actions=[(u'Send',u'Send coins to someone',icons['right'],self.spendCoins),
-                      (u'Receive',u'Receive coins',icons['left'],self.receiveCoins),
-                      (u'Freshen up',u'Freshen up the coins',icons['refresh'],self.freshenUp),
-                      (u'Mint',u'new coins from issuer',icons['down'],self.mintCoins),
-                      (u'Redeem',u'redeem from issuer',icons['up'],self.redeemCoins),
+        self.actions=[(u'Pay',u'Send coins',icons['right'],self.spendCoins),
+                      (u'Receive',u'receive coins',icons['left'],self.receiveCoins),
+                      (u'Get change',u'Optimize change',icons['refresh'],self.freshenUp),
+                      (u'Widthdraw',u'Get from issuer',icons['down'],self.mintCoins),
+                      (u'Exchange',u'Send coins back ',icons['up'],self.redeemCoins),
                       (u'Details',u'See what coins you hold',icons['coins'],self.inspectCurrency),]
 
         
@@ -446,13 +446,13 @@ class WalletClient:
             import sys
             import socket
             if sys.platform == 'symbian_s60':
-                self.feedback(u'Preparing internet access:searching access points')
+                self.feedback(u'Prepare internet:search access')
                 aps = [ap['name'] for ap in socket.access_points()]
                 aps.sort()
-                apid = appuifw.popup_menu(aps,u'select access point')
+                apid = appuifw.popup_menu(aps,u'select access')
                 if apid == None:
                     return None
-                self.feedback(u'Preparing internet access:setting access point')
+                self.feedback(u'Prepare interne:set access')
 
                 socket.set_default_access_point(aps[apid])
            
