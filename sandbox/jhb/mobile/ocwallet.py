@@ -1,4 +1,4 @@
-import appuifw,e32,os,sys
+import appuifw,e32,os,sys,time
 
 def error_catched(f):
     def error_handled(*args,**kwargs):
@@ -48,16 +48,38 @@ class WalletClient:
             self.wallet_menu.bind(EKeyRightArrow,self.displayActionMenu)
 
     def feedback(self,text,cb=None):
+        self.setOptions(True)
         status(unicode(text),callback=cb)
         
+    def setOptions(self,clear=False):
+        menu = []
+        if clear:
+            appuifw.app.menu=[(u'Please wait...',lambda:None)]
+            return
+        if appuifw.app.body !=  self.wallet_menu:
+            menu.append((u'Main menu',self.displayWalletMenu))
+        hascurrencies = self.wallet.listCurrencies()
+        if hascurrencies:
+            menu.extend([(u'Pay',self.spendCoins),
+                      (u'Receive',self.receiveCoins),
+                      (u'Get change',self.freshenUp),
+                      (u'Widthdraw',self.mintCoins),
+                      (u'Exchange back',self.redeemCoins)])
+            if not hasattr(self,'currency_menu') or appuifw.app.body != self.currency_menu:
+                menu.append((u'Inspect currency',self.inspectCurrency))
+            menu.append((u'--------',lambda:None))
+        menu.append((u'add currency',self.addCurrency))
+        if hascurrencies:
+            menu.append((u'delete currency',self.delCurrency))
+        menu.append((u'new password',self.newPassword))            
+        appuifw.app.menu = menu 
 
+        
     def displayWalletMenu(self):
         self.makeWalletMenu()
         appuifw.app.body =  self.wallet_menu
         appuifw.app.title = u'opencoin wallet\nall currencies'
-        appuifw.app.menu = [(u'add currency',self.addCurrency),
-                            (u'delete currency',self.delCurrency),
-                            (u'new password',self.newPassword),]
+        self.setOptions()
 
     def displayActionMenu(self):
 
@@ -68,6 +90,7 @@ class WalletClient:
         appuifw.app.body = self.action_menu
         cdd,amount = self.getCurrentCurrency()
         appuifw.app.title = u'%ss\nactions' % cdd.currencyId
+        self.setOptions()
         #print 'displayActionMenu'
 
     def selectAction(self):
@@ -119,7 +142,8 @@ class WalletClient:
         self.currency_menu.bind(EKeyLeftArrow,self.displayActionMenu)
         appuifw.app.body = self.currency_menu
         appuifw.app.title = u'%ss\ncoin list' % id
- 
+        self.setOptions()
+
     def inspectCoin(self):
         cdd,amount = self.getCurrentCurrency()
         id = cdd.currencyId
@@ -135,6 +159,7 @@ class WalletClient:
         self.coin_menu.bind(EKeyLeftArrow,self.inspectCurrency)
         appuifw.app.body = self.coin_menu
         appuifw.app.title = u'%ss\ncoin details' % id
+        self.setOptions()
  
     def addCurrency(self):
         url = appuifw.query(u'url','text',u'http://baach.de:9090')
@@ -446,13 +471,17 @@ class WalletClient:
             import sys
             import socket
             if sys.platform == 'symbian_s60':
-                self.feedback(u'Prepare internet:search access')
+                self.feedback(u'Prepare internet:please wait...')
                 aps = [ap['name'] for ap in socket.access_points()]
                 aps.sort()
-                apid = appuifw.popup_menu(aps,u'select access')
+                time_taken=0
+                while time_taken < 1:
+                    started = time.time()
+                    apid = appuifw.popup_menu(aps,u'select access point')
+                    time_taken = time.time() - started
                 if apid == None:
                     return None
-                self.feedback(u'Prepare interne:set access')
+                self.feedback(u'Prepare internet:set access point')
 
                 socket.set_default_access_point(aps[apid])
            
@@ -614,5 +643,4 @@ storage.save()
 status('Shut down:exit',icons['save'])
 
 #give a bit of time to read the last message
-import time
 time.sleep(1)
