@@ -477,7 +477,7 @@ class WalletClient:
                 time_taken=0
                 while time_taken < 1:
                     started = time.time()
-                    apid = appuifw.popup_menu(aps,u'select access point')
+                    apid = appuifw.selection_list(aps,1)
                     time_taken = time.time() - started
                 if apid == None:
                     return None
