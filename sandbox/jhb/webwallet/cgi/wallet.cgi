@@ -1,7 +1,7 @@
 #!/usr/bin/python2.5
 
 libdir = '/home/joerg/opencoin'
-datadir = '/home/joerg/opencoin/webwallet'
+datadir = '/home/joerg/opencoin/webwallet/data'
 
 ##################################
 
@@ -13,7 +13,9 @@ import oc2
 from oc2 import storage as oc2storage
 from oc2 import wallet, transports
 
-
+#for key,value in os.environ.items():
+#    print '%s: %s<br>\n' % (key,value)
+#print str(username)    
 
 class CGIWallet:
 
@@ -32,7 +34,8 @@ class CGIWallet:
         print """Content-type:%s""" % self.mimetype
         print "\r"
         if self.mimetype == 'text/html':
-            print '<html><body><small>%s</small>' % (baseserver+baseurl)
+            print '<html><body>'
+            #print '<small><a href="%s?action=logout">Logout</a></small>' % (baseurl)
             print '<br/>\n'.join(self.output)
             print '</body></html>'
         else:
@@ -46,7 +49,6 @@ class CGIWallet:
 
     def dispatchRequest(self):
         self.env = os.environ
-        self.form = cgi.FieldStorage(keep_blank_values=1)
         self.action = action = self.form.getfirst('action','')
         self.method = method = self.env['REQUEST_METHOD'].lower()
        
@@ -54,7 +56,8 @@ class CGIWallet:
                            mint = self.mintCoins,
                            redeem = self.redeemCoins,
                            delcurrency = self.delCurrency,
-                           spend = self.spendCoins)
+                           spend = self.spendCoins,
+                           login = self.displayMain)
 
         getmapping = dict(addcurrency = self.displayAddCurrency,
                           mint = self.displayMint,
@@ -275,12 +278,79 @@ class CGIWallet:
         self.mimetype='text/plain'
         self.out(answer.toString(True))
 
-baseserver = "http://%s:%s" % (os.environ['SERVER_NAME'],os.environ['SERVER_PORT'])
-baseurl = os.environ['SCRIPT_NAME']
+form = cgi.FieldStorage(keep_blank_values=1)
 
+baseserver = "http://%s:%s" % (os.environ['SERVER_NAME'],os.environ['SERVER_PORT'])
+username = os.environ.get('PATH_INFO','')
+baseurl = os.environ['SCRIPT_NAME']+username
+
+def die(string):
+    print 'Content-type:text/plain\r\n'
+    print string
+    sys.exit(0)
+
+if  username == '/' or not username:
+    die('username required, no direct access allowed. Try %s%s/YOURNAME' % (baseserver,baseurl))
+username = username[1:]    
+if username.startswith('.') or '/' in username:
+    die('hacking in, ey')
+
+if 0:
+    password = None
+
+    if form.has_key('password'):    
+        password = form.getfirst('password')
+        print "Set-Cookie:%s=%s" % (username,password)
+    elif form.getfirst('action','') == 'logout':
+        print "Set-Cookie:%s=%s" % (username,'')
+    elif os.environ.has_key('HTTP_COOKIE'):
+        for cookie in [c.strip() for c in os.environ['HTTP_COOKIE'].split(';')]:
+            if not cookie:
+                continue
+            (key, value ) = cookie.split('=');
+            if key == username:
+                password = value
+
+
+    filepath = datadir+'/%s.bin' % username
+    storage = oc2storage.CryptedStorage()
+    storage.setPassword(password)
+    storage.setFilename(filepath)
+    message = ''
+    if password and not os.path.exists(filepath):
+        storage.save()
+    elif form.getfirst('action','') not in ['logout','']:
+        try:
+            storage.restore()
+            storage.save()
+        except:   
+            print "Set-Cookie:%s=%s" % (username,'')
+            password = None
+            message = 'Wrong password<br>'
+
+    if not password:
+        print """Content-type:text/html
+
+        <html><body>
+        <form action='%s' method='post'>
+        %s
+        Enter your password: <input type='password' name='password'> <input type='submit'>
+        <input type='hidden' name='action' value='login' />
+        </form>
+        </body></html>
+        """ % (baseurl,message)
+        sys.exit(0)
+filepath = datadir+'/%s.bin' % username
 storage = oc2storage.Storage()
-storage.setFilename(datadir+'/wallet.bin')
+storage.setFilename(filepath)
 storage.restore()
 w = CGIWallet(storage)
+w.form = form
 w.dispatchRequest()
 w.printout()
+
+
+
+#for key,value in os.environ.items():
+#    print '%s: %s<br>\n' % (key,value)
+#print str(username)    
