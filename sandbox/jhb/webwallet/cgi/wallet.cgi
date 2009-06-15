@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2.5
 
 libdir = '/home/joerg/opencoin'
 datadir = '/home/joerg/opencoin/webwallet'
