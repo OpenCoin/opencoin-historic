@@ -91,9 +91,9 @@ class CGIWallet:
             entry = """
             <p><b>%(amount)s</b> %(cid)ss<br/>
                 <a href='%(baseurl)s?action=spend&currencyId=%(cid)s'>Pay</a>
-                <a href='%(baseurl)s?action=freshenup&currencyId=%(cid)s'>Refresh</a>
+                <a href='%(baseurl)s?action=freshenup&currencyId=%(cid)s'>Get change</a>
                 <a href='%(baseurl)s?action=mint&currencyId=%(cid)s'>Withdraw</a>
-                <a href='%(baseurl)s?action=redeem&currencyId=%(cid)s'>Redeem</a>
+                <a href='%(baseurl)s?action=redeem&currencyId=%(cid)s'>Exchange back</a>
                 <a href='%(baseurl)s?action=delcurrency&currencyId=%(cid)s'>Remove</a>
             </p>
             """ % dict(amount=amount,
