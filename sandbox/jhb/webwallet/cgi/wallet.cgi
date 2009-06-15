@@ -32,7 +32,9 @@ class CGIWallet:
         print """Content-type:%s""" % self.mimetype
         print "\r"
         if self.mimetype == 'text/html':
+            print '<html><body><small>%s</small>' % (baseserver+baseurl)
             print '<br/>\n'.join(self.output)
+            print '</body></html>'
         else:
             print '\n'.join(self.output)
 
@@ -85,11 +87,13 @@ class CGIWallet:
         for cdd,amount in currencies:
             entry = """
             <p>%(amount)s <b href='%(isl)s'>%(cid)ss</b><br/>
+                <small>
                 <a href='%(baseurl)s?action=spend&currencyId=%(cid)s'>Pay</a>
                 <a href='%(baseurl)s?action=freshenup&currencyId=%(cid)s'>Refresh</a>
                 <a href='%(baseurl)s?action=mint&currencyId=%(cid)s'>Withdraw</a>
                 <a href='%(baseurl)s?action=redeem&currencyId=%(cid)s'>Redeem</a>
                 <a href='%(baseurl)s?action=delcurrency&currencyId=%(cid)s'>Remove</a>
+                </small>
             </p>
             """ % dict(amount=amount,
                        isl=cdd.issuerServiceLocation,
@@ -98,12 +102,10 @@ class CGIWallet:
             items.append(entry)
         items = '\n'.join(items)
         html = """
-        <html><body>
         <h2>Wallet content</h2>
         %s
         ----<br/>
-        <a href='%s?action=addcurrency'>Add a currency</a>
-        </body></html>
+        <small><a href='%s?action=addcurrency'>Add a currency</a></small>
         """ % (items,baseurl)
         self.out(html)
 
@@ -120,7 +122,6 @@ class CGIWallet:
 
     def displayAddCurrency(self):
         html="""
-        <html><body>
         <h2>Add a currency</h2>
         <form action='%s' method='post'>
             The url of the issuer:<br>
@@ -128,7 +129,6 @@ class CGIWallet:
             <input type='submit' />
             <input type='hidden' name='action' value='addcurrency'/>
         </form>
-        </body></html>
         """ % baseurl
         self.out(html)
 
@@ -140,7 +140,6 @@ class CGIWallet:
         currencyId = self.form.getfirst('currencyId','')
         cdd,amount = self.getCurrency(currencyId)
         html="""
-        <html><body>
         <h2>Remove  %s</h2>
         <form action='%s' method='post'>
             <p>Really really delete %s with %s coins - there is no way to recover</p>
@@ -152,7 +151,6 @@ class CGIWallet:
             <input type='hidden' name='action' value='delcurrency'/>
             <input type='hidden' name='currencyId' value='%s'/>
         </form>
-        </body></html>
         """ % (currencyId,baseurl,currencyId,amount,currencyId,baseurl,currencyId)
         self.out(html)
 
@@ -178,7 +176,6 @@ class CGIWallet:
     def displayMint(self):
         currencyId = self.form.getfirst('currencyId','coin')
         html="""
-        <html><body>
         <h2>Get new coins</h2>
         <form action='%s' method='post'>
             How many <b>%ss</b><br>
@@ -189,8 +186,6 @@ class CGIWallet:
             <input type='hidden' name='action' value='mint'/>
             <input type='hidden' name='currencyId' value='%s'/>
         </form>
-        </body></html>
-
         """ % (baseurl,currencyId,currencyId)
         self.out(html)
 
@@ -209,7 +204,6 @@ class CGIWallet:
     def displayRedeem(self):
         currencyId = self.form.getfirst('currencyId','coin')
         html="""
-        <html><body>
         <h2>Redeem coins</h2>
         <form action='%s' method='post'>
             How many <b>%ss</b><br>
@@ -220,7 +214,6 @@ class CGIWallet:
             <input type='hidden' name='action' value='redeem'/>
             <input type='hidden' name='currencyId' value='%s'/>
         </form>
-        </body></html>
 
         """ % (baseurl,currencyId,currencyId)
         self.out(html)
@@ -231,7 +224,8 @@ class CGIWallet:
         amount = int(self.form.getfirst('amount',1))
         reference = self.form.getfirst('reference')
         url = self.form.getfirst('url')
-        url = 'http://%s' % url
+        if not url.startswith('http://'):
+            url = 'http://%s' % url
         cid = self.form.getfirst('currencyId')
         transport = transports.HTTPTransport(url)
         self.wallet.spendCoins(transport,cid,amount,reference)
@@ -242,11 +236,10 @@ class CGIWallet:
     def displaySpend(self):
         currencyId = self.form.getfirst('currencyId','coin')
         html="""
-        <html><body>
         <h2>Pay someone</h2>
         <form action='%s' method='post'>
             Recipient<br/>
-            <input type='text' name='url' value='192.168.1.66:9091' /><br>
+            <input type='text' name='url' value='http://192.168.1.66:9091' /><br>
             How many <b>%ss</b><br>
             <input type='number' name='amount' value='1' /><br>
             Optional message<br>
@@ -256,8 +249,6 @@ class CGIWallet:
             <input type='hidden' name='action' value='spend'/>
             <input type='hidden' name='currencyId' value='%s'/>
         </form>
-        </body></html>
-
         """ % (baseurl,currencyId,currencyId)
         self.out(html)
 
