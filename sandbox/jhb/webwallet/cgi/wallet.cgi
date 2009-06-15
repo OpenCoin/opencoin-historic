@@ -231,7 +231,7 @@ class CGIWallet:
         amount = int(self.form.getfirst('amount',1))
         reference = self.form.getfirst('reference')
         url = self.form.getfirst('url')
-        url = 'http://%s:9091' % url
+        url = 'http://%s' % url
         cid = self.form.getfirst('currencyId')
         transport = transports.HTTPTransport(url)
         self.wallet.spendCoins(transport,cid,amount,reference)
@@ -246,7 +246,7 @@ class CGIWallet:
         <h2>Pay someone</h2>
         <form action='%s' method='post'>
             Recipient<br/>
-            <input type='text' name='url' value='192.168.1.66' /><br>
+            <input type='text' name='url' value='192.168.1.66:9091' /><br>
             How many <b>%ss</b><br>
             <input type='number' name='amount' value='1' /><br>
             Optional message<br>
