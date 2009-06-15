@@ -86,14 +86,12 @@ class CGIWallet:
         items = []
         for cdd,amount in currencies:
             entry = """
-            <p>%(amount)s <b href='%(isl)s'>%(cid)ss</b><br/>
-                <small>
+            <p><b>%(amount)s</b> %(cid)ss<br/>
                 <a href='%(baseurl)s?action=spend&currencyId=%(cid)s'>Pay</a>
                 <a href='%(baseurl)s?action=freshenup&currencyId=%(cid)s'>Refresh</a>
                 <a href='%(baseurl)s?action=mint&currencyId=%(cid)s'>Withdraw</a>
                 <a href='%(baseurl)s?action=redeem&currencyId=%(cid)s'>Redeem</a>
                 <a href='%(baseurl)s?action=delcurrency&currencyId=%(cid)s'>Remove</a>
-                </small>
             </p>
             """ % dict(amount=amount,
                        isl=cdd.issuerServiceLocation,
@@ -105,7 +103,7 @@ class CGIWallet:
         <h2>Wallet content</h2>
         %s
         ----<br/>
-        <small><a href='%s?action=addcurrency'>Add a currency</a></small>
+        <a href='%s?action=addcurrency'>Add a currency</a>
         """ % (items,baseurl)
         self.out(html)
 
