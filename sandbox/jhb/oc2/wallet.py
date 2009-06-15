@@ -3,6 +3,7 @@ from container import *
 import occrypto
 import messages
 import coinsplitting
+import sys
 
 class Wallet(Entity):
 
@@ -29,9 +30,15 @@ class Wallet(Entity):
 
     def addIncoming(self,message):
         self.storage.setdefault('incoming',{})[message.transactionId] = message
-        
+        #sys.stderr.write(str(self.storage.filename))
+
     def getIncoming(self,tid):
-        return self.storage.setdefault('incoming',{}).get(tid,None)
+        #sys.stderr.write(str(tid)) 
+        #sys.stderr.write(str(self.storage.filename)) 
+        transaction = self.storage.setdefault('incoming',{}).get(tid,None)
+        if transaction != None:
+            del(self.storage['incoming'][tid])
+        return transaction            
 
         
 
@@ -179,7 +186,8 @@ class Wallet(Entity):
                 amount = sum([int(coin.denomination) for coin in currency['coins']])
                 out.append((cdd,amount))
             except:
-                del(self.storage[key])
+                #del(self.storage[key]) XXX why was that?
+                pass
         return out            
 
     def deleteCurrency(self,id):
@@ -332,7 +340,7 @@ class Wallet(Entity):
         tid = self.makeSerial()
         
         self.feedback(u'Spending coins: wating for confirmation')
-        self.announceSum(transport,tid,amount,target)
+        response = self.announceSum(transport,tid,amount,target)
         self.feedback(u'Spending coins: wating for other side')
         response = self.requestSpend(transport,tid,picked)
         if response == True: 

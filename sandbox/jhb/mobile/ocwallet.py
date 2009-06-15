@@ -433,11 +433,11 @@ class WalletClient:
 
 
         if method == 1:
-            url = appuifw.query(u'address','text',u'192.168.2.105')
+            url = appuifw.query(u'address','text',u'192.168.2.105:%s' % walletport)
             if not url:
                 return                
             else:     
-                url = 'http://%s:%s' % (url,walletport)
+                url = 'http://%s' % (url)
             transport = self.getHTTPTransport(url)
             if not transport:
                 self.displayActionMenu()
