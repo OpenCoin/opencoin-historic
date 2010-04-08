@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<diagram>
+<source><![CDATA[#!>>
+#!* marks functionality that is not happening right now
+#!
+#!<<
+
+alice:Wallet
+bob:Wallet
+service:Service "Issuer Service"
+authorizer:Authorizer "Authorizer"
+mint:Mint "Mint"
+dsdb:DSDB "DSDB"
+bank:Bank "Some Bank"
+
+
+alice: makes up a secret codeword *
+alice:bank.makeMoneyTransfer(secret) *
+bank:secret * =authorizer.moneyArrived(secret,sum) * &
+
+#alice prepares
+alice: \\n \\n
+alice:GiveLatestCDD=service.AskLatestCDD
+alice: \\n \\n
+alice:GiveMintKeys(keycertificates)=service.FetchMintKeys(denomination)
+alice: \\n \\n
+alice: blanks = createBlanks()
+alice: blinds = blindBlanks(blank)
+alice: \\n \\n
+(1)alice:TransferAccept(transactionid,message,signatures)=service.TransferRequest(transactionid,secret,blinds)
+
+#alice requests coins
+*1 alice
+Alice has prearranged a secret with the issuer
+*1
+service:AuthorizedMessage(TransferRequest)=authorizer.authorize(TransferRequest)
+authorizer:checks the secret and the\\nsum of blinds\\nmarks the secret as used
+
+service: \\n \\n
+service:TransferAccept(signatures)=mint.handleRedeemRequest(AuthorizedMessage)
+
+#this is now done internally, and at the moment the weakest bit
+mint: check the AuthorizedMessage signature
+mint: sign the blinds
+
+#alice is done...
+alice: \\n \\n
+alice: coins = unblind(signatures)
+
+#...and now wants to spend with Bob
+alice: \\n \\n
+alice:SumAccept=bob.SumAnnounce(sum(coins))
+alice: \\n \\n
+alice:SpendAccept=bob.SpendRequest(coins)
+bob: checks if coins match\\n anncounced sum
+
+#bob prepares the exchange at the issuer service
+bob:GiveLatestCDD=service.AskLatestCDD
+bob: \\n \\n
+bob:GiveMintKeys(keycertificates)=service.FetchMintKeys(denomination)
+bob: \\n \\n
+bob: blanks = createBlanks()
+bob: blinds = blindBlanks(blank)
+
+#bob transfers
+bob: \\n \\n
+(2)bob:TransferAccept(transactionid,message,signatures)=service.TransferRequest(transactionid,coins,blinds)
+*2 bob
+Bob 'pays' his mint request using the coins
+from Alice
+*2
+#note that this time the coins are used by the autorizer
+service:TransferAccept(signatures)=mint.handleExchangeRequest(TransferRequest)
+mint:checks that the coins\\nare valid and that\\nsum(coins)==sum(blinds)
+mint: \\n \\n
+mint:success=dsdb.addToDSDB(coins)
+mint: \\n \\n
+mint: sign the blinds
+
+
+#bob is happy
+bob: \\n \\n
+bob: coins = unblind(signatures)]]></source>
+<configuration>
+<property name="actorWidth" value="25"/>
+<property name="allowMessageProperties" value="false"/>
+<property name="arrowSize" value="6"/>
+<property name="colorizeThreads" value="true"/>
+<property name="destructorWidth" value="30"/>
+<property family="Dialog" name="font" size="12" style="0"/>
+<property name="fragmentMargin" value="8"/>
+<property name="fragmentPadding" value="10"/>
+<property name="fragmentTextPadding" value="3"/>
+<property name="glue" value="10"/>
+<property name="headHeight" value="35"/>
+<property name="headLabelPadding" value="5"/>
+<property name="headWidth" value="100"/>
+<property name="initialSpace" value="10"/>
+<property name="leftMargin" value="5"/>
+<property name="lineWrap" value="false"/>
+<property name="lowerMargin" value="5"/>
+<property name="mainLifelineWidth" value="8"/>
+<property name="messageLabelSpace" value="3"/>
+<property name="messagePadding" value="6"/>
+<property name="noteMargin" value="6"/>
+<property name="notePadding" value="6"/>
+<property name="opaqueMessageText" value="false"/>
+<property name="returnArrowVisible" value="true"/>
+<property name="rightMargin" value="5"/>
+<property name="selfMessageHorizontalSpace" value="15"/>
+<property name="separatorBottomMargin" value="8"/>
+<property name="separatorTopMargin" value="15"/>
+<property name="shouldShadowParticipants" value="true"/>
+<property name="spaceBeforeActivation" value="2"/>
+<property name="spaceBeforeAnswerToSelf" value="10"/>
+<property name="spaceBeforeConstruction" value="6"/>
+<property name="spaceBeforeSelfMessage" value="7"/>
+<property name="subLifelineWidth" value="6"/>
+<property name="tc0" value="-1118482"/>
+<property name="tc1" value="-256"/>
+<property name="tc2" value="-65536"/>
+<property name="tc3" value="-16776961"/>
+<property name="tc4" value="-16711936"/>
+<property name="tc5" value="-4144960"/>
+<property name="tc6" value="-65281"/>
+<property name="tc7" value="-14336"/>
+<property name="tc8" value="-20561"/>
+<property name="tc9" value="-12566464"/>
+<property name="threadNumbersVisible" value="false"/>
+<property name="threaded" value="true"/>
+<property name="upperMargin" value="5"/>
+<property name="verticallySplit" value="true"/>
+</configuration>
+</diagram>
