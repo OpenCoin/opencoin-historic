@@ -82,16 +82,6 @@ class TransferResume(Message):
         Field('transactionId'),
     ]
 
-class TransferResume(Message):
-     fields = Message.fields + [
-        Field('transactionId'),
-    ]
-
-class TransferResume(Message):
-     fields = Message.fields + [
-        Field('transactionId'),
-    ]
-
 class SumAnnounce(Message):
      fields = Message.fields + [
         Field('transactionId'),

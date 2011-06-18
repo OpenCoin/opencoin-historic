@@ -1,3 +1,5 @@
+"""This file is needed by documentation.py and testissuer.py"""
+
 import BaseHTTPServer, threading
 import issuer, mint, transports, urllib
 
@@ -26,7 +28,11 @@ class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
         self.wfile.write('\r\n')
         self.wfile.write(answer.toString(True))
 
+class TestingHandler(Handler):
+    """Supress output to stderr"""
 
+    def log_message(self, format, *args):
+        pass
 
 def run_once(port,issuer=None,mint=None,authorizer=None):
     import time
@@ -34,7 +40,7 @@ def run_once(port,issuer=None,mint=None,authorizer=None):
     Handler.issuer = issuer
     Handler.mint = mint
     Handler.authorizer = authorizer
-    httpd = BaseHTTPServer.HTTPServer(("", port), Handler)
+    httpd = BaseHTTPServer.HTTPServer(("", port), TestingHandler)
     import threading
     t = threading.Thread(target=httpd.handle_request)     
     t.start()

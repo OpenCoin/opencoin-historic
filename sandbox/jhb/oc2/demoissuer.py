@@ -1,13 +1,17 @@
+"""run this file to run an issuer. If required, it will setup a currency"""
+
+### minmal config ###
+
+#where can this server be reached?
+baseurl = 'http://192.168.2.101'
+#what port to run on?
+port = 9090
+
+### nothing to config below this ###
+
 import BaseHTTPServer
 import issuer, mint,authorizer,storage
 from testserver import Handler
-
-
-
-
-
-
-port = 9090
 
 issuerstorage = storage.Storage().setFilename('data/issuerstorage.bin').restore()
 mintstorage = storage.Storage().setFilename('data/mintstorage.bin').restore()
@@ -23,7 +27,7 @@ if not issuerstorage.has_key('masterPrivKey'):
 
     print 'issuer: setup currency discription'
     denominations=[1,2,5,10,20,50,100,200,500,1000,2000,5000,10000,20000,50000,100000,200000,500000]
-    cdd = issuer.makeCDD('TestCent','tc',[str(d) for d in denominations],'http://192.168.2.101:%s/' % port,'')
+    cdd = issuer.makeCDD('TestCent','tc',[str(d) for d in denominations],'%s:%s/' % (baseurl,port),'')
     mint.setCDD(cdd)
     
     print 'mint: setting up mintkeys'

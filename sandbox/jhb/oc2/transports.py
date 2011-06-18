@@ -1,4 +1,27 @@
-import messages,  simplejson
+import messages,  simplejson, urllib, sys
+from pprint import pformat
+
+
+printmessages = 0
+
+def printMessage(message):
+    sys.stderr.write('\n')
+    sys.stderr.write('-'*30)
+    sys.stderr.write('\n\n')
+    sys.stderr.write(pformat(message.getData(1))+'\n')
+
+def printSection(header):
+    if printmessages:
+        out = """
+
+####################################################################
+   %s
+####################################################################
+        
+        """ % header
+
+        sys.stderr.write(out)
+
 
 def createMessage(data):
     data = dict(simplejson.loads(str(data)))
@@ -18,11 +41,30 @@ class HTTPTransport(object):
         self.url = url
      
     def __call__(self,message):
-        import  urllib
+        
+        if printmessages:
+            printMessage(message)
+        
         response = urllib.urlopen(self.url,message.toString(True))
-        return createMessage(response.read())
+        reply =  createMessage(response.read())
+        
+        if printmessages:
+            printMessage(reply)        
+        
+        return reply
 
-import sys
+class TestingHTTPTransport(object):
+    
+    def __init__(self,port,**kwargs):
+        self.port = port
+        self.kwargs = kwargs
+
+    def __call__(self,message):
+        import testutils
+        testutils.run_once(self.port,**self.kwargs)
+        transport = HTTPTransport('http://localhost:%s/' % self.port)
+        return transport(message)
+
 
 class BTTransport(object):
 
@@ -47,7 +89,27 @@ class BTTransport(object):
         received = line[:-self.lenstop]
         return createMessage(received)
 
+
+class DirectTransport(object):
+
+    def __init__(self,target,transport2=None):
+        self.target = target
+        self.transport2 = transport2
+
+    def __call__(self,message):
     
+        if printmessages:
+            printMessage(message)
+        
+        if self.transport2:
+            response = self.target(message,self.transport2)
+        else:            
+            response = self.target(message)
+        
+        if printmessages:
+            printMessage(response)
+        
+        return response
 
 class YieldTransport(object):
 
@@ -69,12 +131,13 @@ class TestTransport(object):
     def __init__(self, *args):
         self.results = list(args)
         self.debug = 0
+
     def __call__(self,message):
         if self.debug:
             import pdb; pdb.set_trace()
         result = self.results.pop(0)
         
-        if type(result) == type([]) or type(result) == type(()):
+        if type(result) == list or type(result) == tuple:
             method = result[0]
             args = list(result[1:])
             args.append(message)

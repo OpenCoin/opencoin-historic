@@ -150,18 +150,24 @@ class Wallet(Entity):
             answer = messages.SpendReject()
             answer.reason = 'unknown transactionId'
             return answer
+
         #check sum
         if amount != int(orig.amount):
             answer = messages.SpendReject()
             answer.reason = 'amount of coins does not match announced one. Announced: %s, got %s' % (orig.amount, amount)
             return answer
+
         #do exchange
         if transport:
             cdd = self.askLatestCDD(transport)
             currency = self.getCurrency(cdd.currencyId)
             newcoins = message.coins 
-            self.freshenUp(transport,cdd,newcoins)
-
+            answer = self.freshenUp(transport,cdd,newcoins)
+            if answer.header != 'TransferAccept':
+                answer = messages.SpendReject()
+                answer.reason = 'did not go through'
+                return answer
+        
         answer = messages.SpendAccept()
         answer.transactionId = tid
         return answer
@@ -304,11 +310,16 @@ class Wallet(Entity):
         if secrets:
             tid = self.makeSerial()
             response = self.requestTransfer(transport,tid,None,data,paycoins+newcoins)
+            if response.header != 'TransferAccept':
+                return response
             coins = currency['coins']
             for coin in paycoins:
                 coins.pop(coins.index(coin))
             coins.extend(self.unblindWithSignatures(secrets,response.signatures)) 
             self.storage.save()
+            return response 
+        else:
+            return messages.Error()
 
     def prepare4exchange(self,transport,cdd,oldcoins,newcoins):
         oldcoins = [c for c in oldcoins]

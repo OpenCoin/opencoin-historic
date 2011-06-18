@@ -1,1 +1,18 @@
-(c) 2009 Joerg Baach, License: GPL V3
+(c) 2009 Joerg Baach, License: GPL
+
+Please check out svn.opencoin.org/svn/opencoin/trunk/sandbox/jhb/simplejson
+either into this directory or symlink it into this directory (oc2). 
+
+Most documentation is in documentation.py, but also have a look into docs.
+
+IMPORTANT: the whole crypto implementation was done to have a pure python
+version suitable for Nokia phones. Its only purpose is to demo the feasibiltiy
+
+                      !!! DON'T USE FOR PRODUCTION !!!
+
+
+                      
+
+
+
+
