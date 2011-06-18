@@ -56,7 +56,7 @@ True
 Wallet: fetches current public minting keys for denomination
 
 >>> testserver.run_once(port,issuer)
->>> mkcs = wallet.fetchMintKeys(transport,denominations=['1','5'])
+>>> mkcs = wallet.fetchMintKeys(transport,cdd,denominations=['1','5'])
 >>> mkcs[0].toString() == issuer.getCurrentMKCs()['1'].toString()
 True
 
@@ -165,9 +165,8 @@ a sum, and bob dedices if he wants to accept it
 "I don't like odd sums"
 
 >>> bob.approval = True
->>> wallet.announceSum(bob.listenSum, alicetid, 5, 'foobar') 
+>>> alice.announceSum(bob.listenSum, alicetid, 5, 'foobar') 
 True
-
 
 
 Wallet Alice sends tokens to Wallet Bob (this time including their clear 
@@ -182,11 +181,16 @@ SpendReject: unknown transactionId
 
 Or lets try to send a wrong amount
 
+>>> alice.announceSum(bob.listenSum, alicetid, 5, 'foobar')
+True
 >>> alice.requestSpend(bob.listenSpend,alicetid,[])
 Traceback (most recent call last):
     ....
 SpendReject: amount of coins does not match announced one. Announced: 5, got 0
 
+
+>>> alice.announceSum(bob.listenSum, alicetid, 5, 'foobar')
+True
 >>> alice.requestSpend(bob.listenSpend, alicetid, [coin]) 
 True
 

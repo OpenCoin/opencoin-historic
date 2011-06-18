@@ -141,7 +141,7 @@ class Wallet(Entity):
             return True
 
 
-    def listenSpend(self,transport,message):
+    def listenSpend(self,message,transport=None):
         tid = message.transactionId
         amount = sum([int(m.denomination) for m in message.coins])
         #check transactionid
