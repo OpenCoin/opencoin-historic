@@ -633,7 +633,7 @@ startup('oc wallet')
 from oc2 import wallet
 startup('transports')
 from oc2 import transports
-transports.printmessages = 1
+transports.printmessages = 0
 startup('media')
 coinsound = audio.Sound.open(mediapath+u'coinsound.wav')
 startup('done')
