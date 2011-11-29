@@ -273,7 +273,7 @@ class CGIWallet:
         if message.header == 'SpendRequest':
             cdd,wehave = self.getCurrency(message.coins[0].currencyId)
             transport = transports.HTTPTransport(cdd.issuerServiceLocation)
-            answer = self.wallet.listenSpend(transport,message)
+            answer = self.wallet.listenSpend(transport=transport,message=message)
         self.storage.save()
         self.mimetype='text/plain'
         self.out(answer.toString(True))

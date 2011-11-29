@@ -3,7 +3,7 @@
 ### minmal config ###
 
 #where can this server be reached?
-baseurl = 'http://192.168.2.101'
+baseurl = 'http://localhost'
 #what port to run on?
 port = 9090
 
@@ -11,7 +11,7 @@ port = 9090
 
 import BaseHTTPServer
 import issuer, mint,authorizer,storage
-from testserver import Handler
+from testutils import Handler
 
 issuerstorage = storage.Storage().setFilename('data/issuerstorage.bin').restore()
 mintstorage = storage.Storage().setFilename('data/mintstorage.bin').restore()

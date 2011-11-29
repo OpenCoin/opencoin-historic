@@ -277,7 +277,7 @@ class WalletClient:
 
             def server_bind(self):
                 BaseHTTPServer.HTTPServer.server_bind(self)
-                self.socket.settimeout(0.5)
+                self.socket.settimeout(60)
                 self.run = True
 
             def get_request(self):
@@ -313,7 +313,7 @@ class WalletClient:
                 if message.header == 'SumAnnounce':
                     answer = self.wallet.listenSum(message)
                 if message.header == 'SpendRequest':
-                    answer = self.wallet.listenSpend(transport,message)
+                    answer = self.wallet.listenSpend(message=message,transport=transport)
                 self.send_response(200)
                 self.send_header("Content-type", "text/plain")
                 self.wfile.write('\r\n')
@@ -540,9 +540,13 @@ def startup(text):
 
 
 ############################### main code ############################        
+import sys
 
 #what port do we listen on?
-walletport = 9091
+if len(sys.argv) > 1:
+    walletport = int(sys.argv[1])
+else:    
+    walletport = 9091
 
 #setting up the environment
 app_lock = e32.Ao_lock()
@@ -552,7 +556,6 @@ appuifw.app.screen='normal'
 appuifw.app.exit_key_handler = app_lock.signal
 
 import oc2
-import sys
 
 #finding out where we are, in order to get the icons
 oc2path = oc2.__file__
@@ -567,8 +570,11 @@ if sys.platform == 'symbian_s60':
     storagepath=u'e:\\'
 else:
     mediapath = u''
-    storagepath=u''
-        
+    print sys.argv
+    if len(sys.argv)>2:
+        storagepath=unicode(sys.argv[2])
+    else:        
+        storagepath=u''
 #only for documenting it
 #from graphics import *
 #filmIt()
@@ -627,6 +633,7 @@ startup('oc wallet')
 from oc2 import wallet
 startup('transports')
 from oc2 import transports
+transports.printmessages = 1
 startup('media')
 coinsound = audio.Sound.open(mediapath+u'coinsound.wav')
 startup('done')

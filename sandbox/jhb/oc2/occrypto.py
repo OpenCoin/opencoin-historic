@@ -16,9 +16,11 @@ class KeyField(Field):
         value = getattr(object,self.name,self.default)
         items = value.items()
         items.sort()
+        #items = [(key,hex(val)) for key,val in items]
         return items
 
     def setdecoded(self,object,data):
+        #data = [(key,int(val,0)) for key,val in data]
         setattr(object,self.name,dict(data))
 
 class PubKey(Container):
