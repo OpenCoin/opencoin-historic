@@ -28,6 +28,11 @@ class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
         self.wfile.write('\r\n')
         self.wfile.write(answer.toString(True))
 
+    #disable dns lookup
+    def address_string(self):
+        return str(self.client_address[0])
+
+
 class TestingHandler(Handler):
     """Supress output to stderr"""
 
