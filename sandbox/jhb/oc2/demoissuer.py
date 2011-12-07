@@ -3,7 +3,7 @@
 ### minmal config ###
 
 #where can this server be reached?
-baseurl = 'http://localhost'
+baseurl = 'http://10.42.43.1'
 #what port to run on?
 port = 9090
 

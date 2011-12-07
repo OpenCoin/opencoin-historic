@@ -9,10 +9,12 @@ class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
     def do_POST(self):
         #print self.server
         if self.path == '/stop':
-            raise 'foobar'
+            raise 'foobar'            
         length = self.headers.get('Content-Length')
         data = self.rfile.read(int(length))
         data = urllib.unquote(data)
+        if not data.startswith('['):
+            return
         message = transports.createMessage(data)
         if message.header == 'AskLatestCDD':
             answer = self.issuer.giveLatestCDD(message)
