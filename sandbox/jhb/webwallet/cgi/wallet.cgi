@@ -240,11 +240,11 @@ class CGIWallet:
         <h2>Pay someone</h2>
         <form action='%s' method='post'>
             Recipient<br/>
-            <input type='text' name='url' value='http://baach.de/cgi-local/wallet.cgi/' /><br>
+            <input type='text' name='url' value='http://baach.de/cgi-local/wallet.cgi/'size='40' /><br>
             How many <b>%ss</b><br>
-            <input type='number' name='amount' value='1' /><br>
+            <input type='number' name='amount' value='1' size='40'/><br>
             Optional message<br>
-            <input type='text' name='reference' value='secret' /><br>
+            <input type='text' name='reference' value='secret' size='40'/><br>
             Please make sure the other side is ready to accept!<br>
             <input type='submit' />
             <input type='hidden' name='action' value='spend'/>
